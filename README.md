@@ -89,9 +89,11 @@ docker/     — init.sql 数据库初始化脚本(可选，启动时自动建表
 
 | 类型 | 支持厂商 |
 |---|---|
-| **文本** | OpenAI(兼容接口)、Gemini |
+| **文本** | OpenAI(兼容接口)、Gemini、火山引擎 |
 | **图片** | OpenAI、Gemini、火山引擎 |
-| **视频** | 火山引擎 Seedance 2.0(标准 / Fast / Mini) |
+| **视频** | 火山引擎 Seedance 2.0(标准 / Fast / Mini)、MiniMax H3(官方视频接口)、AutoDL(ComfyUI MiniMax H3 工作流) |
+
+> 视频厂商的说明：Seedance 走火山官方接口；MiniMax 走官方 `/v2/video_generation` 接口，仅支持 `MiniMax-H3` 系列；AutoDL 走 ComfyUI 工作流协议（兼容影策 `autodl-comfyui` 插件），常用工作流为 `minimax_h3_image_audio_to_video_v2_15s`。后两者使用中文提示词经 H3 Agent 改写后的大模型提示词。
 
 ---
 
@@ -125,9 +127,9 @@ docker/     — init.sql 数据库初始化脚本(可选，启动时自动建表
 ### 📥 安装依赖
 
 ```bash
-# 克隆项目
-git clone https://github.com/chatfire-AI/huobao-drama.git
-cd huobao-drama
+# 克隆本 fork（JisuVideo / 极速视频）
+git clone https://github.com/Aibrother258/JisuVideo-ai.git
+cd JisuVideo-ai
 
 # 安装后端依赖
 cd backend && npm install
@@ -135,6 +137,8 @@ cd backend && npm install
 # 安装前端依赖
 cd ../frontend && npm install
 ```
+
+> 上游项目为 [chatfire-AI/huobao-drama](https://github.com/chatfire-AI/huobao-drama)。若是从上游克隆的旧工作区，可用 `git remote add upstream https://github.com/chatfire-AI/huobao-drama.git` 保留上游跟踪。
 
 ### 🎯 启动项目
 
@@ -393,6 +397,10 @@ server {
 ---
 
 ## 📝 常见问题
+
+### Q: 许可证允许商用吗？
+
+A: **不允许。** 本项目采用 **CC BY-NC-SA 4.0**，含「非商业性使用」限制：个人学习、研究与自用没问题，用于商业用途需要另行取得授权。由于本项目 fork 自上游 `huobao-drama`（同样为 CC BY-NC-SA 4.0），**fork 无法单方面更换许可证**；如果后续有商业化计划，必须先与 upstream 作者确认授权，否则应仅将本项目用于非商业场景。
 
 ### Q: Docker 容器如何访问宿主机的 Ollama？
 

@@ -61,7 +61,8 @@ test('backend removes TTS endpoints and audio-specific schema fields', () => {
   assert.doesNotMatch(mysqlSchema, /voice_sample_url/)
   assert.doesNotMatch(mysqlSchema, /voice_provider/)
   assert.doesNotMatch(mysqlSchema, /tts_audio_url/)
-  // 无 ai_voices 表定义；仅保留启动时的孤儿表清理 DROP
+  // 无 ai_voices 表定义。
+  // 注：本 fork 的 mysql-schema.ts 目前不再执行 ai_voices 的 DROP 清理，
+  // 这里只断言「不再建表」，不反向要求 DROP（DROP 属破坏性操作，需单独评估）。
   assert.doesNotMatch(mysqlSchema, /CREATE TABLE IF NOT EXISTS ai_voices/)
-  assert.match(mysqlSchema, /DROP TABLE IF EXISTS `ai_voices`/)
 })

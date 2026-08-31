@@ -36,6 +36,18 @@ interface GenerateImageParams {
   configId?: number
 }
 
+/**
+ * 视频任务提交瞬间的参考素材快照。
+ * 与 params 里的 reference*Urls 分开保存：前者是「这次实际用了什么」的可复盘记录，
+ * 后者是适配器真正读取的生成参数。
+ */
+export interface VideoReferenceSnapshot {
+  images: string[]
+  videos: string[]
+  audios: string[]
+  generated_at: string
+}
+
 interface GenerateVideoParams {
   storyboardId?: number
   dramaId?: number
@@ -48,6 +60,7 @@ interface GenerateVideoParams {
   referenceImageUrls?: string[]
   referenceVideoUrls?: string[]
   referenceAudioUrls?: string[]
+  referenceSnapshot?: VideoReferenceSnapshot | null
   generateAudio?: boolean
   duration?: number
   aspectRatio?: string
@@ -118,6 +131,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     aspectRatio: params.aspectRatio || '16:9',
     // 保留高分辨率档位透传（MiniMax 768P/2K），火山等适配器内部自行归并
     resolution: ['480p', '720p', '1080p', '2K'].includes(params.resolution || '') ? params.resolution : '720p',
+    referenceSnapshot: params.referenceSnapshot ?? null,
   })
 
   logTaskStart('VideoTask', 'enqueue', {
@@ -127,6 +141,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     dramaId: params.dramaId,
     referenceMode: params.referenceMode || 'reference',
     duration: params.duration || 5,
+    hasReferenceSnapshot: !!params.referenceSnapshot,
   })
   logTaskPayload('VideoTask', 'enqueue params', {
     id,

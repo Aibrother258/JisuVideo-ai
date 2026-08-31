@@ -58,7 +58,8 @@ test('backend rejects unsupported providers at DB and route boundaries', () => {
   assert.match(ai, /officialProviders/)
   assert.match(ai, /text:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
   assert.match(ai, /image:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
-  assert.match(ai, /video:\s*\[\s*'volcengine'\s*\]/)
+  // 视频厂商随后扩到 MiniMax H3 与 AutoDL 工作流，断言跟随当前厂商白名单
+  assert.match(ai, /video:\s*\[\s*'volcengine',\s*'minimax',\s*'autodl'\s*\]/)
   assert.doesNotMatch(ai, /'deepseek'/)
   assert.doesNotMatch(ai, /'ali'/)
   assert.doesNotMatch(ai, /'vidu'/)

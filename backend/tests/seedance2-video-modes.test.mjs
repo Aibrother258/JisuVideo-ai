@@ -40,7 +40,8 @@ test('video generation service resolves reference media and persists new fields'
   const service = read('src/services/generation.ts')
 
   assert.match(service, /PUBLIC_BASE_URL/)
-  assert.match(service, /resolvePublicMediaUrl/)
+  // 本地参考素材解析函数随后更名为 resolveReferenceMediaUrl（同时按视频/音频分类）
+  assert.match(service, /resolveReferenceMediaUrl/)
   assert.match(service, /referenceVideoUrls: params\.referenceVideoUrls/)
   assert.match(service, /referenceAudioUrls: params\.referenceAudioUrls/)
   assert.match(service, /generateAudio: params\.generateAudio === false \? 0 : 1/)
@@ -63,8 +64,10 @@ test('video resolution is fixed per episode, editable, and locked into video tas
   // 视频任务锁定集的分辨率（优先于请求体）
   assert.match(tasks, /episodeResolution = ep\.resolution/)
   assert.match(tasks, /resolution: episodeResolution \|\| body\.resolution/)
-  // 服务落入 params 并传给适配器
-  assert.match(service, /resolution: params\.resolution === '480p' \? '480p' : '720p'/)
+  // 服务落入 params 并传给适配器。
+  // 分辨率随后放开到 480p/720p/1080p/2K 白名单透传（MiniMax 768P/2K 档位），
+  // 火山等适配器内部仍按自己的规则归并。
+  assert.match(service, /resolution: \['480p', '720p', '1080p', '2K'\]\.includes\(params\.resolution \|\| ''\) \? params\.resolution : '720p'/)
   assert.match(service, /resolution: params\.resolution,/)
 })
 
@@ -128,8 +131,9 @@ test('image/video generation tasks are unified into a single sys_task table', ()
   assert.match(mysqlSchema, /type VARCHAR\(16\) NOT NULL/)
   assert.match(mysqlSchema, /params TEXT/)
   assert.match(mysqlSchema, /result_url TEXT/)
-  assert.match(mysqlSchema, /DROP TABLE IF EXISTS `image_generations`/)
-  assert.match(mysqlSchema, /DROP TABLE IF EXISTS `video_generations`/)
+  // 注：本 fork 的 mysql-schema.ts 目前不再执行 image_generations / video_generations
+  // 的 DROP 清理。这里只断言「不再建旧表」，不反向要求 DROP —— 恢复 DROP 属于
+  // 破坏性操作，需要单独评估，不应由结构测试驱动。
 
   // 路由与服务只操作 sys_task（统一 /tasks 入口，type 过滤）
   const tasksRoute = read('src/routes/tasks.ts')

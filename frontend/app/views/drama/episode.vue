@@ -1783,6 +1783,7 @@
 
 <script setup>
 import { toast } from 'vue-sonner'
+import { nextTick } from 'vue'
 import {
   Users, Video, FileText, FolderKanban, Clapperboard, Download, Loader2,
   MapPin, Play, Plus, X, ListTodo,
@@ -2180,6 +2181,11 @@ const storedShotRefSelections = ref((() => {
   catch { return {} }
 })())
 let restoringShotRefSelection = false
+// 已成功写入 MySQL 的参考素材签名。内容相同的重复提交（页面刷新、切换分镜恢复状态）
+// 直接跳过，避免无意义回写把刚生成的 H3 提示词判定为过期。
+const lastSavedShotRefSelections = ref({})
+// URL → asset_id：记录参考素材来自资产库/上传落库的哪条资产，供后端追溯来源
+const refAssetOrigins = ref({})
 const imageViewer = ref({ open: false, src: '', title: '' })
 const activeMerge = ref(null) // 成片大预览弹窗中正在播放的拼接记录
 const assetDetail = ref({ open: false, type: '', item: null })
@@ -2635,6 +2641,8 @@ const refAssetCandidates = computed(() => {
       source: '本地上传素材库',
       url: asset.url || asset.local_path || asset.localPath,
       thumbnail: asset.thumbnail_url || asset.thumbnailUrl,
+      // 带上资产库记录 ID，保存参考素材时后端可追溯到原始资产
+      asset_id: asset.id,
     })
   }
   return items
@@ -2694,6 +2702,7 @@ function toggleRefAsset(asset) {
     return
   }
   list.value = [...list.value, asset.url]
+  rememberRefAssetOrigin(asset.url, asset.asset_id)
 }
 
 // 配置变化后校验持久化的模型是否仍存在（配置被删/模型被移除时回退默认，避免把失效模型传给后端）
@@ -3900,37 +3909,97 @@ function resolveVideoPromptRefs(sb) {
   })
 }
 
-function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
-  if (!storyboardId || restoringShotRefSelection) return
-  const items = [
-    ...videoRefImageUrls.value.map((url, index) => ({ media_type: 'image', media_role: 'reference', url, sort_order: index })),
-    ...videoRefVideoUrls.value.map((url, index) => ({ media_type: 'video', media_role: 'reference', url, sort_order: index })),
-    ...videoRefAudioUrls.value.map((url, index) => ({ media_type: 'audio', media_role: 'reference', url, sort_order: index })),
+function rememberRefAssetOrigin(url, assetId) {
+  if (!url || assetId == null) return
+  refAssetOrigins.value = { ...refAssetOrigins.value, [url]: Number(assetId) }
+}
+
+function buildShotRefItems() {
+  const withOrigin = (urls, mediaType) => urls.map((url, index) => ({
+    media_type: mediaType,
+    media_role: 'reference',
+    url,
+    sort_order: index,
+    asset_id: refAssetOrigins.value[url] ?? null,
+  }))
+  return [
+    ...withOrigin(videoRefImageUrls.value, 'image'),
+    ...withOrigin(videoRefVideoUrls.value, 'video'),
+    ...withOrigin(videoRefAudioUrls.value, 'audio'),
   ]
-  storedShotRefSelections.value[String(storyboardId)] = {
+}
+
+/** 参考素材内容签名：类型、顺序、URL 全部一致才算没有变化 */
+function shotRefSignature(items) {
+  return JSON.stringify(items.map(item => [item.media_type, item.url]))
+}
+
+async function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
+  if (!storyboardId || restoringShotRefSelection) return
+  const items = buildShotRefItems()
+  const key = String(storyboardId)
+  const signature = shotRefSignature(items)
+  // 与上次成功写入的内容完全一致时不回写：
+  // 页面刷新、切换分镜恢复状态都会用同一份内容重复提交，
+  // 无差别回写会让后端误判参考素材变化，刚生成的 H3 提示词立刻被标记过期。
+  if (lastSavedShotRefSelections.value[key] === signature) return
+
+  storedShotRefSelections.value[key] = {
     image: [...videoRefImageUrls.value], video: [...videoRefVideoUrls.value], audio: [...videoRefAudioUrls.value],
   }
   try { localStorage.setItem(REF_SELECTION_STORE_KEY, JSON.stringify(storedShotRefSelections.value)) } catch { /* ignore */ }
-  // MySQL is the canonical state; localStorage remains a fast fallback for offline/page startup.
-  storyboardAPI.saveReferenceAssets(storyboardId, items).catch(() => {})
+
+  // MySQL 是正式状态，localStorage 只是请求失败时的回退。保存失败必须让用户知道。
+  try {
+    await storyboardAPI.saveReferenceAssets(storyboardId, items)
+    lastSavedShotRefSelections.value = { ...lastSavedShotRefSelections.value, [key]: signature }
+  } catch (error) {
+    toast.error(`参考素材保存失败：${error.message || '请重试'}`)
+  }
 }
 
 async function restoreShotRefSelection(sb) {
   const saved = storedShotRefSelections.value[String(sb?.id)] || {}
-  let durable = []
-  if (sb?.id) {
-    try { durable = await storyboardAPI.referenceAssets(sb.id) || [] } catch { durable = [] }
+  const cachedSource = {
+    image: Array.isArray(saved.image) ? saved.image : [],
+    video: Array.isArray(saved.video) ? saved.video : [],
+    audio: Array.isArray(saved.audio) ? saved.audio : [],
   }
-  const source = durable.length ? {
-    image: durable.filter(item => item.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
-    video: durable.filter(item => item.media_type === 'video').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
-    audio: durable.filter(item => item.media_type === 'audio').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
-  } : saved
+  let source = cachedSource
+
+  if (sb?.id) {
+    try {
+      const durable = await storyboardAPI.referenceAssets(sb.id) || []
+      // 请求成功即代表正式状态：返回空数组就是「确实没有参考素材」，
+      // 不能回退本地缓存，否则用户清空的素材会被旧缓存复活并写回数据库。
+      source = {
+        image: durable.filter(item => item.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+        video: durable.filter(item => item.media_type === 'video').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+        audio: durable.filter(item => item.media_type === 'audio').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+      }
+      const origins = { ...refAssetOrigins.value }
+      for (const item of durable) if (item.asset_id) origins[item.url] = Number(item.asset_id)
+      refAssetOrigins.value = origins
+    } catch {
+      // 只有请求失败才回退到浏览器缓存
+      source = cachedSource
+    }
+  }
+
   restoringShotRefSelection = true
-  videoRefVideoUrls.value = Array.isArray(source.video) ? [...source.video] : []
-  videoRefAudioUrls.value = Array.isArray(source.audio) ? [...source.audio] : []
-  videoRefImageUrls.value = Array.isArray(source.image) ? [...source.image] : []
+  videoRefVideoUrls.value = [...source.video]
+  videoRefAudioUrls.value = [...source.audio]
+  videoRefImageUrls.value = [...source.image]
   videoDuration.value = Number(sb?.duration || 10)
+  // 恢复结果就是数据库当前状态：先记下签名，再让 deep watcher 在本帧内跑完，
+  // 保证「恢复状态」本身不会触发一次回写。
+  if (sb?.id) {
+    lastSavedShotRefSelections.value = {
+      ...lastSavedShotRefSelections.value,
+      [String(sb.id)]: shotRefSignature(buildShotRefItems()),
+    }
+  }
+  await nextTick()
   restoringShotRefSelection = false
 }
 
@@ -3994,6 +4063,7 @@ function uploadRefMedia(kind) {
       try {
         const res = await uploadAPI.image(file, libraryMeta)
         videoRefImageUrls.value = [...videoRefImageUrls.value, res.url]
+        rememberRefAssetOrigin(res.url, res.asset_id)
         await loadRefAssetLibrary()
         toast.success('参考图片已上传')
       } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
@@ -4010,6 +4080,7 @@ function uploadRefMedia(kind) {
     try {
       const res = isVideo ? await uploadAPI.video(file, libraryMeta) : await uploadAPI.audio(file, libraryMeta)
       list.value = [...list.value, res.url]
+      rememberRefAssetOrigin(res.url, res.asset_id)
       await loadRefAssetLibrary()
       toast.success(`参考${label}已上传`)
     } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }

@@ -68,15 +68,15 @@ frontend/app/views/drama/episode.vue
 
 ## 7. 本次收口验收
 
-以下项目需要在本迭代最终完成后重新确认：
+> 2026-08-31 补记：以下清单原为空勾选，属于文档漂移。按 HB-20260831-04 收口与外部复盘时的实际验证结果补齐勾选状态。
 
-- [ ] 历史布局值在窗口变窄后重新限制在当前可用范围。
-- [ ] 窗口 resize 后布局不造成内容区不可见或溢出。
-- [ ] 拖动过程中不持续高频写入 localStorage。
-- [ ] 增加一键恢复全部布局。
-- [ ] 增加布局结构回归测试。
-- [ ] 最终生产构建通过。
-- [ ] 开发热加载栈前后端状态正常。
+- [x] 历史布局值在窗口变窄后重新限制在当前可用范围。（`clampAllPanelSizes` 挂在 `window.resize`，逐键重新夹取并持久化，`episode.vue` `onMounted`）
+- [x] 窗口 resize 后布局不造成内容区不可见或溢出。（同上，min/max 来自各面板实时的 clientWidth/clientHeight）
+- [x] 拖动过程中不持续高频写入 localStorage。（`schedulePanelLayoutSave` 120ms 节流；`pointerup`/`pointercancel` 时 `persistPanelLayout` 强制落盘一次）
+- [x] 增加一键恢复全部布局。（`resetAllPanelSizes`）
+- [x] 增加布局结构回归测试。（`frontend/tests/resizable-workbench-structure.test.mjs`）
+- [x] 最终生产构建通过。（HB-20260831-04 收口时前端生产构建通过；本机当时无 Node 环境，未在本次文档补记时重跑）
+- [x] 开发热加载栈前后端状态正常。（收口验证：前端 3013 HTTP 200、后端 5679 `/api/v1/health` HTTP 200、MySQL 健康）
 
 ## 8. 已知限制
 

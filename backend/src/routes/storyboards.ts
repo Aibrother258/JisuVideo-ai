@@ -1,48 +1,101 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, now, badRequest } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
-import { logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { collectH3SourceHash } from '../services/h3-source.js'
+import { logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
+
+// 单类参考素材上限，与视频生成接口 / 上游厂商能力保持一致
+const REFERENCE_MEDIA_LIMITS: Record<string, number> = { image: 9, video: 3, audio: 3 }
+const REFERENCE_MEDIA_LABELS: Record<string, string> = { image: '图片', video: '视频', audio: '音频' }
+const REFERENCE_TOTAL_LIMIT = 15
+
+const referenceLimitMessage = () => Object.keys(REFERENCE_MEDIA_LIMITS)
+  .map(type => `${REFERENCE_MEDIA_LABELS[type]}≤${REFERENCE_MEDIA_LIMITS[type]}`)
+  .join('、')
 
 // 持久化分镜的视频参考素材选择；上传素材本体仍由 assets 表管理。
 app.get('/:id/reference-assets', async (c) => {
   const storyboardId = Number(c.req.param('id'))
   const rows = await db.select().from(schema.storyboardReferenceAssets)
     .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboardId))
+    .orderBy(asc(schema.storyboardReferenceAssets.sortOrder))
   return success(c, rows.map(toSnakeCase))
 })
 
 app.put('/:id/reference-assets', async (c) => {
   const storyboardId = Number(c.req.param('id'))
+  if (!Number.isFinite(storyboardId)) return badRequest(c, '镜头 ID 无效')
   const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!storyboard) return badRequest(c, '镜头不存在')
+
   const body = await c.req.json().catch(() => ({}))
   const items = Array.isArray(body.items) ? body.items : []
-  const validTypes = new Set(['image', 'video', 'audio'])
+  const validTypes = new Set(Object.keys(REFERENCE_MEDIA_LIMITS))
   const ts = now()
-  const normalized = items
-    .filter((item: any) => validTypes.has(String(item.media_type || '').toLowerCase()) && String(item.url || '').trim())
-    .slice(0, 15)
-    .map((item: any, index: number) => ({
+  const counts: Record<string, number> = { image: 0, video: 0, audio: 0 }
+  const normalized: (typeof schema.storyboardReferenceAssets.$inferInsert)[] = []
+
+  for (const item of items) {
+    if (normalized.length >= REFERENCE_TOTAL_LIMIT) break
+    const mediaType = String(item?.media_type || '').toLowerCase()
+    if (!validTypes.has(mediaType)) continue
+    const url = String(item?.url || '').trim()
+    if (!url) continue
+    if (counts[mediaType] >= REFERENCE_MEDIA_LIMITS[mediaType]) {
+      return badRequest(c, `参考素材超限：${referenceLimitMessage()}`)
+    }
+    counts[mediaType] += 1
+    const assetId = Number(item?.asset_id)
+    normalized.push({
       storyboardId,
-      assetId: item.asset_id == null ? null : Number(item.asset_id),
-      mediaType: String(item.media_type).toLowerCase(),
-      mediaRole: String(item.media_role || 'reference'),
-      url: String(item.url).trim(),
-      sortOrder: index,
+      assetId: item?.asset_id == null || Number.isNaN(assetId) ? null : assetId,
+      mediaType,
+      // 列宽 32，超出会被 MySQL 拒绝，这里直接截断而不是让整批保存失败
+      mediaRole: String(item?.media_role || 'reference').slice(0, 32),
+      url,
+      sortOrder: normalized.length,
       createdAt: ts,
       updatedAt: ts,
-    }))
-  await db.delete(schema.storyboardReferenceAssets)
-    .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboardId))
-  for (const item of normalized) await db.insert(schema.storyboardReferenceAssets).values(item)
-  // 参考素材变化后，旧 H3 提示词不再代表当前投产输入。
-  await db.update(schema.storyboards)
-    .set({ minimaxH3SourceHash: null, minimaxH3GeneratedAt: null, updatedAt: ts })
+    })
+  }
+
+  // 失效判断必须基于内容而不是「收到一次保存请求」：
+  // 页面刷新、切换分镜恢复状态时，前端会用同一份内容重复提交，
+  // 无条件清空会让刚生成的 H3 提示词立刻被判为过期。
+  const beforeHash = await collectH3SourceHash(storyboard)
+
+  // 整表替换放在一个事务里：插入中途失败会回滚，不会留下半套或空记录
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(schema.storyboardReferenceAssets)
+        .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboardId))
+      for (const item of normalized) await tx.insert(schema.storyboardReferenceAssets).values(item)
+    })
+  } catch (err) {
+    return badRequest(c, `参考素材保存失败：${(err as Error).message}`)
+  }
+
+  const [refreshed] = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.id, storyboardId))
+  const afterHash = refreshed ? await collectH3SourceHash(refreshed) : beforeHash
+  if (afterHash !== beforeHash) {
+    await db.update(schema.storyboards)
+      .set({ minimaxH3SourceHash: null, minimaxH3GeneratedAt: null, updatedAt: now() })
+      .where(eq(schema.storyboards.id, storyboardId))
+    logTaskProgress('StoryboardAPI', 'h3-invalidated', { storyboardId, reason: 'reference-assets-changed' })
+  }
+
+  logTaskProgress('StoryboardAPI', 'reference-assets-saved', {
+    storyboardId,
+    image: counts.image,
+    video: counts.video,
+    audio: counts.audio,
+    h3Invalidated: afterHash !== beforeHash,
+  })
   return success(c, normalized.map(toSnakeCase))
 })
 
@@ -181,11 +234,11 @@ app.put('/:id', async (c) => {
   for (const [snakeKey, camelKey] of Object.entries(fieldMap)) {
     if (snakeKey in body) updates[camelKey] = body[snakeKey]
   }
-  // H3 prompt is derived from these source fields; mark it stale when a source changes.
-  if (['description', 'atmosphere', 'duration', 'video_prompt'].some(key => key in body)) {
-    updates.minimaxH3SourceHash = null
-    updates.minimaxH3GeneratedAt = null
-  }
+
+  // H3 提示词派生自来源输入，只有来源真正变化时才失效。
+  // 这里不按「请求里带了哪些字段」判断：前端回写相同内容、或只写 minimax_h3_prompt
+  // 都不应清空来源指纹，否则刚生成的 H3 会立刻被判为过期。
+  const beforeHash = await collectH3SourceHash(storyboard)
 
   await validateStoryboardBindings(
     storyboard.episodeId,
@@ -197,6 +250,18 @@ app.put('/:id', async (c) => {
   await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, id))
   if ('character_ids' in body) await syncStoryboardCharacters(id, body.character_ids || [])
   if ('prop_ids' in body) await syncStoryboardProps(id, body.prop_ids || [])
+
+  const [updated] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+  if (updated) {
+    const afterHash = await collectH3SourceHash(updated)
+    if (afterHash !== beforeHash) {
+      await db.update(schema.storyboards)
+        .set({ minimaxH3SourceHash: null, minimaxH3GeneratedAt: null })
+        .where(eq(schema.storyboards.id, id))
+      logTaskProgress('StoryboardAPI', 'h3-invalidated', { storyboardId: id, reason: 'storyboard-source-changed' })
+    }
+  }
+
   logTaskSuccess('StoryboardAPI', 'update', {
     storyboardId: id,
     updatedFields: Object.keys(updates),
@@ -210,9 +275,17 @@ app.put('/:id', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   logTaskStart('StoryboardAPI', 'delete', { storyboardId: id })
-  await db.delete(schema.storyboardCharacters).where(eq(schema.storyboardCharacters.storyboardId, id))
-  await db.delete(schema.storyboardProps).where(eq(schema.storyboardProps.storyboardId, id))
-  await db.delete(schema.storyboards).where(eq(schema.storyboards.id, id))
+  // 参考素材随分镜一起清理，避免留下指向已删除分镜的孤儿记录
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(schema.storyboardCharacters).where(eq(schema.storyboardCharacters.storyboardId, id))
+      await tx.delete(schema.storyboardProps).where(eq(schema.storyboardProps.storyboardId, id))
+      await tx.delete(schema.storyboardReferenceAssets).where(eq(schema.storyboardReferenceAssets.storyboardId, id))
+      await tx.delete(schema.storyboards).where(eq(schema.storyboards.id, id))
+    })
+  } catch (err) {
+    return badRequest(c, `删除镜头失败：${(err as Error).message}`)
+  }
   logTaskSuccess('StoryboardAPI', 'delete', { storyboardId: id })
   return success(c)
 })

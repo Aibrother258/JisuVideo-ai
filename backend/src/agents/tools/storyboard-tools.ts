@@ -5,11 +5,11 @@
 import { createTool } from '@mastra/core/tools'
 import type { ToolExecutionContext } from '@mastra/core/tools'
 import { z } from 'zod'
-import crypto from 'node:crypto'
 import { db, getInsertId, schema } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
+import { collectH3SourceHash } from '../../services/h3-source.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
@@ -286,6 +286,9 @@ const saveStoryboards = createTool({
           .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
         await db.delete(schema.storyboardProps)
           .where(eq(schema.storyboardProps.storyboardId, storyboardId))
+        // 整集重新生成会换掉分镜 ID，旧参考素材必须一起清理，否则成为孤儿数据
+        await db.delete(schema.storyboardReferenceAssets)
+          .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboardId))
       }
       await db.delete(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
     }
@@ -469,15 +472,8 @@ const saveMinimaxH3Prompt = createTool({
     if (!storyboard || storyboard.episodeId !== ids.episodeId) {
       return { error: `Storyboard ${storyboard_id} not found in current episode` }
     }
-    const referenceAssets = await db.select().from(schema.storyboardReferenceAssets)
-      .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboard_id))
-    const referenceFingerprint = referenceAssets
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(item => `${item.mediaType}:${item.mediaRole}:${item.url}`)
-      .join('\n')
-    const sourceHash = crypto.createHash('sha256')
-      .update(`${storyboard.videoPrompt || ''}\n${storyboard.description || ''}\n${storyboard.atmosphere || ''}\n${storyboard.duration || ''}\n${referenceFingerprint}`)
-      .digest('hex')
+    // 来源指纹必须与失效判断用同一套算法，否则刚保存的 H3 会立刻被判过期
+    const sourceHash = await collectH3SourceHash(storyboard)
     await db.update(schema.storyboards)
       .set({
         minimaxH3Prompt: minimax_h3_prompt,
