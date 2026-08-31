@@ -14,6 +14,7 @@ import assert from 'node:assert/strict'
 
 const {
   assetVersion,
+  buildFullReferenceImageList,
   computeH3SourceHash,
   fingerprintReferenceAssets,
   fingerprintSubmittedReferences,
@@ -155,6 +156,43 @@ test('normalizeReferenceImageUrl：与前端 normalizeMediaUrl 等价', () => {
   assert.equal(normalizeReferenceImageUrl('data:image/png;base64,xx'), 'data:image/png;base64,xx')
   assert.equal(normalizeReferenceImageUrl('/uploads/x.png'), '/uploads/x.png')
   assert.equal(normalizeReferenceImageUrl('uploads/x.png'), '/uploads/x.png')
+})
+
+test('完整参考图重建：过滤软删除与旁白，并按 ID 确定排序', () => {
+  const images = buildFullReferenceImageList({
+    scene: { id: 9, imageUrl: 'scene.png' },
+    characters: [
+      { id: 8, name: '已删除角色', imageUrl: 'deleted-char.png', deletedAt: '2026-09-01T03:00:00.000Z' },
+      { id: 6, name: '系统旁白', role: 'Narrator', imageUrl: 'narrator.png' },
+      { id: 5, name: '李明', imageUrl: 'char-5.png' },
+      { id: 2, name: '张宁', imageUrl: 'char-2.png' },
+    ],
+    props: [
+      { id: 7, imageUrl: 'prop-7.png' },
+      { id: 3, imageUrl: 'deleted-prop.png', deletedAt: '2026-09-01T03:00:00.000Z' },
+      { id: 1, imageUrl: 'prop-1.png' },
+    ],
+    extraImages: ['extra.png', '/char-2.png'],
+  })
+
+  assert.deepEqual(images, [
+    '/scene.png',
+    '/char-2.png',
+    '/char-5.png',
+    '/prop-1.png',
+    '/prop-7.png',
+    '/extra.png',
+  ])
+})
+
+test('完整参考图重建：已软删除场景不进入投产列表，图片总数不超过 9', () => {
+  const images = buildFullReferenceImageList({
+    scene: { id: 1, imageUrl: 'deleted-scene.png', deletedAt: '2026-09-01T03:00:00.000Z' },
+    extraImages: Array.from({ length: 12 }, (_, index) => `extra-${index + 1}.png`),
+  })
+  assert.equal(images.includes('/deleted-scene.png'), false)
+  assert.equal(images.length, 9)
+  assert.equal(images.at(-1), '/extra-9.png')
 })
 
 test('sameReferenceList：长度与每一项都必须一致，顺序敏感', () => {

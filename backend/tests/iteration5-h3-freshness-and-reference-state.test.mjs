@@ -158,8 +158,12 @@ test('server-side guard also verifies submitted reference assets match the H3 so
   assert.match(fingerprint, /export function sameReferenceList/)
   assert.match(fingerprint, /export function referenceMismatchError/)
   assert.match(fingerprint, /参考图片与分镜当前绑定的素材不一致/)
-  // 服务端重建完整图片列表：场景 → 角色 → 道具 → 数据库额外图片
-  assert.match(h3, /场景图 → 角色图（按绑定顺序）→ 道具图/)
+  // 服务端重建完整图片列表时与前端统一软删除/旁白过滤和确定性 ID 排序
+  assert.match(h3, /buildFullReferenceImageList\(/)
+  assert.match(fingerprint, /filter\(item => !item\.deletedAt && !isNarratorReferenceAsset\(item\)\)/)
+  assert.match(fingerprint, /sort\(byId\)/)
+  assert.match(frontend, /getStoryboardCharacters[\s\S]*?sort\(\(a, b\) => Number\(a\.id\) - Number\(b\.id\)\)/)
+  assert.match(frontend, /getStoryboardProps[\s\S]*?sort\(\(a, b\) => Number\(a\.id\) - Number\(b\.id\)\)/)
   assert.match(h3, /storyboardReferenceAssets\.mediaType, 'image'/)
   // tasks.ts 校验传实际数组，快照不再参与比对
   assert.match(tasks, /images: body\.reference_image_urls/)

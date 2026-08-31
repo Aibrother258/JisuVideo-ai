@@ -115,6 +115,57 @@ export function normalizeReferenceImageUrl(value: unknown): string {
   return `/${raw}`
 }
 
+/** 服务端重建完整参考图片列表时所需的最小资产字段。 */
+export interface ReferenceImageAssetInput {
+  id?: number | null
+  imageUrl?: unknown
+  deletedAt?: unknown
+  name?: unknown
+  role?: unknown
+}
+
+/** 与前端 episode.vue 的 isNarratorCharacter 保持一致。 */
+export function isNarratorReferenceAsset(asset: ReferenceImageAssetInput | null | undefined): boolean {
+  const text = `${String(asset?.name ?? '')} ${String(asset?.role ?? '')}`.toLowerCase()
+  return text.includes('旁白') || text.includes('narrator') || text.includes('画外音')
+}
+
+/**
+ * 按前端 getShotReferenceImages 的正式规则重建完整参考图片列表：
+ * 可见场景图 -> 可见非旁白角色图（ID 升序）-> 可见道具图（ID 升序）
+ * -> 已按 sort_order 排好的额外图片；最后统一归一化、去重并限制为 9 张。
+ *
+ * 把规则放在纯函数层，确保软删除、旁白过滤与顺序可以脱离数据库做行为测试。
+ */
+export function buildFullReferenceImageList(input: {
+  scene?: ReferenceImageAssetInput | null
+  characters?: readonly ReferenceImageAssetInput[]
+  props?: readonly ReferenceImageAssetInput[]
+  extraImages?: readonly unknown[]
+}): string[] {
+  const refs: string[] = []
+  const pushRef = (value: unknown) => {
+    const normalized = normalizeReferenceImageUrl(value)
+    if (!normalized || refs.includes(normalized) || refs.length >= 9) return
+    refs.push(normalized)
+  }
+  const byId = (a: ReferenceImageAssetInput, b: ReferenceImageAssetInput) => Number(a.id ?? 0) - Number(b.id ?? 0)
+
+  if (input.scene && !input.scene.deletedAt) pushRef(input.scene.imageUrl)
+  for (const character of [...(input.characters || [])]
+    .filter(item => !item.deletedAt && !isNarratorReferenceAsset(item))
+    .sort(byId)) {
+    pushRef(character.imageUrl)
+  }
+  for (const prop of [...(input.props || [])]
+    .filter(item => !item.deletedAt)
+    .sort(byId)) {
+    pushRef(prop.imageUrl)
+  }
+  for (const image of input.extraImages || []) pushRef(image)
+  return refs
+}
+
 /** 逐项比较两份参考素材列表：长度与每一项都必须一致（顺序敏感） */
 export function sameReferenceList(a: readonly unknown[], b: readonly unknown[]): boolean {
   if (a.length !== b.length) return false

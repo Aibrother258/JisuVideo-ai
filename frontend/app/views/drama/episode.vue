@@ -3156,7 +3156,7 @@ function getStoryboardCharacterIds(sb) {
 
 function getStoryboardCharacters(sb) {
   const ids = getStoryboardCharacterIds(sb)
-  return visualChars.value.filter(char => ids.includes(char.id))
+  return visualChars.value.filter(char => ids.includes(char.id)).sort((a, b) => Number(a.id) - Number(b.id))
 }
 
 function getStoryboardScene(sb) {
@@ -3183,7 +3183,7 @@ function getStoryboardPropIds(sb) {
 
 function getStoryboardProps(sb) {
   const ids = getStoryboardPropIds(sb)
-  return propItems.value.filter(p => ids.includes(p.id))
+  return propItems.value.filter(p => ids.includes(p.id)).sort((a, b) => Number(a.id) - Number(b.id))
 }
 
 function isStoryboardPropSelected(sb, propId) {

@@ -18,6 +18,7 @@ import { now } from '../utils/response.js'
 import { logTaskProgress } from '../utils/task-logger.js'
 import {
   assetVersion,
+  buildFullReferenceImageList,
   computeH3SourceHash,
   fingerprintReferenceAssets,
   fingerprintSubmittedReferences,
@@ -160,24 +161,18 @@ export async function verifyH3PromptFreshness(
 }
 
 /**
- * 服务端重建分镜的完整参考图片列表：场景图 → 角色图（按绑定顺序）→ 道具图
- * （按绑定顺序）→ 数据库额外参考图片（按 sort_order）。与前端 episode.vue 的
- * getShotReferenceImages 使用同一套归一化、去重与上限（≤9），因此可以和
- * 请求中的 reference_image_urls 逐项比较。
+ * 服务端重建分镜的完整参考图片列表：未删除场景图 → 未删除、非旁白角色图
+ * （按 ID）→ 未删除道具图（按 ID）→ 数据库额外参考图片（按 sort_order）。
+ * 与前端 episode.vue 的 getShotReferenceImages 使用同一套可见性、排序、归一化、
+ * 去重与上限（≤9），因此可以和请求中的 reference_image_urls 逐项比较。
  */
 export async function reconstructFullReferenceImageList(storyboardId: number): Promise<string[]> {
   const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!storyboard) return []
-  const refs: string[] = []
-  const pushRef = (value: string | null | undefined) => {
-    const normalized = normalizeReferenceImageUrl(value)
-    if (!normalized || refs.includes(normalized) || refs.length >= 9) return
-    refs.push(normalized)
-  }
-
+  let scene: SceneRow | undefined
   if (storyboard.sceneId) {
-    const [scene] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, storyboard.sceneId))
-    pushRef(scene?.imageUrl)
+    const rows = await db.select().from(schema.scenes).where(eq(schema.scenes.id, storyboard.sceneId))
+    scene = rows[0]
   }
 
   const [characterLinks, propLinks] = await Promise.all([
@@ -185,19 +180,16 @@ export async function reconstructFullReferenceImageList(storyboardId: number): P
     db.select().from(schema.storyboardProps).where(eq(schema.storyboardProps.storyboardId, storyboard.id)),
   ])
 
-  if (characterLinks.length) {
-    const ids = [...new Set(characterLinks.map(link => link.characterId))]
-    const rows = await db.select().from(schema.characters).where(inArray(schema.characters.id, ids))
-    const map = new Map<number, CharacterRow>(rows.map(row => [row.id, row] as const))
-    for (const link of characterLinks) pushRef(map.get(link.characterId)?.imageUrl)
-  }
-
-  if (propLinks.length) {
-    const ids = [...new Set(propLinks.map(link => link.propId))]
-    const rows = await db.select().from(schema.props).where(inArray(schema.props.id, ids))
-    const map = new Map<number, PropRow>(rows.map(row => [row.id, row] as const))
-    for (const link of propLinks) pushRef(map.get(link.propId)?.imageUrl)
-  }
+  const characterIds = [...new Set(characterLinks.map(link => link.characterId))]
+  const propIds = [...new Set(propLinks.map(link => link.propId))]
+  const [characters, props] = await Promise.all([
+    characterIds.length
+      ? db.select().from(schema.characters).where(inArray(schema.characters.id, characterIds))
+      : Promise.resolve([] as CharacterRow[]),
+    propIds.length
+      ? db.select().from(schema.props).where(inArray(schema.props.id, propIds))
+      : Promise.resolve([] as PropRow[]),
+  ])
 
   const extraImages = await db.select().from(schema.storyboardReferenceAssets)
     .where(and(
@@ -205,9 +197,12 @@ export async function reconstructFullReferenceImageList(storyboardId: number): P
       eq(schema.storyboardReferenceAssets.mediaType, 'image'),
     ))
     .orderBy(asc(schema.storyboardReferenceAssets.sortOrder), asc(schema.storyboardReferenceAssets.id))
-  for (const item of extraImages) pushRef(item.url)
-
-  return refs
+  return buildFullReferenceImageList({
+    scene,
+    characters,
+    props,
+    extraImages: extraImages.map(item => item.url),
+  })
 }
 
 /** 分镜当前保存的额外参考素材（保持顺序），格式与前端提交的素材可直接比对 */
