@@ -43,6 +43,8 @@ app.post('/', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.props).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.props.id, id))
+  // 道具被删除后，绑定了它的分镜 H3 不再代表当前输入（指纹含 deletedAt）
+  await invalidateH3ForProp(id, 'prop-deleted')
   return success(c)
 })
 

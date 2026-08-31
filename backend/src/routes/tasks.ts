@@ -25,6 +25,9 @@ function normalizeReferenceSnapshot(raw: unknown): VideoReferenceSnapshot | null
     images: urls(source.images, 9),
     videos: urls(source.videos, 3),
     audios: urls(source.audios, 3),
+    // 额外参考图单独记录：reference_image_urls 混入了场景/角色/道具图，
+    // H3 一致性校验只能比对该字段
+    extra_images: urls(source.extra_images, 9),
     generated_at: typeof source.generated_at === 'string' && source.generated_at
       ? source.generated_at
       : new Date().toISOString(),
@@ -70,10 +73,21 @@ app.post('/', async (c) => {
     }
 
     // 服务端兜底：提交的 prompt 若就是该分镜已保存的 H3 提示词，
-    // 必须确认来源指纹仍然新鲜。前端「已过期」提示可被绕过（直接调 API），
-    // 这里在提交瞬间重算指纹做最终裁决。
+    // 必须确认来源指纹仍然新鲜，且本次请求的参考素材与 H3 生成时一致。
+    // 前端「已过期」提示可被绕过（直接调 API），这里在提交瞬间重算做最终裁决。
     if (type === 'video' && body.storyboard_id) {
-      const h3Error = await verifyH3PromptFreshness(Number(body.storyboard_id), body.prompt)
+      const snapshot = body.reference_snapshot
+      const h3Error = await verifyH3PromptFreshness(
+        Number(body.storyboard_id),
+        body.prompt,
+        {
+          // 额外参考图优先用快照里的 extra_images：reference_image_urls
+          // 混入了场景/角色/道具图，无法与数据库的额外素材直接比对
+          images: snapshot?.extra_images ?? body.reference_image_urls,
+          videos: snapshot?.videos ?? body.reference_video_urls,
+          audios: snapshot?.audios ?? body.reference_audio_urls,
+        },
+      )
       if (h3Error) return badRequest(c, h3Error)
     }
 

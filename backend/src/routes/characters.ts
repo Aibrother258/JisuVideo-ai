@@ -80,6 +80,8 @@ app.put('/:id', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.characters).set({ deletedAt: now() }).where(eq(schema.characters.id, id))
+  // 角色被删除后，绑定了它的分镜 H3 不再代表当前输入（指纹含 deletedAt）
+  await invalidateH3ForCharacter(id, 'character-deleted')
   return success(c)
 })
 

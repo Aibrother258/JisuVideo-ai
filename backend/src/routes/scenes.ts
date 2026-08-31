@@ -125,6 +125,8 @@ app.post('/:id/generate-prompt', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.scenes).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.scenes.id, id))
+  // 场景被删除后，绑定了它的分镜 H3 不再代表当前输入（指纹含 deletedAt）
+  await invalidateH3ForScene(id, 'scene-deleted')
   return success(c)
 })
 

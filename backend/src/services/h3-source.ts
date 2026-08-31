@@ -20,13 +20,22 @@ import {
   assetVersion,
   computeH3SourceHash,
   fingerprintReferenceAssets,
+  fingerprintSubmittedReferences,
   h3FreshnessError,
+  normalizeSubmittedReferences,
   type H3SourceParts,
   type ReferenceAssetFingerprintInput,
+  type SubmittedReferences,
 } from './h3-fingerprint.js'
 
-export { computeH3SourceHash, fingerprintReferenceAssets, h3FreshnessError } from './h3-fingerprint.js'
-export type { H3SourceParts } from './h3-fingerprint.js'
+export {
+  computeH3SourceHash,
+  fingerprintReferenceAssets,
+  fingerprintSubmittedReferences,
+  h3FreshnessError,
+  normalizeSubmittedReferences,
+} from './h3-fingerprint.js'
+export type { H3SourceParts, SubmittedReferences } from './h3-fingerprint.js'
 
 export type StoryboardRow = typeof schema.storyboards.$inferSelect
 type CharacterRow = typeof schema.characters.$inferSelect
@@ -99,9 +108,15 @@ export async function collectH3SourceHash(storyboard: StoryboardRow): Promise<st
  * 返回字符串为拒绝原因。
  *
  * 判定方式是「提交的 prompt 与库中 H3 提示词逐字一致」，不依赖前端传任何标志，
- * 直接调 API 也无法绕过。
+ * 直接调 API 也无法绕过。除此之外，H3 新鲜只证明「数据库状态 == H3 生成时」；
+ * 调用者仍可带着另一套参考素材提交，因此还要比对本次请求的额外参考素材
+ * （手动选择/上传的图片、视频、音频）与数据库，不一致同样拒绝。
  */
-export async function verifyH3PromptFreshness(storyboardId: number, submittedPrompt: unknown): Promise<string | null> {
+export async function verifyH3PromptFreshness(
+  storyboardId: number,
+  submittedPrompt: unknown,
+  submittedReferences?: unknown,
+): Promise<string | null> {
   const trimmed = String(submittedPrompt ?? '').trim()
   if (!trimmed) return null
   const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
@@ -115,8 +130,31 @@ export async function verifyH3PromptFreshness(storyboardId: number, submittedPro
       storyboardId,
       hasStoredHash: !!storyboard.minimaxH3SourceHash,
     })
+    return error
   }
-  return error
+
+  if (submittedReferences != null) {
+    const submittedFp = fingerprintSubmittedReferences(normalizeSubmittedReferences(submittedReferences))
+    const dbRefs = await collectStoryboardReferenceAssets(storyboardId)
+    const dbFp = fingerprintReferenceAssets(dbRefs)
+    if (submittedFp !== dbFp) {
+      logTaskProgress('H3Source', 'ref-mismatch-rejected', { storyboardId })
+      return '参考素材与 H3 生成时不一致，请刷新分镜后重新生成 H3 再提交视频'
+    }
+  }
+  return null
+}
+
+/** 分镜当前保存的额外参考素材（保持顺序），格式与前端提交的素材可直接比对 */
+export async function collectStoryboardReferenceAssets(storyboardId: number): Promise<ReferenceAssetFingerprintInput[]> {
+  const rows = await db.select().from(schema.storyboardReferenceAssets)
+    .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboardId))
+    .orderBy(asc(schema.storyboardReferenceAssets.sortOrder), asc(schema.storyboardReferenceAssets.id))
+  return rows.map((item): ReferenceAssetFingerprintInput => ({
+    mediaType: item.mediaType,
+    mediaRole: item.mediaRole,
+    url: item.url,
+  }))
 }
 
 /** 清空一批分镜的 H3 来源元数据（提示词本体保留，仅标记过期）。只更新仍有指纹的行。 */

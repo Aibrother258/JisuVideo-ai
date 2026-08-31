@@ -35,7 +35,8 @@ test('H3 source fingerprint lives in one shared module used by both writers', ()
   // 纯算法抽到独立模块（不依赖数据库，可做真实行为测试），h3-source 再导出
   assert.match(fingerprint, /export function computeH3SourceHash/)
   assert.match(fingerprint, /export function h3FreshnessError/)
-  assert.match(h3, /export \{ computeH3SourceHash, fingerprintReferenceAssets, h3FreshnessError \} from '\.\/h3-fingerprint\.js'/)
+  // h3-source 必须再导出全部纯函数，供既有调用方继续使用
+  assert.match(h3, /export \{[\s\S]*?computeH3SourceHash[\s\S]*?fingerprintReferenceAssets[\s\S]*?h3FreshnessError[\s\S]*?\} from '\.\/h3-fingerprint\.js'/)
 })
 
 test('H3 fingerprint covers scene, character and prop bindings plus their image versions', () => {
@@ -47,12 +48,15 @@ test('H3 fingerprint covers scene, character and prop bindings plus their image 
   assert.match(h3, /characterVersions/)
   assert.match(h3, /propVersions/)
   // 设定图版本进入指纹：重新生成角色图 / 场景图 / 道具图也要让 H3 失效
-  assert.match(h3, /imageUrl/)
-  assert.match(h3, /localPath/)
+  // （imageUrl/localPath/updatedAt 在纯算法层 h3-fingerprint.ts 的 assetVersion 中）
+  assert.match(fingerprint, /imageUrl/)
+  assert.match(fingerprint, /localPath/)
   // 素材版本带 updatedAt：文件内容变了但路径没变时也能识别
   assert.match(h3, /updatedAt/)
   // 首帧/尾帧影响 H3 模式判定，也纳入指纹
   assert.match(h3, /frameVersion/)
+  // 资产软删除（deletedAt）同样进入版本：删除绑定素材后 H3 不再有效
+  assert.match(fingerprint, /deletedAt/)
 })
 
 test('reference asset saves invalidate H3 only when the source actually changes', () => {
@@ -136,10 +140,24 @@ test('a backfill script can repair storyboards that have an H3 prompt but no sou
 
 test('server-side guard rejects video tasks that resubmit a stale H3 prompt', () => {
   assert.match(tasks, /import \{ verifyH3PromptFreshness \} from '\.\.\/services\/h3-source\.js'/)
-  assert.match(tasks, /await verifyH3PromptFreshness\(Number\(body\.storyboard_id\), body\.prompt\)/)
+  assert.match(tasks, /await verifyH3PromptFreshness\(/)
   assert.match(tasks, /if \(h3Error\) return badRequest\(c, h3Error\)/)
   // 判定必须在生成之前，否则旧提示词照样投产出片
   assert.ok(tasks.indexOf('verifyH3PromptFreshness') < tasks.indexOf('generateVideo('))
+})
+
+test('server-side guard also verifies submitted reference assets match the H3 source', () => {
+  // H3 新鲜只证明「数据库状态 == H3 生成时」；调用者仍可带另一套素材提交，
+  // 因此校验同时接收本次请求的额外参考素材并逐项比对数据库。
+  assert.match(h3, /verifyH3PromptFreshness\(/)
+  assert.match(h3, /submittedReferences/)
+  assert.match(h3, /fingerprintSubmittedReferences\(normalizeSubmittedReferences\(submittedReferences\)\)/)
+  assert.match(h3, /collectStoryboardReferenceAssets\(storyboardId\)/)
+  assert.match(h3, /参考素材与 H3 生成时不一致/)
+  // 前端快照携带 extra_images：reference_image_urls 混入了场景/角色/道具图
+  assert.match(frontend, /extra_images: \[\.\.\.videoRefImageUrls\.value\]/)
+  assert.match(tasks, /snapshot\?\.extra_images \?\? body\.reference_image_urls/)
+  assert.match(generation, /extra_images\?: string\[\]/)
 })
 
 test('character / scene / prop image updates invalidate bound storyboards H3', () => {
@@ -178,6 +196,33 @@ test('rapid reference selection saves are serialized per storyboard', () => {
   assert.match(frontend, /shotRefSaveQueues\[key\] \|\| Promise\.resolve\(\)/)
   // 内容在入队时同步捕获：排队执行时状态可能已切换
   assert.match(frontend, /同步捕获当前内容/)
+})
+
+test('video generation and H3 generation wait for the reference save queue to flush', () => {
+  // 串行队列只是顺序执行：最新素材仍可能排队未写入，必须等队列清空再生成
+  assert.match(frontend, /async function flushShotRefSaves\(storyboardId\)/)
+  assert.match(frontend, /while \(shotRefSaveQueues\[key\]\)/)
+  // 生成 H3、提交视频前都强制等待
+  assert.match(frontend, /await flushShotRefSaves\(sb\.id\)/)
+  // 签名已排队时返回那条队列任务，而不是立即放行
+  assert.match(frontend, /if \(shotRefPendingSignatures\[key\] === signature\)/)
+  assert.match(frontend, /return shotRefSaveQueues\[key\] \|\| Promise\.resolve\(\)/)
+})
+
+test('reference save failure aborts H3 / video generation instead of continuing silently', () => {
+  // 队列不因单次失败中断，但失败必须记录并由 flush 抛出，生成流程中止
+  assert.match(frontend, /const shotRefLastErrors = \{\}/)
+  assert.match(frontend, /\.catch\(\(error\) => \{ shotRefLastErrors\[key\] = error \}\)/)
+  assert.match(frontend, /if \(shotRefLastErrors\[key\]\)/)
+  assert.match(frontend, /throw new Error\(`参考素材保存失败/)
+  // genVid 对 flush 失败的处理：toast 后返回，不再提交
+  assert.match(frontend, /保存失败（flushShotRefSaves 抛出）同样中止生成/)
+})
+
+test('deleting a character / scene / prop invalidates H3 of bound storyboards', () => {
+  assert.match(characters, /invalidateH3ForCharacter\(id, 'character-deleted'\)/)
+  assert.match(scenes, /invalidateH3ForScene\(id, 'scene-deleted'\)/)
+  assert.match(props, /invalidateH3ForProp\(id, 'prop-deleted'\)/)
 })
 
 test('reference asset total overflow returns an explicit 400 instead of silent truncation', () => {

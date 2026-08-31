@@ -200,3 +200,63 @@ PR #1（`Aibrother258/JisuVideo-ai`）审查结论：方向正确、不推倒重
 ## R1-验证状态（重要）
 
 与上一轮相同：**本机无 Node 运行时**，本修订全部改动仅完成静态审查与结构测试断言逐条比对，typecheck / 测试 / 构建 / 真实闭环仍未执行，需在合并前于有 Node 的环境补跑（见下方 Checklist）。
+
+---
+
+# 修订 R2：响应第二轮 PR 审查（2026-09-01）
+
+PR #1 第二轮审查确认 R1 修复方向正确，但仍有 1 个真实竞态 + 2 个本 PR 造成的测试故障 + 1 个边界问题。本轮全部补齐，并**首次在本机真实运行了 typecheck / 测试 / 前端构建**。
+
+## R2-阻断项：串行保存没有在生成 H3、提交视频前等待完成
+
+串行队列保证请求有序，但最新素材仍可能**排队未写入**：
+
+1. `genMinimaxH3Prompt()` / `genVid()` 不等待队列 → 后端读旧素材 → H3 校验通过，但视频携带前端最新素材；
+2. 保存失败在 `performShotRefSave()` 内被捕获后没有继续抛出 → 素材没落库也能继续生成。
+
+修复（`episode.vue`）：
+
+- **`flushShotRefSaves(storyboardId)`**：`while (shotRefSaveQueues[key]) await ...` 等队列完全清空；任一保存失败（记录在 `shotRefLastErrors`）则抛出，调用方必须中止。
+- **`genMinimaxH3Prompt`** 与 **`genVid`** 在发起请求前 `await flushShotRefSaves(sb.id)`，失败 toast 后 `return`，不再提交。
+- **`saveShotRefSelection`** 签名已排队时返回那条队列任务（`shotRefSaveQueues[key] || Promise.resolve()`），而不是立即放行。
+- **`performShotRefSave`** 失败重新抛出（toast 保留）；队列 `catch` 记录到 `shotRefLastErrors`，既不产生 unhandled rejection，也让 flush 能感知失败。
+
+## R2-阻断项：后端校验没有把本次请求的参考素材纳入比对
+
+`verifyH3PromptFreshness` 只比对「数据库当前指纹」，而 H3 新鲜只证明「数据库状态 == H3 生成时」；调用者仍可带另一套素材提交。修复（后端两层）：
+
+- **`h3-fingerprint.ts`** 新增纯函数 `normalizeSubmittedReferences` + `fingerprintSubmittedReferences`：前端提交的额外素材（images/videos/audios）归一化后与 `fingerprintReferenceAssets` 同构，可直接字符串比较。
+- **`h3-source.ts`** `verifyH3PromptFreshness` 接收第三参 `submittedReferences`：hash 新鲜的前提下，再用 `collectStoryboardReferenceAssets` 取数据库当前额外素材逐项比对，不一致返回 400「参考素材与 H3 生成时不一致」。
+- **`tasks.ts`** 提交校验时传入 `{ images: snapshot?.extra_images ?? reference_image_urls, videos, audios }`。
+- **`episode.vue`** `reference_snapshot` 增加 `extra_images`：`reference_image_urls` 混入了场景/角色/道具图，无法与数据库的额外素材直接比对，必须单独携带；`generation.ts` 的 `VideoReferenceSnapshot` 类型同步补充。
+
+## R2-边界：资产软删除不失效 H3
+
+`characters.ts` / `scenes.ts` / `props.ts` 的 `DELETE /:id` 现在调用 `invalidateH3ForCharacter/Scene/Prop(..., '-deleted')`；`assetVersion` 新增第 4 段 `deletedAt`（`imageUrl|localPath|updatedAt|deletedAt`），删除绑定素材后即使漏掉失效钩子，提交校验也会因 hash 不匹配拒绝。
+
+## R2-测试修复（审查方实跑发现的 3 个问题）
+
+1. **`h3-source-behavior.test.mjs` 重复注册 `tsx/esm`**：删除文件内 `register('tsx/esm')`，加载器统一由 npm 脚本 `node --import tsx/esm` 加载，消除 `ERR_UNSUPPORTED_RESOLVE_REQUEST`。
+2. **`iteration5-*.test.mjs` 在旧文件找 `imageUrl/localPath`**：断言改指 `h3-fingerprint.ts`（资产版本纯函数层）；同时修正 h3-source re-export 断言以兼容多行导出。
+3. **`npm test` 无法展开测试**：`node --test tests/` 在 Node 22 把目录当模块路径（`MODULE_NOT_FOUND`），改为 `node --import tsx/esm --test`（默认扫描全部 `*.test.mjs`）。
+4. 行为测试实际 12 项（回复误称 13）→ 本轮新增「资产软删除改变哈希」「assetVersion deletedAt」「提交素材指纹同构」3 项，现为 **15 项**。
+
+## R2-首次真实运行结果（本机 Node v22.22.2）
+
+| 验证项 | 结果 |
+|---|---|
+| `cd backend && npm run typecheck` | 通过 |
+| `cd backend && npm test` | 91 项中 82 通过、9 失败（全部为既有测试债务，与审查方判断一致） |
+| `cd backend && npm run test:h3` | 15 项全部通过 |
+| `cd frontend && npm run build` | 通过（Nuxt 生产构建） |
+| `cd frontend && node --test` | 32 项中 14 通过、18 失败（与合并前基线完全一致，无新增失败） |
+
+9 个既有后端失败抽查确认与本轮无关（`episodes.ts` 错误消息断言、上传路由 `AUDIO_EXT` 断言等过时结构断言）。
+
+## R2-改动文件
+
+- 改：`episode.vue`（flush + 失败中止 + extra_images）、`h3-fingerprint.ts`（deletedAt + 提交素材指纹）、`h3-source.ts`（校验第三参 + collectStoryboardReferenceAssets）、`tasks.ts`（extra_images + 传参）、`generation.ts`（快照类型）、`characters.ts` / `scenes.ts` / `props.ts`（删除失效）、`package.json`（npm test）、`h3-source-behavior.test.mjs`、`iteration5-*.test.mjs`
+
+## R2-剩余
+
+合并前仍需人工执行一次真实闭环（需要 MySQL + 生成服务）：快速连选素材 → 立即生成 H3 → 提交视频，确认素材全部落库、H3 基于最新素材生成、提交不被拒。代码层与自动化验证已全部就位。

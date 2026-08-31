@@ -2190,6 +2190,9 @@ const lastSavedShotRefSelections = ref({})
 // 无法解决多个请求完成顺序颠倒的问题。
 const shotRefSaveQueues = {}
 const shotRefPendingSignatures = {}
+// 某分镜最近一次失败的保存错误：flushShotRefSaves 读取后抛出并清空，
+// 让「生成 H3 / 提交视频」在素材还没全部落库时中止，而不是继续用旧状态生成。
+const shotRefLastErrors = {}
 // URL → asset_id：记录参考素材来自资产库/上传落库的哪条资产，供后端追溯来源
 const refAssetOrigins = ref({})
 const imageViewer = ref({ open: false, src: '', title: '' })
@@ -3507,6 +3510,9 @@ async function genMinimaxH3Prompt(sb) {
   const referencePlan = buildMinimaxH3ReferencePlan(sb)
   minimaxH3PromptGeneratingIds.value.push(sb.id)
   try {
+    // 最新参考素材可能还在排队写入 MySQL：先等保存队列清空，
+    // 否则 H3 会基于旧素材生成，刚保存的参考图没有进入 H3 的输入。
+    await flushShotRefSaves(sb.id)
     await api.post('/agent/minimax_h3_prompt_generator/chat', {
       message: `请为分镜 #${idx}(ID:${sb.id})生成并保存 MiniMax H3 大模型提示词(minimax_h3_prompt)。
 
@@ -3951,11 +3957,15 @@ function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
   const items = buildShotRefItems()
   const key = String(storyboardId)
   const signature = shotRefSignature(items)
-  // 与上次成功写入的内容完全一致，或已有相同内容的保存在排队/执行中时不重复提交：
+  // 与上次成功写入的内容完全一致：无需重复提交。
   // 页面刷新、切换分镜恢复状态都会用同一份内容重复提交，
   // 无差别回写会让后端误判参考素材变化，刚生成的 H3 提示词立刻被标记过期。
   if (lastSavedShotRefSelections.value[key] === signature) return Promise.resolve()
-  if (shotRefPendingSignatures[key] === signature) return Promise.resolve()
+  // 已有相同内容的保存在排队/执行中：不重复入队，但必须返回那条队列任务，
+  // 让「生成 H3 / 提交视频」前的 flush 能等到它真正写完，而不是立即放行。
+  if (shotRefPendingSignatures[key] === signature) {
+    return shotRefSaveQueues[key] || Promise.resolve()
+  }
 
   shotRefPendingSignatures[key] = signature
   storedShotRefSelections.value[key] = {
@@ -3963,17 +3973,37 @@ function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
   }
   try { localStorage.setItem(REF_SELECTION_STORE_KEY, JSON.stringify(storedShotRefSelections.value)) } catch { /* ignore */ }
 
-  // 排队：同一分镜的请求永远按入队顺序依次执行，后面的保存排在前面的结果之后
+  // 排队：同一分镜的请求永远按入队顺序依次执行，后面的保存排在前面的结果之后。
+  // 队列本身不因单次失败中断（后面的保存可能带最新状态），
+  // 但失败必须记录到 shotRefLastErrors，由 flushShotRefSaves 抛出并中止生成。
   const run = (shotRefSaveQueues[key] || Promise.resolve())
-    .catch(() => {})
     .then(() => performShotRefSave(storyboardId, { items, signature }))
+    .catch((error) => { shotRefLastErrors[key] = error })
   const settle = () => {
     if (shotRefSaveQueues[key] === run) shotRefSaveQueues[key] = null
     if (shotRefPendingSignatures[key] === signature) delete shotRefPendingSignatures[key]
   }
-  run.then(settle, settle)
+  run.then(settle)
   shotRefSaveQueues[key] = run
   return run
+}
+
+/**
+ * 等待某分镜的参考素材保存队列完全清空。
+ * 用于「生成 H3 提示词 / 提交视频」之前：最新素材可能还在排队写入 MySQL，
+ * 不等队列就读取会拿到旧素材——H3 校验通过，但视频实际携带前端最新参考图。
+ * 任一保存失败则抛出错误，调用方必须中止生成。
+ */
+async function flushShotRefSaves(storyboardId) {
+  const key = String(storyboardId)
+  while (shotRefSaveQueues[key]) {
+    await shotRefSaveQueues[key]
+  }
+  if (shotRefLastErrors[key]) {
+    const error = shotRefLastErrors[key]
+    delete shotRefLastErrors[key]
+    throw error
+  }
 }
 
 /** 实际的参考素材保存请求，只由 saveShotRefSelection 排入的串行队列调用。 */
@@ -3981,12 +4011,15 @@ async function performShotRefSave(storyboardId, { items, signature }) {
   const key = String(storyboardId)
   // 执行到自己时内容可能已由队列中更靠后的保存写入，或已被更新的保存覆盖
   if (lastSavedShotRefSelections.value[key] === signature) return
+  // MySQL 是正式状态，localStorage 只是请求失败时的回退。
+  // 保存失败必须让调用方感知并中止生成：队列的 catch 会记录到 shotRefLastErrors，
+  // 生成 H3 / 提交视频前的 flushShotRefSaves 读取后抛出，不能只弹提示后继续。
   try {
-    // MySQL 是正式状态，localStorage 只是请求失败时的回退。保存失败必须让用户知道。
     await storyboardAPI.saveReferenceAssets(storyboardId, items)
     lastSavedShotRefSelections.value = { ...lastSavedShotRefSelections.value, [key]: signature }
   } catch (error) {
     toast.error(`参考素材保存失败：${error.message || '请重试'}`)
+    throw new Error(`参考素材保存失败：${error.message || '请重试'}`)
   }
 }
 
@@ -4136,6 +4169,15 @@ async function genVid(sb) {
     toast.error('H3 提示词可能已过期（分镜内容或参考素材已变化），请重新生成 H3 后再提交视频')
     return
   }
+  try {
+    // 最新参考素材可能还在排队写入 MySQL：必须先等保存队列清空，
+    // 否则后端读到的仍是旧素材——H3 校验通过，但视频实际携带前端最新参考图。
+    // 保存失败（flushShotRefSaves 抛出）同样中止生成。
+    await flushShotRefSaves(sb.id)
+  } catch (e) {
+    toast.error(e.message)
+    return
+  }
   const useH3Prompt = h3Provider && !!h3Prompt
   const params = {
     storyboard_id: sb.id,
@@ -4153,6 +4195,9 @@ async function genVid(sb) {
       images: [...referenceImages],
       videos: [...videoRefVideoUrls.value],
       audios: [...videoRefAudioUrls.value],
+      // 额外参考图（手动选择/上传）单独列出：reference_image_urls 混入了
+      // 场景/角色/道具图，后端比对「本次请求素材 == H3 生成时素材」时只能用这一份。
+      extra_images: [...videoRefImageUrls.value],
       generated_at: new Date().toISOString(),
     },
   }

@@ -31,6 +31,8 @@ export interface AssetVersionInput {
   localPath?: string | null
   /** 任意保存都会刷新；同路径新内容靠它识别 */
   updatedAt?: string | null
+  /** 软删除时间：资产被删除后，绑定了它的分镜 H3 同样不再代表当前输入 */
+  deletedAt?: string | null
 }
 
 /** H3 来源指纹的组成段落 */
@@ -55,8 +57,8 @@ export interface H3SourceParts {
 const SECTION_SEPARATOR = '\n---\n'
 
 export function assetVersion(row: AssetVersionInput | undefined): string {
-  if (!row) return '||'
-  return `${row.imageUrl || ''}|${row.localPath || ''}|${row.updatedAt || ''}`
+  if (!row) return '|||'
+  return `${row.imageUrl || ''}|${row.localPath || ''}|${row.updatedAt || ''}|${row.deletedAt || ''}`
 }
 
 /**
@@ -68,6 +70,38 @@ export function fingerprintReferenceAssets(items: readonly ReferenceAssetFingerp
   return items
     .map(item => `${item.mediaType}:${item.mediaRole}:${item.url}`)
     .join('\n')
+}
+
+/** 前端提交的参考素材（仅额外素材：手动选择/上传的图片、视频、音频） */
+export interface SubmittedReferences {
+  images?: unknown[]
+  videos?: unknown[]
+  audios?: unknown[]
+}
+
+/** 归一化前端提交的参考素材：只保留字符串 URL、保持顺序、丢弃空项 */
+export function normalizeSubmittedReferences(raw: unknown): SubmittedReferences {
+  if (!raw || typeof raw !== 'object') return {}
+  const source = raw as Record<string, unknown>
+  const urls = (value: unknown) => Array.isArray(value)
+    ? value.map(item => String(item ?? '').trim()).filter(Boolean)
+    : []
+  return { images: urls(source.images), videos: urls(source.videos), audios: urls(source.audios) }
+}
+
+/**
+ * 把前端提交的额外参考素材转成与 storyboardReferenceAssets 相同的指纹格式。
+ * 与 fingerprintReferenceAssets 完全同构，只是媒体角色固定为 reference，
+ * 因此两份指纹可直接做字符串比较。
+ */
+export function fingerprintSubmittedReferences(submitted: SubmittedReferences | null | undefined): string {
+  if (!submitted) return ''
+  const items: ReferenceAssetFingerprintInput[] = [
+    ...(submitted.images || []).map(url => ({ mediaType: 'image', mediaRole: 'reference', url: String(url) })),
+    ...(submitted.videos || []).map(url => ({ mediaType: 'video', mediaRole: 'reference', url: String(url) })),
+    ...(submitted.audios || []).map(url => ({ mediaType: 'audio', mediaRole: 'reference', url: String(url) })),
+  ]
+  return fingerprintReferenceAssets(items)
 }
 
 export function computeH3SourceHash(parts: H3SourceParts): string {

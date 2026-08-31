@@ -46,6 +46,8 @@ export interface VideoReferenceSnapshot {
   images: string[]
   videos: string[]
   audios: string[]
+  /** 额外参考图（手动选择/上传）：reference_image_urls 混入了场景/角色/道具图 */
+  extra_images?: string[]
   generated_at: string
 }
 
