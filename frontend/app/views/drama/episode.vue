@@ -1783,6 +1783,7 @@
 
 <script setup>
 import { toast } from 'vue-sonner'
+import { nextTick } from 'vue'
 import {
   Users, Video, FileText, FolderKanban, Clapperboard, Download, Loader2,
   MapPin, Play, Plus, X, ListTodo,
@@ -2180,6 +2181,20 @@ const storedShotRefSelections = ref((() => {
   catch { return {} }
 })())
 let restoringShotRefSelection = false
+// 已成功写入 MySQL 的参考素材签名。内容相同的重复提交（页面刷新、切换分镜恢复状态）
+// 直接跳过，避免无意义回写把刚生成的 H3 提示词判定为过期。
+const lastSavedShotRefSelections = ref({})
+// 每个分镜一条串行保存队列 + 最新待存签名。
+// 快速连续选择素材时（deep watcher 每次变更都会触发保存），请求按提交顺序依次执行，
+// 避免网络返回顺序颠倒导致旧状态覆盖新状态——后端事务只保证单次请求完整，
+// 无法解决多个请求完成顺序颠倒的问题。
+const shotRefSaveQueues = {}
+const shotRefPendingSignatures = {}
+// 某分镜最近一次失败的保存错误：flushShotRefSaves 读取后抛出并清空，
+// 让「生成 H3 / 提交视频」在素材还没全部落库时中止，而不是继续用旧状态生成。
+const shotRefLastErrors = {}
+// URL → asset_id：记录参考素材来自资产库/上传落库的哪条资产，供后端追溯来源
+const refAssetOrigins = ref({})
 const imageViewer = ref({ open: false, src: '', title: '' })
 const activeMerge = ref(null) // 成片大预览弹窗中正在播放的拼接记录
 const assetDetail = ref({ open: false, type: '', item: null })
@@ -2635,6 +2650,8 @@ const refAssetCandidates = computed(() => {
       source: '本地上传素材库',
       url: asset.url || asset.local_path || asset.localPath,
       thumbnail: asset.thumbnail_url || asset.thumbnailUrl,
+      // 带上资产库记录 ID，保存参考素材时后端可追溯到原始资产
+      asset_id: asset.id,
     })
   }
   return items
@@ -2694,6 +2711,7 @@ function toggleRefAsset(asset) {
     return
   }
   list.value = [...list.value, asset.url]
+  rememberRefAssetOrigin(asset.url, asset.asset_id)
 }
 
 // 配置变化后校验持久化的模型是否仍存在（配置被删/模型被移除时回退默认，避免把失效模型传给后端）
@@ -3138,7 +3156,7 @@ function getStoryboardCharacterIds(sb) {
 
 function getStoryboardCharacters(sb) {
   const ids = getStoryboardCharacterIds(sb)
-  return visualChars.value.filter(char => ids.includes(char.id))
+  return visualChars.value.filter(char => ids.includes(char.id)).sort((a, b) => Number(a.id) - Number(b.id))
 }
 
 function getStoryboardScene(sb) {
@@ -3165,7 +3183,7 @@ function getStoryboardPropIds(sb) {
 
 function getStoryboardProps(sb) {
   const ids = getStoryboardPropIds(sb)
-  return propItems.value.filter(p => ids.includes(p.id))
+  return propItems.value.filter(p => ids.includes(p.id)).sort((a, b) => Number(a.id) - Number(b.id))
 }
 
 function isStoryboardPropSelected(sb, propId) {
@@ -3492,6 +3510,9 @@ async function genMinimaxH3Prompt(sb) {
   const referencePlan = buildMinimaxH3ReferencePlan(sb)
   minimaxH3PromptGeneratingIds.value.push(sb.id)
   try {
+    // 最新参考素材可能还在排队写入 MySQL：先等保存队列清空，
+    // 否则 H3 会基于旧素材生成，刚保存的参考图没有进入 H3 的输入。
+    await flushShotRefSaves(sb.id)
     await api.post('/agent/minimax_h3_prompt_generator/chat', {
       message: `请为分镜 #${idx}(ID:${sb.id})生成并保存 MiniMax H3 大模型提示词(minimax_h3_prompt)。
 
@@ -3900,37 +3921,150 @@ function resolveVideoPromptRefs(sb) {
   })
 }
 
-function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
-  if (!storyboardId || restoringShotRefSelection) return
-  const items = [
-    ...videoRefImageUrls.value.map((url, index) => ({ media_type: 'image', media_role: 'reference', url, sort_order: index })),
-    ...videoRefVideoUrls.value.map((url, index) => ({ media_type: 'video', media_role: 'reference', url, sort_order: index })),
-    ...videoRefAudioUrls.value.map((url, index) => ({ media_type: 'audio', media_role: 'reference', url, sort_order: index })),
+function rememberRefAssetOrigin(url, assetId) {
+  if (!url || assetId == null) return
+  refAssetOrigins.value = { ...refAssetOrigins.value, [url]: Number(assetId) }
+}
+
+function buildShotRefItems() {
+  const withOrigin = (urls, mediaType) => urls.map((url, index) => ({
+    media_type: mediaType,
+    media_role: 'reference',
+    url,
+    sort_order: index,
+    asset_id: refAssetOrigins.value[url] ?? null,
+  }))
+  return [
+    ...withOrigin(videoRefImageUrls.value, 'image'),
+    ...withOrigin(videoRefVideoUrls.value, 'video'),
+    ...withOrigin(videoRefAudioUrls.value, 'audio'),
   ]
-  storedShotRefSelections.value[String(storyboardId)] = {
+}
+
+/** 参考素材内容签名：类型、顺序、URL 全部一致才算没有变化 */
+function shotRefSignature(items) {
+  return JSON.stringify(items.map(item => [item.media_type, item.url]))
+}
+
+/**
+ * 保存分镜的参考素材选择。返回 Promise 便于调用方感知保存结果。
+ * 内容捕获是同步的（关键：排队执行时状态可能已切换到别的分镜或继续更新过）；
+ * 真正的 HTTP 请求按分镜串行执行，快速连续选择不会乱序覆盖。
+ */
+function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
+  if (!storyboardId || restoringShotRefSelection) return Promise.resolve()
+  // 关键：同步捕获当前内容。排队执行时状态可能已经切换到别的分镜或继续更新过。
+  const items = buildShotRefItems()
+  const key = String(storyboardId)
+  const signature = shotRefSignature(items)
+  // 与上次成功写入的内容完全一致：无需重复提交。
+  // 页面刷新、切换分镜恢复状态都会用同一份内容重复提交，
+  // 无差别回写会让后端误判参考素材变化，刚生成的 H3 提示词立刻被标记过期。
+  if (lastSavedShotRefSelections.value[key] === signature) return Promise.resolve()
+  // 已有相同内容的保存在排队/执行中：不重复入队，但必须返回那条队列任务，
+  // 让「生成 H3 / 提交视频」前的 flush 能等到它真正写完，而不是立即放行。
+  if (shotRefPendingSignatures[key] === signature) {
+    return shotRefSaveQueues[key] || Promise.resolve()
+  }
+
+  shotRefPendingSignatures[key] = signature
+  storedShotRefSelections.value[key] = {
     image: [...videoRefImageUrls.value], video: [...videoRefVideoUrls.value], audio: [...videoRefAudioUrls.value],
   }
   try { localStorage.setItem(REF_SELECTION_STORE_KEY, JSON.stringify(storedShotRefSelections.value)) } catch { /* ignore */ }
-  // MySQL is the canonical state; localStorage remains a fast fallback for offline/page startup.
-  storyboardAPI.saveReferenceAssets(storyboardId, items).catch(() => {})
+
+  // 排队：同一分镜的请求永远按入队顺序依次执行，后面的保存排在前面的结果之后。
+  // 队列本身不因单次失败中断（后面的保存可能带最新状态），
+  // 但失败必须记录到 shotRefLastErrors，由 flushShotRefSaves 抛出并中止生成。
+  const run = (shotRefSaveQueues[key] || Promise.resolve())
+    .then(() => performShotRefSave(storyboardId, { items, signature }))
+    .catch((error) => { shotRefLastErrors[key] = error })
+  const settle = () => {
+    if (shotRefSaveQueues[key] === run) shotRefSaveQueues[key] = null
+    if (shotRefPendingSignatures[key] === signature) delete shotRefPendingSignatures[key]
+  }
+  run.then(settle)
+  shotRefSaveQueues[key] = run
+  return run
+}
+
+/**
+ * 等待某分镜的参考素材保存队列完全清空。
+ * 用于「生成 H3 提示词 / 提交视频」之前：最新素材可能还在排队写入 MySQL，
+ * 不等队列就读取会拿到旧素材——H3 校验通过，但视频实际携带前端最新参考图。
+ * 任一保存失败则抛出错误，调用方必须中止生成。
+ */
+async function flushShotRefSaves(storyboardId) {
+  const key = String(storyboardId)
+  while (shotRefSaveQueues[key]) {
+    await shotRefSaveQueues[key]
+  }
+  if (shotRefLastErrors[key]) {
+    const error = shotRefLastErrors[key]
+    delete shotRefLastErrors[key]
+    throw error
+  }
+}
+
+/** 实际的参考素材保存请求，只由 saveShotRefSelection 排入的串行队列调用。 */
+async function performShotRefSave(storyboardId, { items, signature }) {
+  const key = String(storyboardId)
+  // 执行到自己时内容可能已由队列中更靠后的保存写入，或已被更新的保存覆盖
+  if (lastSavedShotRefSelections.value[key] === signature) return
+  // MySQL 是正式状态，localStorage 只是请求失败时的回退。
+  // 保存失败必须让调用方感知并中止生成：队列的 catch 会记录到 shotRefLastErrors，
+  // 生成 H3 / 提交视频前的 flushShotRefSaves 读取后抛出，不能只弹提示后继续。
+  try {
+    await storyboardAPI.saveReferenceAssets(storyboardId, items)
+    lastSavedShotRefSelections.value = { ...lastSavedShotRefSelections.value, [key]: signature }
+  } catch (error) {
+    toast.error(`参考素材保存失败：${error.message || '请重试'}`)
+    throw new Error(`参考素材保存失败：${error.message || '请重试'}`)
+  }
 }
 
 async function restoreShotRefSelection(sb) {
   const saved = storedShotRefSelections.value[String(sb?.id)] || {}
-  let durable = []
-  if (sb?.id) {
-    try { durable = await storyboardAPI.referenceAssets(sb.id) || [] } catch { durable = [] }
+  const cachedSource = {
+    image: Array.isArray(saved.image) ? saved.image : [],
+    video: Array.isArray(saved.video) ? saved.video : [],
+    audio: Array.isArray(saved.audio) ? saved.audio : [],
   }
-  const source = durable.length ? {
-    image: durable.filter(item => item.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
-    video: durable.filter(item => item.media_type === 'video').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
-    audio: durable.filter(item => item.media_type === 'audio').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
-  } : saved
+  let source = cachedSource
+
+  if (sb?.id) {
+    try {
+      const durable = await storyboardAPI.referenceAssets(sb.id) || []
+      // 请求成功即代表正式状态：返回空数组就是「确实没有参考素材」，
+      // 不能回退本地缓存，否则用户清空的素材会被旧缓存复活并写回数据库。
+      source = {
+        image: durable.filter(item => item.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+        video: durable.filter(item => item.media_type === 'video').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+        audio: durable.filter(item => item.media_type === 'audio').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+      }
+      const origins = { ...refAssetOrigins.value }
+      for (const item of durable) if (item.asset_id) origins[item.url] = Number(item.asset_id)
+      refAssetOrigins.value = origins
+    } catch {
+      // 只有请求失败才回退到浏览器缓存
+      source = cachedSource
+    }
+  }
+
   restoringShotRefSelection = true
-  videoRefVideoUrls.value = Array.isArray(source.video) ? [...source.video] : []
-  videoRefAudioUrls.value = Array.isArray(source.audio) ? [...source.audio] : []
-  videoRefImageUrls.value = Array.isArray(source.image) ? [...source.image] : []
+  videoRefVideoUrls.value = [...source.video]
+  videoRefAudioUrls.value = [...source.audio]
+  videoRefImageUrls.value = [...source.image]
   videoDuration.value = Number(sb?.duration || 10)
+  // 恢复结果就是数据库当前状态：先记下签名，再让 deep watcher 在本帧内跑完，
+  // 保证「恢复状态」本身不会触发一次回写。
+  if (sb?.id) {
+    lastSavedShotRefSelections.value = {
+      ...lastSavedShotRefSelections.value,
+      [String(sb.id)]: shotRefSignature(buildShotRefItems()),
+    }
+  }
+  await nextTick()
   restoringShotRefSelection = false
 }
 
@@ -3994,6 +4128,7 @@ function uploadRefMedia(kind) {
       try {
         const res = await uploadAPI.image(file, libraryMeta)
         videoRefImageUrls.value = [...videoRefImageUrls.value, res.url]
+        rememberRefAssetOrigin(res.url, res.asset_id)
         await loadRefAssetLibrary()
         toast.success('参考图片已上传')
       } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
@@ -4010,6 +4145,7 @@ function uploadRefMedia(kind) {
     try {
       const res = isVideo ? await uploadAPI.video(file, libraryMeta) : await uploadAPI.audio(file, libraryMeta)
       list.value = [...list.value, res.url]
+      rememberRefAssetOrigin(res.url, res.asset_id)
       await loadRefAssetLibrary()
       toast.success(`参考${label}已上传`)
     } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
@@ -4024,7 +4160,25 @@ function removeRefMedia(kind, index) {
 async function genVid(sb) {
   const referenceImages = getShotReferenceImages(sb)
   const h3Prompt = String(sb.minimax_h3_prompt || sb.minimaxH3Prompt || '').trim()
-  const useH3Prompt = ['autodl', 'minimax'].includes(selectedVideoProvider.value) && !!h3Prompt
+  const h3SourceHash = String(sb.minimax_h3_source_hash || sb.minimaxH3SourceHash || '').trim()
+  const h3Provider = ['autodl', 'minimax'].includes(selectedVideoProvider.value)
+  // H3 已被标记过期（来源哈希被清空）时禁止直接用于生成：
+  // 分镜内容或参考素材已变化，旧提示词不再代表当前投产输入。
+  // 服务端提交时还会重算指纹兜底，前端拦截只为了尽早提示用户。
+  if (h3Provider && h3Prompt && !h3SourceHash) {
+    toast.error('H3 提示词可能已过期（分镜内容或参考素材已变化），请重新生成 H3 后再提交视频')
+    return
+  }
+  try {
+    // 最新参考素材可能还在排队写入 MySQL：必须先等保存队列清空，
+    // 否则后端读到的仍是旧素材——H3 校验通过，但视频实际携带前端最新参考图。
+    // 保存失败（flushShotRefSaves 抛出）同样中止生成。
+    await flushShotRefSaves(sb.id)
+  } catch (e) {
+    toast.error(e.message)
+    return
+  }
+  const useH3Prompt = h3Provider && !!h3Prompt
   const params = {
     storyboard_id: sb.id,
     drama_id: dramaId,
@@ -4041,6 +4195,11 @@ async function genVid(sb) {
       images: [...referenceImages],
       videos: [...videoRefVideoUrls.value],
       audios: [...videoRefAudioUrls.value],
+      // 额外参考图（手动选择/上传）单独列出，随快照落库供追溯。
+      // 注意：H3 一致性校验不读取本字段——服务端会按分镜绑定与数据库
+      // 额外素材重建完整参考列表，与实际的 reference_*_urls 逐项比较，
+      // 客户端快照一律不被信任。
+      extra_images: [...videoRefImageUrls.value],
       generated_at: new Date().toISOString(),
     },
   }

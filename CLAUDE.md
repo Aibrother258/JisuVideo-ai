@@ -32,15 +32,16 @@ data/      — generated static files
 - **HTTP**: Hono framework with CORS, logger middleware
 - **Database**: Drizzle ORM + mysql2, schema in `src/db/schema.ts`
 - **AI Agents**: Mastra framework with AI SDK (OpenAI compatible providers)
-- **Agent Types**: script_rewriter, extractor, storyboard_breaker, grid_prompt_generator
+- **Agent Types**: script_rewriter, extractor, storyboard_breaker, prompt_generator, minimax_h3_prompt_generator
 - **Agent Chat**: Hono JSON endpoints for agent responses
 - **File Storage**: Local filesystem under `data/static/`
+- **H3 Source Fingerprint**: `src/services/h3-source.ts` — 唯一指纹入口，保存与失效判断共用
 
 ### Frontend
-- **Vue 3** + TypeScript + Vite
-- **Routing**: Vue Router (4 routes: list, detail, workbench, settings)
+- **Vue 3** + TypeScript + Vite (Nuxt 3, SPA mode `ssr:false`)
+- **Routing**: 文件路由 + `nuxt.config.ts` 的 `pages:extend` 手动注册 `/drama/:id` 与 `/drama/:id/episode/:episodeNumber`
 - **State**: Single composable `useWorkbench.ts` for workbench page
-- **API**: Unified fetch client in `src/api/index.ts` with SSE async generator
+- **API**: Unified fetch client in `frontend/app/composables/useApi.ts`
 - **Styling**: Pure CSS with CSS variables (dark theme)
 
 ## Database

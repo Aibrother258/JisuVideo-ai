@@ -10,6 +10,7 @@
 | HB-20260831-02 | MiniMax H3 提示词 Skill、Agent 与生成按钮 | 已完成并用分镜 01 真实验证 | [查看日志](./2026-08-31-minimax-h3-prompt-workflow.md) |
 | HB-20260831-03 | 工作台面板可拖动布局与尺寸记忆 | 已完成代码实现、构建与新增测试验证；历史测试仍有路径债务 | [查看日志](./2026-08-31-resizable-workbench.md) |
 | HB-20260831-04 | 参考素材持久化、视频区职责分层与 H3 新鲜度 | 已完成代码实现与开发栈验证 | [查看日志](./2026-08-31-reference-state-and-h3-freshness.md) |
+| HB-20260831-05 | H3 新鲜度修复、参考素材事务化与测试基线收紧 | 代码实现与静态审查完成；本机无 Node，typecheck/测试/构建待补跑 | [查看日志](./2026-08-31-h3-freshness-and-reference-state-sync.md) |
 
 ## 记录规范
 

@@ -2,12 +2,37 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, created, badRequest } from '../utils/response.js'
-import { generateImage, generateVideo } from '../services/generation.js'
+import { generateImage, generateVideo, type VideoReferenceSnapshot } from '../services/generation.js'
+import { verifyH3PromptFreshness } from '../services/h3-source.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
 
 type TaskType = 'image' | 'video'
+
+/**
+ * 归一化前端提交的参考素材快照。
+ * 只保留可序列化的字符串数组与时间戳，其余字段一律丢弃，
+ * 避免把整个前端状态对象写进任务参数。
+ */
+function normalizeReferenceSnapshot(raw: unknown): VideoReferenceSnapshot | null {
+  if (!raw || typeof raw !== 'object') return null
+  const source = raw as Record<string, unknown>
+  const urls = (value: unknown, limit: number) => Array.isArray(value)
+    ? value.map(item => String(item ?? '').trim()).filter(Boolean).slice(0, limit)
+    : []
+  return {
+    images: urls(source.images, 9),
+    videos: urls(source.videos, 3),
+    audios: urls(source.audios, 3),
+    // 额外参考图单独记录：reference_image_urls 混入了场景/角色/道具图，
+    // H3 一致性校验只能比对该字段
+    extra_images: urls(source.extra_images, 9),
+    generated_at: typeof source.generated_at === 'string' && source.generated_at
+      ? source.generated_at
+      : new Date().toISOString(),
+  }
+}
 
 // POST /tasks — 发起生成任务（body.type: image | video）
 app.post('/', async (c) => {
@@ -47,6 +72,24 @@ app.post('/', async (c) => {
       }
     }
 
+    // 服务端兜底：提交的 prompt 若就是该分镜已保存的 H3 提示词，
+    // 必须确认来源指纹仍然新鲜，且本次请求的参考素材与 H3 生成时一致。
+    // 前端「已过期」提示可被绕过（直接调 API），这里在提交瞬间重算做最终裁决。
+    // 校验只比较实际的 reference_*_urls，不信任 reference_snapshot：
+    // 调用者可在快照里填正确值、实际生成数组里放另一套素材，快照仅用于落库追溯。
+    if (type === 'video' && body.storyboard_id) {
+      const h3Error = await verifyH3PromptFreshness(
+        Number(body.storyboard_id),
+        body.prompt,
+        {
+          images: body.reference_image_urls,
+          videos: body.reference_video_urls,
+          audios: body.reference_audio_urls,
+        },
+      )
+      if (h3Error) return badRequest(c, h3Error)
+    }
+
     logTaskStart('TaskAPI', 'generate', {
       type,
       storyboardId: body.storyboard_id,
@@ -78,6 +121,7 @@ app.post('/', async (c) => {
         referenceImageUrls: body.reference_image_urls,
         referenceVideoUrls: body.reference_video_urls,
         referenceAudioUrls: body.reference_audio_urls,
+        referenceSnapshot: normalizeReferenceSnapshot(body.reference_snapshot),
         generateAudio: body.generate_audio,
         duration: body.duration,
         aspectRatio: body.aspect_ratio,

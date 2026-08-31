@@ -10,7 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "typecheck": "tsc --noEmit",
-    "backfill-artwork": "tsx scripts/backfill-artwork.ts"
+    "test": "node --import tsx/esm --test",
+    "test:h3": "node --import tsx/esm --test tests/h3-source-behavior.test.mjs",
+    "backfill-artwork": "tsx scripts/backfill-artwork.ts",
+    "backfill-h3-source": "tsx scripts/backfill-h3-source.ts"
   },
   "keywords": [],
   "author": "",

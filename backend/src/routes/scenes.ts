@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, badRequest, now } from '../utils/response.js'
 import { generateImage } from '../services/generation.js'
+import { invalidateH3ForScene } from '../services/h3-source.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureSceneFinalPrompt } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
@@ -60,6 +61,10 @@ app.put('/:id', async (c) => {
   if (body.final_prompt !== undefined) updates.finalPrompt = body.final_prompt || null
   else if (body.finalPrompt !== undefined) updates.finalPrompt = body.finalPrompt || null
   await db.update(schema.scenes).set(updates).where(eq(schema.scenes.id, id))
+  // 场景设定图变化会使绑定该场景的分镜 H3 提示词过期
+  if ('imageUrl' in updates || 'localPath' in updates) {
+    await invalidateH3ForScene(id, 'scene-image-updated')
+  }
   return success(c)
 })
 
@@ -120,6 +125,8 @@ app.post('/:id/generate-prompt', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.scenes).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.scenes.id, id))
+  // 场景被删除后，绑定了它的分镜 H3 不再代表当前输入（指纹含 deletedAt）
+  await invalidateH3ForScene(id, 'scene-deleted')
   return success(c)
 })
 

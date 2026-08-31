@@ -4,6 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
+import { invalidateH3ForProp } from '../services/h3-source.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensurePropFinalPrompt } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
@@ -42,6 +43,8 @@ app.post('/', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.props).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.props.id, id))
+  // 道具被删除后，绑定了它的分镜 H3 不再代表当前输入（指纹含 deletedAt）
+  await invalidateH3ForProp(id, 'prop-deleted')
   return success(c)
 })
 
@@ -62,6 +65,10 @@ app.put('/:id', async (c) => {
   if (body.final_prompt !== undefined) updates.finalPrompt = body.final_prompt || null
   else if (body.finalPrompt !== undefined) updates.finalPrompt = body.finalPrompt || null
   await db.update(schema.props).set(updates).where(eq(schema.props.id, id))
+  // 道具设定图变化会使绑定该道具的分镜 H3 提示词过期
+  if ('imageUrl' in updates || 'localPath' in updates) {
+    await invalidateH3ForProp(id, 'prop-image-updated')
+  }
   return success(c)
 })
 
