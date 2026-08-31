@@ -10,6 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/",
+    "test:h3": "node --import tsx/esm --test tests/h3-source-behavior.test.mjs",
     "backfill-artwork": "tsx scripts/backfill-artwork.ts",
     "backfill-h3-source": "tsx scripts/backfill-h3-source.ts"
   },

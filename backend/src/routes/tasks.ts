@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, created, badRequest } from '../utils/response.js'
 import { generateImage, generateVideo, type VideoReferenceSnapshot } from '../services/generation.js'
+import { verifyH3PromptFreshness } from '../services/h3-source.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -66,6 +67,14 @@ app.post('/', async (c) => {
         if (locked != null) configId = locked
         if (type === 'video' && ep?.resolution) episodeResolution = ep.resolution
       }
+    }
+
+    // 服务端兜底：提交的 prompt 若就是该分镜已保存的 H3 提示词，
+    // 必须确认来源指纹仍然新鲜。前端「已过期」提示可被绕过（直接调 API），
+    // 这里在提交瞬间重算指纹做最终裁决。
+    if (type === 'video' && body.storyboard_id) {
+      const h3Error = await verifyH3PromptFreshness(Number(body.storyboard_id), body.prompt)
+      if (h3Error) return badRequest(c, h3Error)
     }
 
     logTaskStart('TaskAPI', 'generate', {

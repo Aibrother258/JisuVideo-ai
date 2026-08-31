@@ -9,6 +9,7 @@ import { now } from '../utils/response.js'
 import { downloadFile, generateImageThumb, readImageAsCompressedDataUrl, readMediaAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
+import { invalidateH3ForCharacter, invalidateH3ForProp, invalidateH3ForScene, invalidateH3ForStoryboards } from './h3-source.js'
 import type { AIConfig } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 
@@ -430,7 +431,9 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
   await writeBackImageAssets(record, localPath)
 }
 
-// 图片完成后回写业务表：分镜(按 frameType)、角色、场景、道具
+// 图片完成后回写业务表：分镜(按 frameType)、角色、场景、道具。
+// 回写即「内容被引用的输入变了」：首/尾帧影响 H3 模式判定，角色/场景/道具设定图
+// 是 H3 的参考输入，必须主动失效绑定这些资产的分镜 H3，界面才会立即显示过期。
 async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   const params = parseTaskParams(record.params)
   if (record.storyboardId) {
@@ -439,15 +442,21 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
     else if (params.frameType === 'last_frame') sbUpdate.lastFrameImage = localPath
     else sbUpdate.composedImage = localPath
     await db.update(schema.storyboards).set(sbUpdate).where(eq(schema.storyboards.id, record.storyboardId))
+    if (params.frameType === 'first_frame' || params.frameType === 'last_frame') {
+      await invalidateH3ForStoryboards([record.storyboardId], `frame-${params.frameType}-generated`)
+    }
   }
   if (record.characterId) {
     await db.update(schema.characters).set({ imageUrl: localPath, updatedAt: now() }).where(eq(schema.characters.id, record.characterId))
+    await invalidateH3ForCharacter(record.characterId, 'character-image-generated')
   }
   if (record.sceneId) {
     await db.update(schema.scenes).set({ imageUrl: localPath, status: 'completed', updatedAt: now() }).where(eq(schema.scenes.id, record.sceneId))
+    await invalidateH3ForScene(record.sceneId, 'scene-image-generated')
   }
   if (record.propId) {
     await db.update(schema.props).set({ imageUrl: localPath, updatedAt: now() }).where(eq(schema.props.id, record.propId))
+    await invalidateH3ForProp(record.propId, 'prop-image-generated')
   }
 }
 

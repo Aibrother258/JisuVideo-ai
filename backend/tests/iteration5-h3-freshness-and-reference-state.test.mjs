@@ -14,11 +14,15 @@ const read = (path) => readFileSync(new URL(path, root), 'utf8')
 const exists = (path) => existsSync(new URL(path, root))
 
 const h3 = read('src/services/h3-source.ts')
+const fingerprint = read('src/services/h3-fingerprint.ts')
 const routes = read('src/routes/storyboards.ts')
 const tools = read('src/agents/tools/storyboard-tools.ts')
 const tasks = read('src/routes/tasks.ts')
 const generation = read('src/services/generation.ts')
 const frontend = read('../frontend/app/views/drama/episode.vue')
+const characters = read('src/routes/characters.ts')
+const scenes = read('src/routes/scenes.ts')
+const props = read('src/routes/props.ts')
 
 test('H3 source fingerprint lives in one shared module used by both writers', () => {
   // 生成侧（Agent 工具）与失效侧（路由）必须用同一套算法，
@@ -28,7 +32,10 @@ test('H3 source fingerprint lives in one shared module used by both writers', ()
   assert.match(tools, /collectH3SourceHash\(storyboard\)/)
   assert.match(routes, /collectH3SourceHash\(/)
   assert.match(h3, /export async function collectH3SourceHash/)
-  assert.match(h3, /export function computeH3SourceHash/)
+  // 纯算法抽到独立模块（不依赖数据库，可做真实行为测试），h3-source 再导出
+  assert.match(fingerprint, /export function computeH3SourceHash/)
+  assert.match(fingerprint, /export function h3FreshnessError/)
+  assert.match(h3, /export \{ computeH3SourceHash, fingerprintReferenceAssets, h3FreshnessError \} from '\.\/h3-fingerprint\.js'/)
 })
 
 test('H3 fingerprint covers scene, character and prop bindings plus their image versions', () => {
@@ -42,6 +49,10 @@ test('H3 fingerprint covers scene, character and prop bindings plus their image 
   // 设定图版本进入指纹：重新生成角色图 / 场景图 / 道具图也要让 H3 失效
   assert.match(h3, /imageUrl/)
   assert.match(h3, /localPath/)
+  // 素材版本带 updatedAt：文件内容变了但路径没变时也能识别
+  assert.match(h3, /updatedAt/)
+  // 首帧/尾帧影响 H3 模式判定，也纳入指纹
+  assert.match(h3, /frameVersion/)
 })
 
 test('reference asset saves invalidate H3 only when the source actually changes', () => {
@@ -117,5 +128,61 @@ test('a backfill script can repair storyboards that have an H3 prompt but no sou
   assert.match(script, /isNotNull\(schema\.storyboards\.minimaxH3Prompt\)/)
   assert.match(script, /collectH3SourceHash/)
   assert.match(script, /--dry-run/)
+  // 实际写入必须显式 --confirm，防止把「内容已变但没被识别」的旧提示词误标为新鲜
+  assert.match(script, /--confirm/)
+  assert.match(script, /未指定模式：默认只预演/)
   assert.match(read('package.json'), /"backfill-h3-source": "tsx scripts\/backfill-h3-source\.ts"/)
+})
+
+test('server-side guard rejects video tasks that resubmit a stale H3 prompt', () => {
+  assert.match(tasks, /import \{ verifyH3PromptFreshness \} from '\.\.\/services\/h3-source\.js'/)
+  assert.match(tasks, /await verifyH3PromptFreshness\(Number\(body\.storyboard_id\), body\.prompt\)/)
+  assert.match(tasks, /if \(h3Error\) return badRequest\(c, h3Error\)/)
+  // 判定必须在生成之前，否则旧提示词照样投产出片
+  assert.ok(tasks.indexOf('verifyH3PromptFreshness') < tasks.indexOf('generateVideo('))
+})
+
+test('character / scene / prop image updates invalidate bound storyboards H3', () => {
+  assert.match(characters, /import \{ invalidateH3ForCharacter \} from '\.\.\/services\/h3-source\.js'/)
+  assert.match(characters, /invalidateH3ForCharacter\(id, 'character-image-updated'\)/)
+  assert.match(scenes, /import \{ invalidateH3ForScene \} from '\.\.\/services\/h3-source\.js'/)
+  assert.match(scenes, /invalidateH3ForScene\(id, 'scene-image-updated'\)/)
+  assert.match(props, /import \{ invalidateH3ForProp \} from '\.\.\/services\/h3-source\.js'/)
+  assert.match(props, /invalidateH3ForProp\(id, 'prop-image-updated'\)/)
+  // 钩子只挂在图片字段变化时，避免「改文本也失效」的过度失效
+  assert.match(characters, /if \('imageUrl' in updates \|\| 'localPath' in updates\)/)
+  assert.match(h3, /export async function invalidateH3ForCharacter/)
+  assert.match(h3, /export async function invalidateH3ForScene/)
+  assert.match(h3, /export async function invalidateH3ForProp/)
+})
+
+test('generated character / scene / prop images also invalidate bound storyboards H3', () => {
+  assert.match(generation, /invalidateH3ForCharacter\(record\.characterId, 'character-image-generated'\)/)
+  assert.match(generation, /invalidateH3ForScene\(record\.sceneId, 'scene-image-generated'\)/)
+  assert.match(generation, /invalidateH3ForProp\(record\.propId, 'prop-image-generated'\)/)
+  // 首帧/尾帧生成后同样失效该分镜 H3（帧图影响 H3 模式判定）
+  assert.match(generation, /invalidateH3ForStoryboards\(\[record\.storyboardId\], `frame-/)
+})
+
+test('frontend blocks video generation when H3 has been marked stale', () => {
+  assert.match(frontend, /const h3SourceHash = String\(sb\.minimax_h3_source_hash/)
+  assert.match(frontend, /h3Provider && h3Prompt && !h3SourceHash/)
+  assert.match(frontend, /请重新生成 H3 后再提交视频/)
+})
+
+test('rapid reference selection saves are serialized per storyboard', () => {
+  assert.match(frontend, /const shotRefSaveQueues = \{\}/)
+  assert.match(frontend, /const shotRefPendingSignatures = \{\}/)
+  assert.match(frontend, /async function performShotRefSave/)
+  // 请求按入队顺序串行执行，防止网络返回乱序覆盖
+  assert.match(frontend, /shotRefSaveQueues\[key\] \|\| Promise\.resolve\(\)/)
+  // 内容在入队时同步捕获：排队执行时状态可能已切换
+  assert.match(frontend, /同步捕获当前内容/)
+})
+
+test('reference asset total overflow returns an explicit 400 instead of silent truncation', () => {
+  assert.match(routes, /normalized\.length > REFERENCE_TOTAL_LIMIT/)
+  assert.match(routes, /参考素材总数超过上限/)
+  // 静默截断已移除
+  assert.doesNotMatch(routes, /if \(normalized\.length >= REFERENCE_TOTAL_LIMIT\) break/)
 })

@@ -4,6 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
+import { invalidateH3ForCharacter } from '../services/h3-source.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureCharacterFinalPrompt } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
@@ -67,6 +68,11 @@ app.put('/:id', async (c) => {
   if (body.final_prompt !== undefined) updates.finalPrompt = body.final_prompt || null
   else if (body.finalPrompt !== undefined) updates.finalPrompt = body.finalPrompt || null
   await db.update(schema.characters).set(updates).where(eq(schema.characters.id, id))
+  // 设定图变化会使绑定该角色的分镜 H3 提示词过期：这些分镜引用的是角色设定图，
+  // 内容被引用的输入变了，旧提示词不再代表当前投产输入。
+  if ('imageUrl' in updates || 'localPath' in updates) {
+    await invalidateH3ForCharacter(id, 'character-image-updated')
+  }
   return success(c)
 })
 

@@ -40,7 +40,6 @@ app.put('/:id/reference-assets', async (c) => {
   const normalized: (typeof schema.storyboardReferenceAssets.$inferInsert)[] = []
 
   for (const item of items) {
-    if (normalized.length >= REFERENCE_TOTAL_LIMIT) break
     const mediaType = String(item?.media_type || '').toLowerCase()
     if (!validTypes.has(mediaType)) continue
     const url = String(item?.url || '').trim()
@@ -61,6 +60,12 @@ app.put('/:id/reference-assets', async (c) => {
       createdAt: ts,
       updatedAt: ts,
     })
+  }
+
+  // 总量兜底：单类上限 9+3+3 之和已等于总量，此检查是防御性约束，
+  // 一旦任一上限被调松，超量保存必须显式报错而不是静默截断。
+  if (normalized.length > REFERENCE_TOTAL_LIMIT) {
+    return badRequest(c, `参考素材总数超过上限 ${REFERENCE_TOTAL_LIMIT}，请删减后再保存`)
   }
 
   // 失效判断必须基于内容而不是「收到一次保存请求」：

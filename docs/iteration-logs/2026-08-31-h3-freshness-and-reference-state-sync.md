@@ -139,3 +139,64 @@ if (after !== before) 清空 H3 元数据
 5. 视频生成轮询在进程内存中 fire-and-forget，重启即丢；规模化后应换持久化队列（如 BullMQ）。
 6. 评估是否恢复 `mysql-schema.ts` 的旧表 `DROP` 清理（本轮刻意未动）。
 7. 剩余旧测试失败项需在有 Node 的环境逐条分类（真实缺陷 / 旧路径 / 旧断言）后继续收敛。
+
+---
+
+# 修订 R1：响应 PR 审查（2026-09-01）
+
+PR #1（`Aibrother258/JisuVideo-ai`）审查结论：方向正确、不推倒重来，但有 **3 个合并阻断项** + 2 项建议。本修订在同一分支、同一 PR 上补齐，不另开新 PR。
+
+## R1-阻断项 1：已过期的 H3 提示词仍会被拿去生成视频
+
+原 `genVid` 只判断「有没有 H3 提示词」（`!!h3Prompt`），完全不检查来源哈希；参考素材/分镜内容变化、H3 已被标记过期后，用户仍可提交旧提示词生成视频。
+
+修复（前端 + 后端双保险）：
+
+- **前端** `episode.vue` `genVid`：新增 `h3SourceHash` 检查，`h3Provider && h3Prompt && !h3SourceHash` 时 toast 提示并 `return`，禁止提交。
+- **后端** `tasks.ts` `POST /tasks`：新增服务端兜底 `verifyH3PromptFreshness(storyboardId, prompt)`——提交的 prompt 若与库中该分镜的 `minimax_h3_prompt` 逐字一致，就重算当前指纹与存储值比对；缺失指纹或指纹不匹配一律 400 拒绝。判定不依赖前端传任何标志，直接调 API 也无法绕过。
+
+## R1-阻断项 2：角色/场景/道具图片更新后不会自动判定 H3 过期
+
+上轮指纹已纳入角色/场景/道具图片地址，但失效判断只挂在「更新分镜」「保存参考素材」两个接口上；角色图/场景图/道具图在其他接口更新，重绘设定图后 H3 仍显示有效。
+
+修复（三层覆盖）：
+
+1. **失效钩子**：`characters.ts` / `scenes.ts` / `props.ts` 的 `PUT /:id` 在图片字段（`imageUrl` / `localPath`）变化时调用 `invalidateH3ForCharacter/Scene/Prop`，清空所有绑定了该资产的分镜 H3 元数据（界面立即显示过期）。
+2. **生成回写失效**：`generation.ts` `writeBackImageAssets` 在角色/场景/道具图生成完成回写时同样失效；首帧/尾帧生成后也失效对应分镜 H3（帧图影响 H3 的 T2VA/I2VA/Ref2VA 模式判定）。
+3. **指纹纳入 `updatedAt` 与帧图**：`h3-fingerprint.ts` 的资产版本 = `image_url|local_path|updatedAt`，文件内容改变但路径未变也能识别；指纹新增 `frameVersion`（首帧/尾帧）。即使某个更新路径漏挂钩子，服务端提交校验也会在最后一刻拒绝过期 H3。
+
+纯算法抽到新模块 `backend/src/services/h3-fingerprint.ts`（无任何 DB 依赖），`h3-source.ts` 再导出并持有全部 DB 读写，两层职责分离。
+
+## R1-阻断项 3：快速连续选择素材可能保存乱序
+
+原实现监听数组变化后直接并发调用异步保存：请求一存 A、请求二存 A+B，若请求一最后完成，数据库最终只剩 A。后端事务只保证单次请求完整，无法解决多个请求完成顺序颠倒。
+
+修复：`episode.vue` 新增**每分镜一条串行保存队列**（`shotRefSaveQueues` + `shotRefPendingSignatures`）：
+
+- 内容与签名在入队时**同步捕获**（排队执行时状态可能已切换分镜或继续更新）；
+- 同一分镜的请求永远按入队顺序依次执行，后面的保存排在前面的结果之后；
+- 已成功写入或已有相同内容在排队时不重复入队（沿用签名去重）；
+- localStorage 在入队时立即更新，HTTP 请求串行执行。
+
+## R1-建议 1：参考素材总数超限改为显式报错
+
+`storyboards.ts` 移除 `if (normalized.length >= REFERENCE_TOTAL_LIMIT) break` 的静默截断，改为循环后 `if (normalized.length > REFERENCE_TOTAL_LIMIT) return badRequest(400)`。单类上限 9+3+3 之和本已等于总量，此检查是防御性约束，防止未来任一上限调松后超量保存被悄悄截断。
+
+## R1-建议 2：回填脚本不要直接运行
+
+`backfill-h3-source.ts` 改为**默认只预演**：无参数时打印风险说明并退出；实际写入必须显式加 `--confirm`。风险说明明确「回填以当前输入为基准，无法证明生成时用的就是当前素材；无法确认内容一致的历史记录应直接重新生成 H3」。
+
+## R1-测试
+
+- **新增真实行为测试** `backend/tests/h3-source-behavior.test.mjs`（13 项断言）：直接导入 `h3-fingerprint.ts` 执行算法，无需 MySQL。覆盖：指纹幂等、文本/场景图/角色图/updatedAt/顺序/内容变化均改变哈希、`assetVersion` 语义、`h3FreshnessError` 拒绝与放行。通过 tsx 的 ESM 加载器（`register('tsx/esm')`）解析 TS 源码，`npm run test:h3` 可单独运行，`node --test tests/` 也能一起跑。
+- **更新结构测试** `iteration5-*.test.mjs`（+56 行断言）：服务端 H3 过期兜底、三个资产路由的失效钩子、生成回写失效、前端过期拦截、串行队列、总数超限 400、回填 `--confirm`。
+- 说明：审查建议的「H3 生成后刷新仍有效」「角色图更新后 H3 失效」「快速连选三张图最终存三张」等端到端行为，依赖 HTTP + MySQL + 前端渲染环境；本项目尚无该测试基建，本轮以纯函数行为测试 + 结构约束覆盖，端到端闭环仍在合并前 Checklist 中人工执行。
+
+## R1-改动文件
+
+- 新增：`backend/src/services/h3-fingerprint.ts`、`backend/tests/h3-source-behavior.test.mjs`
+- 改：`h3-source.ts`（失效钩子 + 校验 + 帧图/updatedAt）、`tasks.ts`（服务端兜底）、`characters.ts` / `scenes.ts` / `props.ts`（图片更新失效钩子）、`generation.ts`（回写失效）、`storyboards.ts`（总量 400）、`episode.vue`（genVid 拦截 + 串行队列）、`backfill-h3-source.ts`（--confirm）、`package.json`（test / test:h3 脚本）、`iteration5-*.test.mjs`
+
+## R1-验证状态（重要）
+
+与上一轮相同：**本机无 Node 运行时**，本修订全部改动仅完成静态审查与结构测试断言逐条比对，typecheck / 测试 / 构建 / 真实闭环仍未执行，需在合并前于有 Node 的环境补跑（见下方 Checklist）。

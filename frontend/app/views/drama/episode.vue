@@ -2184,6 +2184,12 @@ let restoringShotRefSelection = false
 // 已成功写入 MySQL 的参考素材签名。内容相同的重复提交（页面刷新、切换分镜恢复状态）
 // 直接跳过，避免无意义回写把刚生成的 H3 提示词判定为过期。
 const lastSavedShotRefSelections = ref({})
+// 每个分镜一条串行保存队列 + 最新待存签名。
+// 快速连续选择素材时（deep watcher 每次变更都会触发保存），请求按提交顺序依次执行，
+// 避免网络返回顺序颠倒导致旧状态覆盖新状态——后端事务只保证单次请求完整，
+// 无法解决多个请求完成顺序颠倒的问题。
+const shotRefSaveQueues = {}
+const shotRefPendingSignatures = {}
 // URL → asset_id：记录参考素材来自资产库/上传落库的哪条资产，供后端追溯来源
 const refAssetOrigins = ref({})
 const imageViewer = ref({ open: false, src: '', title: '' })
@@ -3934,23 +3940,49 @@ function shotRefSignature(items) {
   return JSON.stringify(items.map(item => [item.media_type, item.url]))
 }
 
-async function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
-  if (!storyboardId || restoringShotRefSelection) return
+/**
+ * 保存分镜的参考素材选择。返回 Promise 便于调用方感知保存结果。
+ * 内容捕获是同步的（关键：排队执行时状态可能已切换到别的分镜或继续更新过）；
+ * 真正的 HTTP 请求按分镜串行执行，快速连续选择不会乱序覆盖。
+ */
+function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
+  if (!storyboardId || restoringShotRefSelection) return Promise.resolve()
+  // 关键：同步捕获当前内容。排队执行时状态可能已经切换到别的分镜或继续更新过。
   const items = buildShotRefItems()
   const key = String(storyboardId)
   const signature = shotRefSignature(items)
-  // 与上次成功写入的内容完全一致时不回写：
+  // 与上次成功写入的内容完全一致，或已有相同内容的保存在排队/执行中时不重复提交：
   // 页面刷新、切换分镜恢复状态都会用同一份内容重复提交，
   // 无差别回写会让后端误判参考素材变化，刚生成的 H3 提示词立刻被标记过期。
-  if (lastSavedShotRefSelections.value[key] === signature) return
+  if (lastSavedShotRefSelections.value[key] === signature) return Promise.resolve()
+  if (shotRefPendingSignatures[key] === signature) return Promise.resolve()
 
+  shotRefPendingSignatures[key] = signature
   storedShotRefSelections.value[key] = {
     image: [...videoRefImageUrls.value], video: [...videoRefVideoUrls.value], audio: [...videoRefAudioUrls.value],
   }
   try { localStorage.setItem(REF_SELECTION_STORE_KEY, JSON.stringify(storedShotRefSelections.value)) } catch { /* ignore */ }
 
-  // MySQL 是正式状态，localStorage 只是请求失败时的回退。保存失败必须让用户知道。
+  // 排队：同一分镜的请求永远按入队顺序依次执行，后面的保存排在前面的结果之后
+  const run = (shotRefSaveQueues[key] || Promise.resolve())
+    .catch(() => {})
+    .then(() => performShotRefSave(storyboardId, { items, signature }))
+  const settle = () => {
+    if (shotRefSaveQueues[key] === run) shotRefSaveQueues[key] = null
+    if (shotRefPendingSignatures[key] === signature) delete shotRefPendingSignatures[key]
+  }
+  run.then(settle, settle)
+  shotRefSaveQueues[key] = run
+  return run
+}
+
+/** 实际的参考素材保存请求，只由 saveShotRefSelection 排入的串行队列调用。 */
+async function performShotRefSave(storyboardId, { items, signature }) {
+  const key = String(storyboardId)
+  // 执行到自己时内容可能已由队列中更靠后的保存写入，或已被更新的保存覆盖
+  if (lastSavedShotRefSelections.value[key] === signature) return
   try {
+    // MySQL 是正式状态，localStorage 只是请求失败时的回退。保存失败必须让用户知道。
     await storyboardAPI.saveReferenceAssets(storyboardId, items)
     lastSavedShotRefSelections.value = { ...lastSavedShotRefSelections.value, [key]: signature }
   } catch (error) {
@@ -4095,7 +4127,16 @@ function removeRefMedia(kind, index) {
 async function genVid(sb) {
   const referenceImages = getShotReferenceImages(sb)
   const h3Prompt = String(sb.minimax_h3_prompt || sb.minimaxH3Prompt || '').trim()
-  const useH3Prompt = ['autodl', 'minimax'].includes(selectedVideoProvider.value) && !!h3Prompt
+  const h3SourceHash = String(sb.minimax_h3_source_hash || sb.minimaxH3SourceHash || '').trim()
+  const h3Provider = ['autodl', 'minimax'].includes(selectedVideoProvider.value)
+  // H3 已被标记过期（来源哈希被清空）时禁止直接用于生成：
+  // 分镜内容或参考素材已变化，旧提示词不再代表当前投产输入。
+  // 服务端提交时还会重算指纹兜底，前端拦截只为了尽早提示用户。
+  if (h3Provider && h3Prompt && !h3SourceHash) {
+    toast.error('H3 提示词可能已过期（分镜内容或参考素材已变化），请重新生成 H3 后再提交视频')
+    return
+  }
+  const useH3Prompt = h3Provider && !!h3Prompt
   const params = {
     storyboard_id: sb.id,
     drama_id: dramaId,
