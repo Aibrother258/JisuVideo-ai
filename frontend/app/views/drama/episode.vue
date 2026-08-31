@@ -4195,8 +4195,10 @@ async function genVid(sb) {
       images: [...referenceImages],
       videos: [...videoRefVideoUrls.value],
       audios: [...videoRefAudioUrls.value],
-      // 额外参考图（手动选择/上传）单独列出：reference_image_urls 混入了
-      // 场景/角色/道具图，后端比对「本次请求素材 == H3 生成时素材」时只能用这一份。
+      // 额外参考图（手动选择/上传）单独列出，随快照落库供追溯。
+      // 注意：H3 一致性校验不读取本字段——服务端会按分镜绑定与数据库
+      // 额外素材重建完整参考列表，与实际的 reference_*_urls 逐项比较，
+      // 客户端快照一律不被信任。
       extra_images: [...videoRefImageUrls.value],
       generated_at: new Date().toISOString(),
     },

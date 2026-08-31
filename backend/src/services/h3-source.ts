@@ -22,7 +22,9 @@ import {
   fingerprintReferenceAssets,
   fingerprintSubmittedReferences,
   h3FreshnessError,
+  normalizeReferenceImageUrl,
   normalizeSubmittedReferences,
+  referenceMismatchError,
   type H3SourceParts,
   type ReferenceAssetFingerprintInput,
   type SubmittedReferences,
@@ -33,7 +35,9 @@ export {
   fingerprintReferenceAssets,
   fingerprintSubmittedReferences,
   h3FreshnessError,
+  normalizeReferenceImageUrl,
   normalizeSubmittedReferences,
+  referenceMismatchError,
 } from './h3-fingerprint.js'
 export type { H3SourceParts, SubmittedReferences } from './h3-fingerprint.js'
 
@@ -109,8 +113,9 @@ export async function collectH3SourceHash(storyboard: StoryboardRow): Promise<st
  *
  * 判定方式是「提交的 prompt 与库中 H3 提示词逐字一致」，不依赖前端传任何标志，
  * 直接调 API 也无法绕过。除此之外，H3 新鲜只证明「数据库状态 == H3 生成时」；
- * 调用者仍可带着另一套参考素材提交，因此还要比对本次请求的额外参考素材
- * （手动选择/上传的图片、视频、音频）与数据库，不一致同样拒绝。
+ * 调用者仍可带着另一套参考素材提交，因此还要把本次请求的**实际** reference_*_urls
+ * 与服务端重建的当前状态逐项比较。不信任客户端快照：调用者可在快照里填正确值、
+ * 实际生成数组里放另一套素材，快照一律不参与校验。
  */
 export async function verifyH3PromptFreshness(
   storyboardId: number,
@@ -134,15 +139,75 @@ export async function verifyH3PromptFreshness(
   }
 
   if (submittedReferences != null) {
-    const submittedFp = fingerprintSubmittedReferences(normalizeSubmittedReferences(submittedReferences))
-    const dbRefs = await collectStoryboardReferenceAssets(storyboardId)
-    const dbFp = fingerprintReferenceAssets(dbRefs)
-    if (submittedFp !== dbFp) {
+    const [dbImages, dbRefs] = await Promise.all([
+      reconstructFullReferenceImageList(storyboardId),
+      collectStoryboardReferenceAssets(storyboardId),
+    ])
+    const refError = referenceMismatchError(
+      {
+        images: dbImages,
+        videos: dbRefs.filter(item => item.mediaType === 'video').map(item => item.url),
+        audios: dbRefs.filter(item => item.mediaType === 'audio').map(item => item.url),
+      },
+      submittedReferences,
+    )
+    if (refError) {
       logTaskProgress('H3Source', 'ref-mismatch-rejected', { storyboardId })
-      return '参考素材与 H3 生成时不一致，请刷新分镜后重新生成 H3 再提交视频'
+      return refError
     }
   }
   return null
+}
+
+/**
+ * 服务端重建分镜的完整参考图片列表：场景图 → 角色图（按绑定顺序）→ 道具图
+ * （按绑定顺序）→ 数据库额外参考图片（按 sort_order）。与前端 episode.vue 的
+ * getShotReferenceImages 使用同一套归一化、去重与上限（≤9），因此可以和
+ * 请求中的 reference_image_urls 逐项比较。
+ */
+export async function reconstructFullReferenceImageList(storyboardId: number): Promise<string[]> {
+  const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  if (!storyboard) return []
+  const refs: string[] = []
+  const pushRef = (value: string | null | undefined) => {
+    const normalized = normalizeReferenceImageUrl(value)
+    if (!normalized || refs.includes(normalized) || refs.length >= 9) return
+    refs.push(normalized)
+  }
+
+  if (storyboard.sceneId) {
+    const [scene] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, storyboard.sceneId))
+    pushRef(scene?.imageUrl)
+  }
+
+  const [characterLinks, propLinks] = await Promise.all([
+    db.select().from(schema.storyboardCharacters).where(eq(schema.storyboardCharacters.storyboardId, storyboard.id)),
+    db.select().from(schema.storyboardProps).where(eq(schema.storyboardProps.storyboardId, storyboard.id)),
+  ])
+
+  if (characterLinks.length) {
+    const ids = [...new Set(characterLinks.map(link => link.characterId))]
+    const rows = await db.select().from(schema.characters).where(inArray(schema.characters.id, ids))
+    const map = new Map<number, CharacterRow>(rows.map(row => [row.id, row] as const))
+    for (const link of characterLinks) pushRef(map.get(link.characterId)?.imageUrl)
+  }
+
+  if (propLinks.length) {
+    const ids = [...new Set(propLinks.map(link => link.propId))]
+    const rows = await db.select().from(schema.props).where(inArray(schema.props.id, ids))
+    const map = new Map<number, PropRow>(rows.map(row => [row.id, row] as const))
+    for (const link of propLinks) pushRef(map.get(link.propId)?.imageUrl)
+  }
+
+  const extraImages = await db.select().from(schema.storyboardReferenceAssets)
+    .where(and(
+      eq(schema.storyboardReferenceAssets.storyboardId, storyboard.id),
+      eq(schema.storyboardReferenceAssets.mediaType, 'image'),
+    ))
+    .orderBy(asc(schema.storyboardReferenceAssets.sortOrder), asc(schema.storyboardReferenceAssets.id))
+  for (const item of extraImages) pushRef(item.url)
+
+  return refs
 }
 
 /** 分镜当前保存的额外参考素材（保持顺序），格式与前端提交的素材可直接比对 */

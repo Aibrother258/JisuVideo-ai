@@ -18,7 +18,10 @@ const {
   fingerprintReferenceAssets,
   fingerprintSubmittedReferences,
   h3FreshnessError,
+  normalizeReferenceImageUrl,
   normalizeSubmittedReferences,
+  referenceMismatchError,
+  sameReferenceList,
 } = await import('../src/services/h3-fingerprint.js')
 
 function baseParts(overrides = {}) {
@@ -143,4 +146,66 @@ test('提交素材指纹：与数据库参考素材指纹同构，可直接字�
   assert.notEqual(dropped, dbFp)
   // 空输入 → 空指纹（无额外素材的 H3 不应被误判为不一致）
   assert.equal(fingerprintSubmittedReferences(undefined), '')
+})
+
+test('normalizeReferenceImageUrl：与前端 normalizeMediaUrl 等价', () => {
+  assert.equal(normalizeReferenceImageUrl(''), '')
+  assert.equal(normalizeReferenceImageUrl('  '), '')
+  assert.equal(normalizeReferenceImageUrl('https://cdn/x.png'), 'https://cdn/x.png')
+  assert.equal(normalizeReferenceImageUrl('data:image/png;base64,xx'), 'data:image/png;base64,xx')
+  assert.equal(normalizeReferenceImageUrl('/uploads/x.png'), '/uploads/x.png')
+  assert.equal(normalizeReferenceImageUrl('uploads/x.png'), '/uploads/x.png')
+})
+
+test('sameReferenceList：长度与每一项都必须一致，顺序敏感', () => {
+  assert.equal(sameReferenceList([], []), true)
+  assert.equal(sameReferenceList(['a', 'b'], ['a', 'b']), true)
+  assert.equal(sameReferenceList(['a', 'b'], ['b', 'a']), false)
+  assert.equal(sameReferenceList(['a'], ['a', 'b']), false)
+})
+
+test('referenceMismatchError：实际素材与服务端重建状态一致 → 放行', () => {
+  const db = {
+    images: ['/scene.png', '/char.png', '/ref1.png'],
+    videos: ['/ref1.mp4'],
+    audios: [],
+  }
+  const submitted = normalizeSubmittedReferences({
+    images: ['/scene.png', '/char.png', '/ref1.png'],
+    videos: ['/ref1.mp4'],
+    audios: [],
+  })
+  assert.equal(referenceMismatchError(db, submitted), null)
+})
+
+test('referenceMismatchError：伪造快照 - 实际数组放另一套素材必须拒绝', () => {
+  // 数据库当前状态：H3 生成时的素材
+  const db = {
+    images: ['/scene.png', '/char.png', '/ref1.png'],
+    videos: ['/ref1.mp4'],
+    audios: [],
+  }
+  // 调用者可以在 reference_snapshot 里填正确值，但实际生成数组携带另一套素材。
+  // 校验只比较实际数组，因此即使「快照正确」，实际素材不同也必须拒绝。
+  const submitted = normalizeSubmittedReferences({
+    images: ['/scene.png', '/char.png', '/evil.png'], // 偷换了额外参考图
+    videos: ['/ref1.mp4'],
+    audios: [],
+  })
+  assert.match(referenceMismatchError(db, submitted), /参考图片与分镜当前绑定的素材不一致/)
+
+  const swappedVideo = normalizeSubmittedReferences({
+    images: ['/scene.png', '/char.png', '/ref1.png'],
+    videos: ['/evil.mp4'],
+    audios: [],
+  })
+  assert.match(referenceMismatchError(db, swappedVideo), /参考视频与数据库保存的额外素材不一致/)
+
+  // 多传一张图（超出现有状态）同样拒绝
+  const extra = normalizeSubmittedReferences({
+    images: ['/scene.png', '/char.png', '/ref1.png', '/extra.png'],
+    videos: ['/ref1.mp4'],
+    audios: [],
+  })
+  assert.match(referenceMismatchError(db, extra), /参考图片与分镜当前绑定的素材不一致/)
 })

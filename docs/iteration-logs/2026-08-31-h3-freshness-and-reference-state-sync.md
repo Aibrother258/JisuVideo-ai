@@ -260,3 +260,44 @@ PR #1 第二轮审查确认 R1 修复方向正确，但仍有 1 个真实竞态 
 ## R2-剩余
 
 合并前仍需人工执行一次真实闭环（需要 MySQL + 生成服务）：快速连选素材 → 立即生成 H3 → 提交视频，确认素材全部落库、H3 基于最新素材生成、提交不被拒。代码层与自动化验证已全部就位。
+
+---
+
+# 修订 R3：响应第三轮 PR 审查（2026-09-01）
+
+第三轮审查（P1）：**素材快照仍可伪造绕过 H3 校验**——服务端用 `reference_snapshot.extra_images/videos/audios` 做一致性校验，但真正生成视频时使用 `body.reference_*_urls`。直接调 API 时可在快照里填数据库正确值、实际生成数组放另一套素材，校验仍会通过。**结论：不能信任客户端快照。**
+
+## 修复：服务端重建参考列表，与实际的 reference_*_urls 逐项比较
+
+- **`h3-fingerprint.ts`** 新增纯函数：
+  - `normalizeReferenceImageUrl`：与前端 `episode.vue` 的 `normalizeMediaUrl` 等价（空值→空串、http(s)/data:/根路径原样、其余补 `/` 前缀）；
+  - `sameReferenceList`：长度与每一项逐项比较（顺序敏感）；
+  - `referenceMismatchError(db, submitted)`：db 为服务端重建的当前状态（images/videos/audios），submitted 为请求中的实际数组；图片/视频/音频任一不一致返回对应拒绝消息。**只比较实际数组，与快照完全无关。**
+- **`h3-source.ts`**：
+  - 新增 `reconstructFullReferenceImageList(storyboardId)`：服务端重建完整图片列表——场景图 → 角色图（按 `storyboard_characters` 绑定顺序）→ 道具图（按绑定顺序）→ 数据库额外参考图片（按 `sort_order`），与前端 `getShotReferenceImages` 同一套归一化、去重、≤9 上限；
+  - `verifyH3PromptFreshness` 第三参语义改为「请求中的实际 `reference_*_urls`」：hash 新鲜的前提下，用 `reconstructFullReferenceImageList` + `collectStoryboardReferenceAssets` 重建当前状态，交 `referenceMismatchError` 判定。
+- **`tasks.ts`**：校验传 `{ images: body.reference_image_urls, videos: body.reference_video_urls, audios: body.reference_audio_urls }`，移除 `snapshot?.extra_images` fallback；注释明确快照仅用于落库追溯。
+- **`episode.vue`**：`extra_images` 保留（随快照落库供追溯），注释更新为「H3 一致性校验不读取本字段」。
+
+## 测试
+
+- 行为测试 15 → **19 项**：新增 `normalizeReferenceImageUrl` 等价性、`sameReferenceList` 顺序敏感、`referenceMismatchError` 放行、**伪造快照拒绝**（快照正确但实际图片/视频被偷换或多传一张，均必须返回 400）。
+- 结构测试 `iteration5` 更新：断言校验只比较 `body.reference_*_urls`、`doesNotMatch(snapshot?.extra_images)`、服务端重建列表与拒绝消息在纯函数层。
+
+## R3-真实运行结果（Node v22.22.2）
+
+| 验证项 | 结果 |
+|---|---|
+| `cd backend && npm run typecheck` | 通过 |
+| `cd backend && npm test` | 95 项中 86 通过、9 失败（全部既有测试债务） |
+| `cd backend && npm run test:h3` | 19 项全部通过 |
+| `cd frontend && npm run build` | 通过 |
+| `cd frontend && node --test` | 14/32，与合并前基线一致，无新增失败 |
+
+## R3-改动文件
+
+- 改：`h3-fingerprint.ts`（normalizeReferenceImageUrl / sameReferenceList / referenceMismatchError）、`h3-source.ts`（reconstructFullReferenceImageList + 校验改实际数组）、`tasks.ts`（传 body.reference_*_urls，移除快照依赖）、`episode.vue`（注释更新）、`h3-source-behavior.test.mjs`（+4 项，含伪造快照）、`iteration5-*.test.mjs`（断言更新）
+
+## R3-剩余
+
+与 R2 相同：合并前人工真实闭环一次（需要 MySQL + 生成服务）。自动化验证全部就位。

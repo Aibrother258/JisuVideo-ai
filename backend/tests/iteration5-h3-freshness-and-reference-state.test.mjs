@@ -147,16 +147,28 @@ test('server-side guard rejects video tasks that resubmit a stale H3 prompt', ()
 })
 
 test('server-side guard also verifies submitted reference assets match the H3 source', () => {
-  // H3 新鲜只证明「数据库状态 == H3 生成时」；调用者仍可带另一套素材提交，
-  // 因此校验同时接收本次请求的额外参考素材并逐项比对数据库。
+  // H3 新鲜只证明「数据库状态 == H3 生成时」；调用者仍可带另一套素材提交。
+  // 校验只比较请求中的实际 reference_*_urls，不信任客户端快照。
   assert.match(h3, /verifyH3PromptFreshness\(/)
   assert.match(h3, /submittedReferences/)
-  assert.match(h3, /fingerprintSubmittedReferences\(normalizeSubmittedReferences\(submittedReferences\)\)/)
-  assert.match(h3, /collectStoryboardReferenceAssets\(storyboardId\)/)
-  assert.match(h3, /参考素材与 H3 生成时不一致/)
-  // 前端快照携带 extra_images：reference_image_urls 混入了场景/角色/道具图
+  assert.match(h3, /reconstructFullReferenceImageList\(storyboardId\)/)
+  assert.match(h3, /referenceMismatchError\(/)
+  // 纯函数层提供与前端 normalizeMediaUrl 等价的归一化、逐项比较与拒绝消息
+  assert.match(fingerprint, /export function normalizeReferenceImageUrl/)
+  assert.match(fingerprint, /export function sameReferenceList/)
+  assert.match(fingerprint, /export function referenceMismatchError/)
+  assert.match(fingerprint, /参考图片与分镜当前绑定的素材不一致/)
+  // 服务端重建完整图片列表：场景 → 角色 → 道具 → 数据库额外图片
+  assert.match(h3, /场景图 → 角色图（按绑定顺序）→ 道具图/)
+  assert.match(h3, /storyboardReferenceAssets\.mediaType, 'image'/)
+  // tasks.ts 校验传实际数组，快照不再参与比对
+  assert.match(tasks, /images: body\.reference_image_urls/)
+  assert.match(tasks, /videos: body\.reference_video_urls/)
+  assert.match(tasks, /audios: body\.reference_audio_urls/)
+  assert.doesNotMatch(tasks, /snapshot\?\.extra_images/)
+  assert.match(tasks, /不信任 reference_snapshot/)
+  // 前端快照仍携带 extra_images 供落库追溯，但不参与校验
   assert.match(frontend, /extra_images: \[\.\.\.videoRefImageUrls\.value\]/)
-  assert.match(tasks, /snapshot\?\.extra_images \?\? body\.reference_image_urls/)
   assert.match(generation, /extra_images\?: string\[\]/)
 })
 

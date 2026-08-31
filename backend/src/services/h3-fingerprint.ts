@@ -104,6 +104,64 @@ export function fingerprintSubmittedReferences(submitted: SubmittedReferences | 
   return fingerprintReferenceAssets(items)
 }
 
+/**
+ * 与前端 episode.vue 的 normalizeMediaUrl 等价：空值返回空串，
+ * http(s)/data:/根路径开头原样保留，其余补根路径前缀。
+ * 服务端重建参考列表时必须用同一套归一化，否则与前端提交的 URL 无法逐项比对。
+ */
+export function normalizeReferenceImageUrl(value: unknown): string {
+  const raw = String(value ?? '').trim()
+  if (!raw || /^https?:\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('/')) return raw
+  return `/${raw}`
+}
+
+/** 逐项比较两份参考素材列表：长度与每一项都必须一致（顺序敏感） */
+export function sameReferenceList(a: readonly unknown[], b: readonly unknown[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+/** 服务端重建的当前参考素材状态（不信任客户端快照） */
+export interface ReferenceStateSnapshot {
+  /** 完整图片列表：场景图 + 角色图 + 道具图 + 数据库额外图片（已归一化、去重、≤9） */
+  images: readonly string[]
+  /** 数据库保存的额外视频（顺序敏感） */
+  videos: readonly string[]
+  /** 数据库保存的额外音频（顺序敏感） */
+  audios: readonly string[]
+}
+
+/**
+ * 校验本次请求携带的实际参考素材（reference_image_urls / reference_video_urls /
+ * reference_audio_urls）与服务端重建的当前状态逐项一致。
+ * 返回 null 表示一致；返回字符串为拒绝原因。
+ *
+ * 不信任客户端快照：调用者可以在快照里填数据库的正确值、实际生成数组里放
+ * 另一套素材，因此这里只比较请求中的实际数组，与快照完全无关。
+ */
+export function referenceMismatchError(
+  db: ReferenceStateSnapshot,
+  submitted: SubmittedReferences | null | undefined,
+): string | null {
+  if (submitted == null) return null
+  const sImages = (submitted.images || []).map(normalizeReferenceImageUrl)
+  const sVideos = (submitted.videos || []).map(normalizeReferenceImageUrl)
+  const sAudios = (submitted.audios || []).map(normalizeReferenceImageUrl)
+  if (!sameReferenceList(db.images, sImages)) {
+    return '参考图片与分镜当前绑定的素材不一致，请刷新分镜后重新生成 H3 再提交视频'
+  }
+  if (!sameReferenceList(db.videos, sVideos)) {
+    return '参考视频与数据库保存的额外素材不一致，请刷新分镜后重新生成 H3 再提交视频'
+  }
+  if (!sameReferenceList(db.audios, sAudios)) {
+    return '参考音频与数据库保存的额外素材不一致，请刷新分镜后重新生成 H3 再提交视频'
+  }
+  return null
+}
+
 export function computeH3SourceHash(parts: H3SourceParts): string {
   return crypto.createHash('sha256')
     .update([

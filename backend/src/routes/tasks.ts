@@ -75,17 +75,16 @@ app.post('/', async (c) => {
     // 服务端兜底：提交的 prompt 若就是该分镜已保存的 H3 提示词，
     // 必须确认来源指纹仍然新鲜，且本次请求的参考素材与 H3 生成时一致。
     // 前端「已过期」提示可被绕过（直接调 API），这里在提交瞬间重算做最终裁决。
+    // 校验只比较实际的 reference_*_urls，不信任 reference_snapshot：
+    // 调用者可在快照里填正确值、实际生成数组里放另一套素材，快照仅用于落库追溯。
     if (type === 'video' && body.storyboard_id) {
-      const snapshot = body.reference_snapshot
       const h3Error = await verifyH3PromptFreshness(
         Number(body.storyboard_id),
         body.prompt,
         {
-          // 额外参考图优先用快照里的 extra_images：reference_image_urls
-          // 混入了场景/角色/道具图，无法与数据库的额外素材直接比对
-          images: snapshot?.extra_images ?? body.reference_image_urls,
-          videos: snapshot?.videos ?? body.reference_video_urls,
-          audios: snapshot?.audios ?? body.reference_audio_urls,
+          images: body.reference_image_urls,
+          videos: body.reference_video_urls,
+          audios: body.reference_audio_urls,
         },
       )
       if (h3Error) return badRequest(c, h3Error)
