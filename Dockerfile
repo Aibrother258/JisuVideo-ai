@@ -18,7 +18,7 @@ RUN npm run generate
 # ── Stage 2: Build backend native modules ────────────────────
 FROM node:20-slim AS backend-build
 
-ARG APT_MIRROR=mirrors.tuna.tsinghua.edu.cn
+ARG APT_MIRROR=mirrors.aliyun.com
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 
 # apt 换国内源: Debian 12 (bookworm) 是 deb822 格式的 debian.sources,同时兼容旧版 sources.list

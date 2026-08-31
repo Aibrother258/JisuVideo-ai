@@ -6,7 +6,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
-import { downloadFile, generateImageThumb, readImageAsCompressedDataUrl, saveBase64Image } from '../utils/storage.js'
+import { downloadFile, generateImageThumb, readImageAsCompressedDataUrl, readMediaAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig } from './adapters/types'
@@ -213,8 +213,8 @@ async function processTask(id: number, config: AIConfig) {
       const resolvedLastFrameUrl = await normalizeVideoReferenceUrl(params.lastFrameUrl)
       const resolvedReferenceImageUrls = await normalizeVideoReferenceUrls(params.referenceImageUrls)
       // 参考视频/音频文件较大，不适合 dataURL 内联，需解析为公网可访问 URL
-      const resolvedReferenceVideoUrls = resolvePublicMediaUrls(params.referenceVideoUrls, 'video')
-      const resolvedReferenceAudioUrls = resolvePublicMediaUrls(params.referenceAudioUrls, 'audio')
+      const resolvedReferenceVideoUrls = await resolveReferenceMediaUrls(params.referenceVideoUrls, 'video')
+      const resolvedReferenceAudioUrls = await resolveReferenceMediaUrls(params.referenceAudioUrls, 'audio')
       ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, {
         id: record.id,
         model: record.model,
@@ -516,31 +516,33 @@ async function normalizeVideoReferenceUrls(refs: string[] | null | undefined): P
 }
 
 /**
- * 将参考视频/音频解析为 Seedance API 可访问的 URL。
- * http(s)/dataURL 直通；本地 static 路径需要 PUBLIC_BASE_URL 拼成公网地址，
- * 未配置时抛出可操作的中文错误（落入 catch 写入 error_msg 供前端展示）。
+ * 将参考视频/音频解析为上游可读取的地址。
+ * http(s)/dataURL 直通；本地 static 路径优先使用 PUBLIC_BASE_URL，
+ * 本地开发未配置公网入口时转为 data URL，使“从本地上传”可以直接工作。
  */
-function resolvePublicMediaUrl(value: string | null | undefined, kind: 'video' | 'audio'): string | null {
+function resolveReferenceMediaUrl(value: string | null | undefined, kind: 'video' | 'audio'): string | null {
   const raw = String(value || '').trim()
   if (!raw) return null
   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) return raw
   if (raw.startsWith('static/') || raw.startsWith('/static/')) {
     const base = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '')
-    if (!base) {
-      const label = kind === 'video' ? '视频' : '音频'
-      throw new Error(
-        `参考${label}为本地路径 ${raw}，但后端未配置 PUBLIC_BASE_URL，Seedance API 无法访问内网地址。` +
-        `请在 backend/.env 配置 PUBLIC_BASE_URL（如 https://your-domain.com）后重试，或改用公网 URL。`,
-      )
+    if (base) {
+      const p = raw.startsWith('/') ? raw : `/${raw}`
+      return `${base}${p}`
     }
-    const p = raw.startsWith('/') ? raw : `/${raw}`
-    return `${base}${p}`
+    const localPath = raw.startsWith('/') ? raw.slice(1) : raw
+    try {
+      return readMediaAsDataUrl(localPath)
+    } catch (error) {
+      const label = kind === 'video' ? '视频' : '音频'
+      throw new Error(`读取本地参考${label}失败：${(error as Error).message}`)
+    }
   }
   return raw
 }
 
-function resolvePublicMediaUrls(refs: string[] | null | undefined, kind: 'video' | 'audio'): string[] {
+async function resolveReferenceMediaUrls(refs: string[] | null | undefined, kind: 'video' | 'audio'): Promise<string[]> {
   if (!Array.isArray(refs) || !refs.length) return []
   const items = Array.from(new Set(refs.map((item) => String(item || '').trim()).filter(Boolean)))
-  return items.map((item) => resolvePublicMediaUrl(item, kind)).filter((item): item is string => !!item)
+  return items.map((item) => resolveReferenceMediaUrl(item, kind)).filter((item): item is string => !!item)
 }

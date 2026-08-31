@@ -94,6 +94,17 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
     }
   }
 
+  if (p === 'autodl') {
+    // 用不存在的任务 ID 做无扣费鉴权探针：有效 Token 会到达任务查询层，
+    // 缺失或无效 Token 返回 401；Authorization 不加 Bearer。
+    return {
+      method: 'GET',
+      url: joinProviderUrl(baseUrl, '', '/api/v1/comfyui/comfyui_workflow/result/huobao-connection-probe'),
+      headers: apiKey ? { Authorization: apiKey } : {},
+      body: undefined,
+    }
+  }
+
   return {
     method: 'GET',
     url: joinProviderUrl(baseUrl, '', m ? `/${m}` : '/'),
@@ -182,16 +193,21 @@ app.post('/test', async (c) => {
       body: probe.body ? JSON.stringify(probe.body) : undefined,
     })
     const text = await resp.text()
-    const reachable = [200, 204, 400, 401, 403].includes(resp.status)
+    const isAutoDL = body.provider.toLowerCase() === 'autodl'
+    const reachable = [200, 204, 400, 401, 403, 404].includes(resp.status)
+    const authenticated = !isAutoDL || ![401, 403].includes(resp.status)
+    const verified = isAutoDL ? reachable && authenticated : resp.ok
     const payload = {
-      ok: resp.ok,
+      ok: verified,
       reachable,
       status: resp.status,
       status_text: resp.statusText,
       method: probe.method,
       url: probeUrl,
       message: reachable
-        ? (resp.ok ? '端点可访问，认证与路径基本正常' : '端点已响应，请根据状态码判断认证或路径是否正确')
+        ? (!authenticated
+            ? 'AutoDL 端点可达，但 Token 无效或未填写'
+            : (verified ? '端点可访问，认证与路径基本正常' : '端点已响应，请根据状态码判断认证或路径是否正确'))
         : '端点未按预期响应，请检查 Base URL 和代理前缀',
       response_preview: text.slice(0, 240),
     }

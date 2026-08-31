@@ -1,0 +1,82 @@
+# 本地 Docker 开发栈：源码 bind mount + Nuxt HMR + tsx watch。
+# 生产部署继续使用 docker-compose.yml；不要将此文件用于公网部署。
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: huobao_drama
+      MYSQL_USER: huobao
+      MYSQL_PASSWORD: huobao
+      MYSQL_ROOT_PASSWORD: huobao_root
+    ports:
+      - "3307:3306"
+    volumes:
+      # 与生产 Compose 复用同一 MySQL 数据卷；启动开发栈前会先停生产应用容器。
+      - mysql-data:/var/lib/mysql
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-phuobao_root"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    working_dir: /workspace/backend
+    command: >-
+      sh -c "npm ci && exec npm run dev"
+    ports:
+      - "5679:5679"
+    volumes:
+      - ./backend:/workspace/backend
+      - ./data:/workspace/data
+      - backend-dev-node-modules:/workspace/backend/node_modules
+    environment:
+      NODE_ENV: development
+      PORT: "5679"
+      DATABASE_URL: mysql://huobao:huobao@mysql:3306/huobao_drama
+      STORAGE_PATH: /workspace/data/static
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:5679/api/v1/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1)).setTimeout(3000, function(){ this.destroy(); process.exit(1) })\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    working_dir: /workspace/frontend
+    command: >-
+      sh -c "npm ci && exec npm run dev -- --host 0.0.0.0"
+    ports:
+      - "3013:3013"
+    volumes:
+      - ./frontend:/workspace/frontend
+      - frontend-dev-node-modules:/workspace/frontend/node_modules
+    environment:
+      NODE_ENV: development
+      HUOBAO_BACKEND_URL: http://backend:5679
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+    external: true
+    name: huobao-drama_mysql-data
+  backend-dev-node-modules:
+  frontend-dev-node-modules:

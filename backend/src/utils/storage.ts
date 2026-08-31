@@ -116,6 +116,15 @@ export function readImageAsDataUrl(relativePath: string): string {
   return `data:${mimeType};base64,${buffer.toString('base64')}`
 }
 
+/** 将本地参考视频/音频转成 data URL，供支持 Base64 素材的上游直接读取。 */
+export function readMediaAsDataUrl(relativePath: string): string {
+  const filePath = getAbsolutePath(relativePath)
+  const buffer = fs.readFileSync(filePath)
+  const ext = path.extname(filePath).toLowerCase()
+  const mimeType = mediaExtToMimeType(ext)
+  return `data:${mimeType};base64,${buffer.toString('base64')}`
+}
+
 export async function readImageAsCompressedDataUrl(
   relativePath: string,
   options: {
@@ -172,4 +181,19 @@ function extToMimeType(ext: string): string {
     '.gif': 'image/gif',
   }
   return map[ext] || 'image/png'
+}
+
+function mediaExtToMimeType(ext: string): string {
+  const map: Record<string, string> = {
+    '.mp4': 'video/mp4',
+    '.mov': 'video/quicktime',
+    '.webm': 'video/webm',
+    '.m4v': 'video/x-m4v',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.flac': 'audio/flac',
+  }
+  return map[ext] || 'application/octet-stream'
 }

@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url'
 
+const devProxyTarget = process.env.HUOBAO_BACKEND_URL || 'http://localhost:5679'
+
 export default defineNuxtConfig({
   srcDir: 'app/',
   ssr: false,
@@ -38,8 +40,8 @@ export default defineNuxtConfig({
   vite: {
     server: {
       proxy: {
-        '/api': { target: 'http://localhost:5679', changeOrigin: true },
-        '/static': { target: 'http://localhost:5679', changeOrigin: true },
+        '/api': { target: devProxyTarget, changeOrigin: true },
+        '/static': { target: devProxyTarget, changeOrigin: true },
       },
     },
   },

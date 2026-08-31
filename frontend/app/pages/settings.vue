@@ -116,7 +116,7 @@
                   </div>
                   <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
                 </div>
-                <button v-if="st.type === 'text'" class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">测试</button>
+                <button class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">测试</button>
                 <label class="config-switch">
                   <input type="checkbox" class="sr-only" :checked="c.is_active" @change="toggleCfg(c)">
                   <span class="switch" :class="{ on: c.is_active }"></span>
@@ -466,12 +466,12 @@ const huobaoApiKey = ref('')
 const huobaoSaving = ref(false)
 const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', modelStr: '', service_type: 'text', priority: 0, temperature: '' })
 const serviceTypes = [{ type: 'text', label: '文本' }, { type: 'image', label: '图片' }, { type: 'video', label: '视频' }]
-const providers = ['gemini', 'openai', 'volcengine', 'minimax']
+const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'autodl']
 const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
 const serviceMeta = {
   text: { label: '文本', desc: '剧本改写、角色场景提取、分镜拆解等 Agent 文本能力' },
   image: { label: '图片', desc: '角色图、场景图与镜头图等静态图像生成' },
-  video: { label: '视频', desc: '镜头视频直出生成，默认 Seedance 2.0' },
+  video: { label: '视频', desc: '镜头视频直出生成，支持 Seedance、MiniMax 与 AutoDL H3 工作流' },
 }
 const providerPresets = {
   text: {
@@ -485,6 +485,7 @@ const providerPresets = {
   video: {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128', 'doubao-seedance-2-0-mini-260615'] },
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
+    autodl: { label: 'AutoDL H3 工作流', baseUrl: 'https://autodl.art', models: ['minimax_h3_image_audio_to_video_v2_15s', 'minimax_h3_lightx2v_v5_15s', 'minimax_h3_image_audio_to_video_v2', 'minimax_h3_image_audio_to_video', 'minimax_h3_lightx2v_v5', 'minimax_h3_lightx2v_no_pic', 'minimax_h3_lightx2v'] },
   },
 }
 const huobaoQuickConfigs = [
@@ -595,7 +596,8 @@ async function testCfgPayload(payload) {
   cfgTesting.value = true
   try {
     cfgTestResult.value = await aiConfigAPI.test(payload)
-    if (cfgTestResult.value.reachable) toast.success('端点已响应')
+    if (cfgTestResult.value.ok) toast.success('配置验证通过')
+    else if (cfgTestResult.value.reachable) toast.warning(cfgTestResult.value.message || '端点已响应，但配置未通过验证')
     else toast.warning('端点未通过测试')
   } catch (e) {
     toast.error(e.message)
@@ -648,6 +650,7 @@ const agentDefs = [
   { type: 'extractor', label: '角色场景提取', icon: '🔍' },
   { type: 'storyboard_breaker', label: '分镜拆解', icon: '🎬' },
   { type: 'prompt_generator', label: '提示词', icon: '🖼' },
+  { type: 'minimax_h3_prompt_generator', label: 'MiniMax H3 提示词', icon: '🎞️' },
 ]
 
 function getAgentCfg(type) {

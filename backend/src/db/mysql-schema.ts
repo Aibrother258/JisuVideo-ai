@@ -92,6 +92,9 @@ export const mysqlSchemaStatements = [
     atmosphere TEXT,
     image_prompt TEXT,
     video_prompt TEXT,
+    minimax_h3_prompt TEXT,
+    minimax_h3_source_hash VARCHAR(64),
+    minimax_h3_generated_at VARCHAR(64),
     bgm_prompt TEXT,
     sound_effect TEXT,
     description TEXT,
@@ -107,6 +110,20 @@ export const mysqlSchemaStatements = [
     created_at VARCHAR(64) NOT NULL,
     updated_at VARCHAR(64) NOT NULL,
     deleted_at VARCHAR(64)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS storyboard_reference_assets (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    storyboard_id INT NOT NULL,
+    asset_id INT,
+    media_type VARCHAR(16) NOT NULL,
+    media_role VARCHAR(32) NOT NULL DEFAULT 'reference',
+    url TEXT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at VARCHAR(64) NOT NULL,
+    updated_at VARCHAR(64) NOT NULL,
+    INDEX idx_storyboard_reference_assets_storyboard_id (storyboard_id),
+    INDEX idx_storyboard_reference_assets_asset_id (asset_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS episode_characters (
@@ -305,6 +322,25 @@ export async function initMySqlSchema(pool: Pool) {
   for (const statement of mysqlSchemaStatements) {
     await pool.query(statement)
   }
+  // CREATE TABLE IF NOT EXISTS 不会给已有表补列；启动时幂等补齐新增生产字段。
+  const [h3PromptColumns] = await pool.query<any[]>(
+    "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'storyboards' AND COLUMN_NAME = 'minimax_h3_prompt' LIMIT 1",
+  )
+  if (!h3PromptColumns.length) {
+    await pool.query('ALTER TABLE storyboards ADD COLUMN minimax_h3_prompt TEXT AFTER video_prompt')
+  }
+  const [h3MetaColumns] = await pool.query<any[]>(
+    "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'storyboards' AND COLUMN_NAME IN ('minimax_h3_source_hash','minimax_h3_generated_at')",
+  )
+  const h3Meta = new Set(h3MetaColumns.map((row: any) => row.COLUMN_NAME))
+  if (!h3Meta.has('minimax_h3_source_hash')) await pool.query('ALTER TABLE storyboards ADD COLUMN minimax_h3_source_hash VARCHAR(64) AFTER minimax_h3_prompt')
+  if (!h3Meta.has('minimax_h3_generated_at')) await pool.query('ALTER TABLE storyboards ADD COLUMN minimax_h3_generated_at VARCHAR(64) AFTER minimax_h3_source_hash')
+  await pool.query(`CREATE TABLE IF NOT EXISTS storyboard_reference_assets (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, storyboard_id INT NOT NULL, asset_id INT,
+    media_type VARCHAR(16) NOT NULL, media_role VARCHAR(32) NOT NULL DEFAULT 'reference',
+    url TEXT NOT NULL, sort_order INT NOT NULL DEFAULT 0, created_at VARCHAR(64) NOT NULL, updated_at VARCHAR(64) NOT NULL,
+    INDEX idx_storyboard_reference_assets_storyboard_id (storyboard_id), INDEX idx_storyboard_reference_assets_asset_id (asset_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
   for (const seed of mysqlDataSeedStatements) {
     await pool.query(seed.sql, seed.params)
   }

@@ -118,6 +118,9 @@ export const storyboards = mysqlTable('storyboards', {
   atmosphere: text('atmosphere'),
   imagePrompt: text('image_prompt'),
   videoPrompt: text('video_prompt'),
+  minimaxH3Prompt: text('minimax_h3_prompt'),
+  minimaxH3SourceHash: varchar('minimax_h3_source_hash', { length: 64 }),
+  minimaxH3GeneratedAt: varchar('minimax_h3_generated_at', { length: 64 }),
   bgmPrompt: text('bgm_prompt'),
   soundEffect: text('sound_effect'),
   description: text('description'),
@@ -133,6 +136,19 @@ export const storyboards = mysqlTable('storyboards', {
   createdAt: varchar('created_at', { length: 64 }).notNull(),
   updatedAt: varchar('updated_at', { length: 64 }).notNull(),
   deletedAt: varchar('deleted_at', { length: 64 }),
+})
+
+// Durable per-storyboard reference media selections for video generation.
+export const storyboardReferenceAssets = mysqlTable('storyboard_reference_assets', {
+  id: int('id').primaryKey().autoincrement(),
+  storyboardId: int('storyboard_id').notNull(),
+  assetId: int('asset_id'),
+  mediaType: varchar('media_type', { length: 16 }).notNull(),
+  mediaRole: varchar('media_role', { length: 32 }).notNull().default('reference'),
+  url: text('url').notNull(),
+  sortOrder: int('sort_order').notNull().default(0),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+  updatedAt: varchar('updated_at', { length: 64 }).notNull(),
 })
 
 export const storyboardCharacters = mysqlTable('storyboard_characters', {

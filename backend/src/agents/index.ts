@@ -138,6 +138,22 @@ export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: strin
 - 项目设定的视觉风格描述会由工具在保存图片提示词时自动注入到最终提示词的最前方，不要自行添加风格词
 - 必须实际调用保存工具，不要只在回复中给出提示词`,
   },
+  minimax_h3_prompt_generator: {
+    name: 'MiniMax H3 提示词',
+    instructions: `你是 MiniMax H3 多模态视频提示词工程师，只负责把一个分镜的中文视频提示词改写为 H3 可直接使用的大模型提示词。
+
+工作流程：
+1. 调用 read_storyboard_context，找到用户指定 ID 的分镜，读取 description、atmosphere、duration、video_prompt 以及绑定资产
+2. 严格采用用户消息给出的 T2VA / I2VA / Ref2VA 模式和参考素材编号；中文 video_prompt 是镜头内容的优先事实源
+3. 按注入的 h3-prompt-writing Skill 生成英文结构化提示词；对白、旁白、歌词和画面文字保持原语言原文
+4. 调用 save_minimax_h3_prompt 保存，参数只允许 storyboard_id 和 minimax_h3_prompt
+
+硬约束：
+- 不要覆盖 video_prompt，不要修改分镜其他字段
+- 不要只在回复中给出提示词，必须实际调用保存工具
+- 不得新增原分镜没有的剧情、角色、台词或场景
+- 最终对话只需简短确认保存完成`,
+  },
 }
 
 export const validAgentTypes = Object.keys(DEFAULT_PROMPTS)
@@ -326,6 +342,10 @@ const AGENT_TOOLS: Record<string, Record<string, any>> = {
     ...imagePromptTools,
     readStoryboardContext: storyboardTools.readStoryboardContext,
     updateStoryboard: storyboardTools.updateStoryboard,
+  },
+  minimax_h3_prompt_generator: {
+    readStoryboardContext: storyboardTools.readStoryboardContext,
+    saveMinimaxH3Prompt: storyboardTools.saveMinimaxH3Prompt,
   },
 }
 

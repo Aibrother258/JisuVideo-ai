@@ -21,6 +21,39 @@ function formatTime(): string {
   return new Date().toLocaleTimeString('zh-CN', { hour12: false })
 }
 
+const secretKeys = new Set([
+  'authorization',
+  'api_key',
+  'apikey',
+  'token',
+  'access_token',
+  'secret',
+  'secret_key',
+  'password',
+])
+
+function redactRequestBody(text: string): string {
+  try {
+    const value = JSON.parse(text)
+    const visit = (input: unknown): unknown => {
+      if (Array.isArray(input)) return input.map(visit)
+      if (!input || typeof input !== 'object') return input
+      const output: Record<string, unknown> = {}
+      for (const [key, child] of Object.entries(input as Record<string, unknown>)) {
+        const normalized = key.toLowerCase().replace(/[-\s]/g, '_')
+        output[key] = secretKeys.has(normalized) || normalized.includes('token') || normalized.includes('password')
+          ? '***'
+          : visit(child)
+      }
+      return output
+    }
+    return JSON.stringify(visit(value))
+  } catch {
+    return text
+      .replace(/("(?:api[_-]?key|authorization|access[_-]?token|token|secret[_-]?key|password)"\s*:\s*")[^"]*(")/gi, '$1***$2')
+  }
+}
+
 /**
  * 全局日志中间件 — 打印请求方法/路径/状态/耗时/请求体
  */
@@ -33,14 +66,19 @@ export const requestLogger: MiddlewareHandler = async (c, next) => {
   const time = formatTime()
   let bodyInfo = ''
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    const contentType = c.req.header('content-type') || ''
+    if (contentType.toLowerCase().startsWith('multipart/form-data')) {
+      bodyInfo = `\n  ${colors.dim}body: <multipart file omitted>${colors.reset}`
+    } else {
     try {
       const clone = c.req.raw.clone()
-      const text = await clone.text()
+      const text = redactRequestBody(await clone.text())
       if (text) {
         const truncated = text.length > 500 ? text.slice(0, 500) + '...' : text
         bodyInfo = `\n  ${colors.dim}body: ${truncated}${colors.reset}`
       }
     } catch {}
+    }
   }
 
   console.log(`${colors.dim}${time}${colors.reset} ${colors.cyan}${method}${colors.reset} ${path}${bodyInfo}`)

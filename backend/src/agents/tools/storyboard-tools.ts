@@ -5,6 +5,7 @@
 import { createTool } from '@mastra/core/tools'
 import type { ToolExecutionContext } from '@mastra/core/tools'
 import { z } from 'zod'
+import crypto from 'node:crypto'
 import { db, getInsertId, schema } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
@@ -195,6 +196,7 @@ const readStoryboardContext = createTool({
           description: sb.description || '',
           atmosphere: sb.atmosphere || '',
           video_prompt: sb.videoPrompt || '',
+          minimax_h3_prompt: sb.minimaxH3Prompt || '',
         }
       }))
 
@@ -224,35 +226,47 @@ const readStoryboardContext = createTool({
   },
 })
 
+// 模型常把布尔字段的字面量字符串（"true"/"false"）当 boolean 传过来，
+// 这里做输入归一化，避免 replace_existing 判断失效。
+// 字符串字段传 null 的情况由 schema 层 z.union([z.string(), z.literal(null)]) 兼容。
+function coerceBool(v: any): boolean | undefined {
+  if (typeof v === 'boolean') return v
+  if (v === undefined) return undefined
+  if (typeof v === 'string') return v.toLowerCase() === 'true'
+  return !!v
+}
+
 const storyboardFields = z.object({
   shot_number: z.number(),
-  title: z.string().optional(),
-  shot_type: z.string().optional(),
-  angle: z.string().optional(),
-  movement: z.string().optional(),
-  location: z.string().optional(),
-  time: z.string().optional(),
-  description: z.string().optional(),
-  result: z.string().optional(),
-  atmosphere: z.string().optional(),
-  image_prompt: z.string().optional(),
-  video_prompt: z.string().optional(),
-  bgm_prompt: z.string().optional(),
-  sound_effect: z.string().optional(),
-  duration: z.number().optional(),
-  scene_id: z.number().nullable().optional(),
-  character_ids: z.array(z.number()).optional(),
-  prop_ids: z.array(z.number()).optional(),
+  title: z.union([z.string(), z.literal(null)]).optional(),
+  shot_type: z.union([z.string(), z.literal(null)]).optional(),
+  angle: z.union([z.string(), z.literal(null)]).optional(),
+  movement: z.union([z.string(), z.literal(null)]).optional(),
+  location: z.union([z.string(), z.literal(null)]).optional(),
+  time: z.union([z.string(), z.literal(null)]).optional(),
+  description: z.union([z.string(), z.literal(null)]).optional(),
+  result: z.union([z.string(), z.literal(null)]).optional(),
+  atmosphere: z.union([z.string(), z.literal(null)]).optional(),
+  image_prompt: z.union([z.string(), z.literal(null)]).optional(),
+  video_prompt: z.union([z.string(), z.literal(null)]).optional(),
+  bgm_prompt: z.union([z.string(), z.literal(null)]).optional(),
+  sound_effect: z.union([z.string(), z.literal(null)]).optional(),
+  duration: z.union([z.number(), z.coerce.number()]).optional(),
+  scene_id: z.union([z.number(), z.literal(null)]).nullable().optional(),
+  character_ids: z.union([z.array(z.number()), z.literal(null)]).optional(),
+  prop_ids: z.union([z.array(z.number()), z.literal(null)]).optional(),
 })
 
 const saveStoryboards = createTool({
   id: 'save_storyboards',
   description: 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates.',
   inputSchema: z.object({
-    replace_existing: z.boolean().optional(),
+    // 模型常传字符串 "true"，用 coerce 接受字符串/布尔
+    replace_existing: z.union([z.boolean(), z.string(), z.number()]).optional(),
     storyboards: z.array(storyboardFields),
   }),
   execute: async ({ storyboards, replace_existing }, context) => {
+    const replaceExisting = coerceBool(replace_existing)
     const ids = requireIds(context)
     if ('error' in ids) return ids
     const { episodeId, dramaId } = ids
@@ -260,11 +274,11 @@ const saveStoryboards = createTool({
     logTaskProgress('StoryboardTool', 'save-begin', {
       episodeId,
       dramaId,
-      replaceExisting: replace_existing === true,
+      replaceExisting: replaceExisting === true,
       count: storyboards.length,
       shotNumbers: storyboards.map(sb => sb.shot_number).join(','),
     })
-    if (replace_existing === true) {
+    if (replaceExisting === true) {
       const existingStoryboardRows = await db.select().from(schema.storyboards)
         .where(eq(schema.storyboards.episodeId, episodeId))
       for (const storyboardId of existingStoryboardRows.map(sb => sb.id)) {
@@ -284,7 +298,10 @@ const saveStoryboards = createTool({
     )
 
     for (const sb of storyboards) {
-      await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
+      const characterIds = (sb.character_ids || []).filter((id): id is number => typeof id === 'number')
+      const propIds = (sb.prop_ids || []).filter((id): id is number => typeof id === 'number')
+      const sceneId = typeof sb.scene_id === 'number' ? sb.scene_id : null
+      await validateStoryboardBindings(episodeId, dramaId, sceneId, characterIds, propIds)
       const existingId = shotToId.get(sb.shot_number)
       if (existingId !== undefined) {
         await db.update(schema.storyboards).set({
@@ -295,11 +312,11 @@ const saveStoryboards = createTool({
           atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
-          sceneId: sb.scene_id, duration: sb.duration || 10,
+          sceneId, duration: typeof sb.duration === 'number' ? sb.duration : 10,
           updatedAt: ts,
         }).where(eq(schema.storyboards.id, existingId))
-        await syncStoryboardCharacters(existingId, sb.character_ids || [])
-        await syncStoryboardProps(existingId, sb.prop_ids || [])
+        await syncStoryboardCharacters(existingId, characterIds)
+        await syncStoryboardProps(existingId, propIds)
       } else {
         const res = await db.insert(schema.storyboards).values({
           episodeId,
@@ -311,13 +328,13 @@ const saveStoryboards = createTool({
           atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
-          sceneId: sb.scene_id, duration: sb.duration || 10,
+          sceneId, duration: typeof sb.duration === 'number' ? sb.duration : 10,
           createdAt: ts, updatedAt: ts,
         })
         const newId = getInsertId(res)
         shotToId.set(sb.shot_number, newId)
-        await syncStoryboardCharacters(newId, sb.character_ids || [])
-        await syncStoryboardProps(newId, sb.prop_ids || [])
+        await syncStoryboardCharacters(newId, characterIds)
+        await syncStoryboardProps(newId, propIds)
       }
     }
 
@@ -346,23 +363,24 @@ const updateStoryboard = createTool({
   description: 'Update a specific storyboard shot.',
   inputSchema: z.object({
     storyboard_id: z.number(),
-    title: z.string().optional(),
-    shot_type: z.string().optional(),
-    angle: z.string().optional(),
-    movement: z.string().optional(),
-    location: z.string().optional(),
-    time: z.string().optional(),
-    result: z.string().optional(),
-    atmosphere: z.string().optional(),
-    image_prompt: z.string().optional(),
-    video_prompt: z.string().optional(),
-    bgm_prompt: z.string().optional(),
-    sound_effect: z.string().optional(),
-    description: z.string().optional(),
-    scene_id: z.number().nullable().optional(),
-    character_ids: z.array(z.number()).optional(),
-    prop_ids: z.array(z.number()).optional(),
-    duration: z.number().optional(),
+    title: z.union([z.string(), z.literal(null)]).optional(),
+    shot_type: z.union([z.string(), z.literal(null)]).optional(),
+    angle: z.union([z.string(), z.literal(null)]).optional(),
+    movement: z.union([z.string(), z.literal(null)]).optional(),
+    location: z.union([z.string(), z.literal(null)]).optional(),
+    time: z.union([z.string(), z.literal(null)]).optional(),
+    result: z.union([z.string(), z.literal(null)]).optional(),
+    atmosphere: z.union([z.string(), z.literal(null)]).optional(),
+    image_prompt: z.union([z.string(), z.literal(null)]).optional(),
+    video_prompt: z.union([z.string(), z.literal(null)]).optional(),
+    minimax_h3_prompt: z.union([z.string(), z.literal(null)]).optional(),
+    bgm_prompt: z.union([z.string(), z.literal(null)]).optional(),
+    sound_effect: z.union([z.string(), z.literal(null)]).optional(),
+    description: z.union([z.string(), z.literal(null)]).optional(),
+    scene_id: z.union([z.number(), z.literal(null)]).nullable().optional(),
+    character_ids: z.union([z.array(z.number()), z.literal(null)]).optional(),
+    prop_ids: z.union([z.array(z.number()), z.literal(null)]).optional(),
+    duration: z.union([z.number(), z.coerce.number()]).optional(),
   }),
   execute: async ({ storyboard_id, ...fields }, context) => {
     const ids = requireIds(context)
@@ -387,13 +405,13 @@ const updateStoryboard = createTool({
     })
 
     const currentCharacterIds = 'character_ids' in fields
-      ? fields.character_ids
+      ? (fields.character_ids || []).filter((id): id is number => typeof id === 'number')
       : (await db.select().from(schema.storyboardCharacters)
           .where(eq(schema.storyboardCharacters.storyboardId, storyboard_id)))
           .map(link => link.characterId)
 
     const currentPropIds = 'prop_ids' in fields
-      ? fields.prop_ids
+      ? (fields.prop_ids || []).filter((id): id is number => typeof id === 'number')
       : (await db.select().from(schema.storyboardProps)
           .where(eq(schema.storyboardProps.storyboardId, storyboard_id)))
           .map(link => link.propId)
@@ -417,6 +435,7 @@ const updateStoryboard = createTool({
     if ('atmosphere' in fields) updates.atmosphere = fields.atmosphere
     if ('image_prompt' in fields) updates.imagePrompt = fields.image_prompt
     if ('video_prompt' in fields) updates.videoPrompt = fields.video_prompt
+    if ('minimax_h3_prompt' in fields) updates.minimaxH3Prompt = fields.minimax_h3_prompt
     if ('bgm_prompt' in fields) updates.bgmPrompt = fields.bgm_prompt
     if ('sound_effect' in fields) updates.soundEffect = fields.sound_effect
     if ('description' in fields) updates.description = fields.description
@@ -436,4 +455,44 @@ const updateStoryboard = createTool({
   },
 })
 
-export const storyboardTools = { readStoryboardContext, saveStoryboards, updateStoryboard }
+const saveMinimaxH3Prompt = createTool({
+  id: 'save_minimax_h3_prompt',
+  description: 'Save only the MiniMax H3 prompt for one storyboard. This tool cannot change any other storyboard field.',
+  inputSchema: z.object({
+    storyboard_id: z.number(),
+    minimax_h3_prompt: z.string().min(1),
+  }),
+  execute: async ({ storyboard_id, minimax_h3_prompt }, context) => {
+    const ids = requireIds(context)
+    if ('error' in ids) return ids
+    const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboard_id))
+    if (!storyboard || storyboard.episodeId !== ids.episodeId) {
+      return { error: `Storyboard ${storyboard_id} not found in current episode` }
+    }
+    const referenceAssets = await db.select().from(schema.storyboardReferenceAssets)
+      .where(eq(schema.storyboardReferenceAssets.storyboardId, storyboard_id))
+    const referenceFingerprint = referenceAssets
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(item => `${item.mediaType}:${item.mediaRole}:${item.url}`)
+      .join('\n')
+    const sourceHash = crypto.createHash('sha256')
+      .update(`${storyboard.videoPrompt || ''}\n${storyboard.description || ''}\n${storyboard.atmosphere || ''}\n${storyboard.duration || ''}\n${referenceFingerprint}`)
+      .digest('hex')
+    await db.update(schema.storyboards)
+      .set({
+        minimaxH3Prompt: minimax_h3_prompt,
+        minimaxH3SourceHash: sourceHash,
+        minimaxH3GeneratedAt: now(),
+        updatedAt: now(),
+      })
+      .where(eq(schema.storyboards.id, storyboard_id))
+    logTaskSuccess('StoryboardTool', 'h3-prompt-saved', {
+      episodeId: ids.episodeId,
+      storyboardId: storyboard_id,
+      promptLength: minimax_h3_prompt.length,
+    })
+    return { message: `MiniMax H3 prompt saved for storyboard ${storyboard_id}` }
+  },
+})
+
+export const storyboardTools = { readStoryboardContext, saveStoryboards, updateStoryboard, saveMinimaxH3Prompt }

@@ -62,6 +62,8 @@ export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
   del: (id: number) => api.del(`/storyboards/${id}`),
+  referenceAssets: (id: number) => api.get(`/storyboards/${id}/reference-assets`),
+  saveReferenceAssets: (id: number, items: any[]) => api.put(`/storyboards/${id}/reference-assets`, { items }),
 }
 
 export const characterAPI = {
@@ -105,9 +107,12 @@ export const taskAPI = {
   listByEpisode: (episodeId: number) => api.get<{ tasks: any[]; merges: any[] }>(`/episodes/${episodeId}/generation-tasks`),
 }
 
-async function uploadReq<T = any>(path: string, file: File): Promise<T> {
+async function uploadReq<T = any>(path: string, file: File, meta: Record<string, string | number | boolean | null | undefined> = {}): Promise<T> {
   const fd = new FormData()
   fd.append('file', file)
+  for (const [key, value] of Object.entries(meta)) {
+    if (value !== undefined && value !== null) fd.append(key, String(value))
+  }
   console.log(`%c[API] %cPOST %c${path} %c${file.name}`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', 'color:#888')
   const resp = await fetch(`${BASE}${path}`, { method: 'POST', body: fd })
   const json = await resp.json()
@@ -119,9 +124,18 @@ async function uploadReq<T = any>(path: string, file: File): Promise<T> {
 }
 
 export const uploadAPI = {
-  image: (f: File) => uploadReq<{ url: string; path: string }>('/upload/image', f),
-  video: (f: File) => uploadReq<{ url: string; path: string }>('/upload/video', f),
-  audio: (f: File) => uploadReq<{ url: string; path: string }>('/upload/audio', f),
+  image: (f: File, meta?: Record<string, any>) => uploadReq<{ url: string; path: string; asset_id?: number }>('/upload/image', f, meta),
+  video: (f: File, meta?: Record<string, any>) => uploadReq<{ url: string; path: string; asset_id?: number }>('/upload/video', f, meta),
+  audio: (f: File, meta?: Record<string, any>) => uploadReq<{ url: string; path: string; asset_id?: number }>('/upload/audio', f, meta),
+}
+export const assetLibraryAPI = {
+  list: (params?: { drama_id?: number; episode_id?: number; type?: 'image' | 'video' | 'audio' }) => {
+    const query = new URLSearchParams()
+    if (params?.drama_id) query.set('drama_id', String(params.drama_id))
+    if (params?.episode_id) query.set('episode_id', String(params.episode_id))
+    if (params?.type) query.set('type', params.type)
+    return api.get(`/assets${query.size ? `?${query.toString()}` : ''}`)
+  },
 }
 export const mergeAPI = {
   merge: (epId: number, storyboardIds?: number[]) => api.post(`/merge/episodes/${epId}/merge`, storyboardIds?.length ? { storyboard_ids: storyboardIds } : {}),

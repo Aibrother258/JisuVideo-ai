@@ -29,6 +29,7 @@ const AGENT_SKILL_MAP: Record<string, string[]> = {
     'prompt-generator/prop-prompt',
     'prompt-generator/video-prompt',
   ],
+  minimax_h3_prompt_generator: ['minimax-h3-prompt-generator'],
 }
 
 /** 每个 Agent 的 Workspace（filesystem 工作目录 + 原生技能注册）

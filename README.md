@@ -1,4 +1,6 @@
-# 🎬 Huobao Drama - AI 短剧生成平台
+# 🎬 极速视频（JisuVideo）
+
+> 基于 [Huobao Drama](https://github.com/chatfire-AI/huobao-drama) 的社区 fork，包含 Aibrother258 的功能迭代。
 
 <div align="center">
 
@@ -73,7 +75,7 @@ docker/     — init.sql 数据库初始化脚本(可选，启动时自动建表
 
 ### 🤖 AI Agents
 
-内置 4 个 Mastra Agent，支持数据库配置和 Skill 扩展：
+内置 5 个 Mastra Agent，支持数据库配置和 Skill 扩展：
 
 | Agent | 职责 |
 |---|---|
@@ -81,6 +83,7 @@ docker/     — init.sql 数据库初始化脚本(可选，启动时自动建表
 | `extractor` | 角色 / 场景 / 道具智能提取与去重 |
 | `storyboard_breaker` | 剧本 → 分镜序列拆解 |
 | `prompt_generator` | 角色/场景/道具图片提示词 + 分镜视频提示词生成 |
+| `minimax_h3_prompt_generator` | 中文分镜提示词 → MiniMax H3 T2VA / I2VA / Ref2VA 提示词 |
 
 ### 🔌 多厂商适配
 
@@ -152,6 +155,39 @@ npm run dev
 - 前端地址: `http://localhost:3013`
 - 后端 API: `http://localhost:5679/api/v1`
 - 前端自动代理 `/api` 和 `/static` 到后端
+
+### Docker 开发热加载模式
+
+生产 Compose 会将源码复制进镜像，修改代码后必须重建。日常开发请使用独立的 Node.js 22 热加载 Compose：后端通过 `tsx watch` 自动重启，前端 Nuxt 使用 HMR；代码文件直接挂载自本机仓库。
+
+> 开发栈与生产栈共用当前 MySQL 数据卷和 `./data`。启动开发栈前必须关闭生产 Compose；不要同时启动两套 Compose。
+
+```bash
+# 关闭生产容器（不删除 MySQL 数据卷和素材）
+docker compose down
+
+# 启动开发栈（首次会安装依赖）
+docker compose -f docker-compose.dev.yml up -d --build
+
+# 查看状态与日志
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml logs -f backend frontend
+```
+
+- 前端（Nuxt HMR）：<http://localhost:3013>
+- 后端 API（tsx watch）：<http://localhost:5679/api/v1>
+- 数据库：`localhost:3307`
+
+开发 Compose 会通过 `HUOBAO_BACKEND_URL=http://backend:5679` 将 Nuxt 的 `/api` 和 `/static` 代理到后端容器；在宿主机直接执行 `npm run dev` 时仍默认代理到 `http://localhost:5679`。
+
+验证热加载：编辑 `backend/src/` 下一个 TypeScript 文件后查看 `backend` 日志，`tsx watch` 应自动重启；编辑 `frontend/app/` 下 Vue 文件后浏览器应即时刷新或局部 HMR 更新。修改 `package-lock.json`、`Dockerfile.dev` 或 Compose 配置后，重新执行带 `--build` 的启动命令。
+
+切回生产：
+
+```bash
+docker compose -f docker-compose.dev.yml down
+docker compose up -d --build
+```
 
 #### 方式二：单服务模式
 
@@ -439,6 +475,17 @@ A: 后端会在首次启动时自动创建所有表，检查日志确认初始�
 - 修复视频生成 API 响应解析问题
 - 添加 OpenAI Sora 视频端点配置
 - 优化错误处理和日志输出
+
+---
+
+## 🧾 迭代日志
+
+本地开发版的重要功能改动与真实验证记录见 [docs/iteration-logs](docs/iteration-logs/README.md)。
+
+当前已记录：
+
+- 视频生成参考图片、视频、音频的本地上传与资产库复用。
+- MiniMax H3 提示词 Skill、独立 Agent、生成按钮及分镜 01 实测。
 
 ---
 

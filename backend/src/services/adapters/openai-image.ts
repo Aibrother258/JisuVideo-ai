@@ -20,11 +20,14 @@ export class OpenAIImageAdapter implements ImageProviderAdapter {
     const model = record.model || config.model || 'gpt-image-2'
     const isGptImage = model.startsWith('gpt-image-')
     const isGptImage2 = model === 'gpt-image-2'
+    const isSenseNova = model.toLowerCase().includes('sensenova')
     const size = isGptImage2
       ? this.normalizeGptImage2Size(record.size)
       : isGptImage
-      ? this.normalizeGptImageSize(record.size)
-      : record.size || '1024x1024'
+        ? this.normalizeGptImageSize(record.size)
+        : isSenseNova
+          ? this.mapSenseNovaSize(record.size)
+          : record.size || '1024x1024'
 
     const body: any = {
       model,
@@ -59,6 +62,48 @@ export class OpenAIImageAdapter implements ImageProviderAdapter {
     if (!width || !height) return 'auto'
     if (width === height) return '1024x1024'
     return width > height ? '1536x1024' : '1024x1536'
+  }
+
+  /**
+   * 商汤 SenseNova 图片模型（如 sensenova-u1-fast）只接受固定的一组分辨率，
+   * 不支持 OpenAI/DALL-E 的 1024x1024、1536x1024 等。这里把请求尺寸按宽高比
+   * 归一化映射到最接近的合法值，保证项目里硬编码的 1920x1080 / 1024x1024 可用。
+   */
+  private mapSenseNovaSize(size?: string | null): string {
+    const allowed = [
+      '1664x2496', '2496x1664',
+      '1760x2368', '2368x1760',
+      '1824x2272', '2272x1824',
+      '2048x2048',
+      '2752x1536', '1536x2752',
+      '3072x1376', '1344x3136',
+      '2560x720', '3072x864',
+    ]
+    if (!size) return '2048x2048'
+    if (allowed.includes(size.toLowerCase())) return size.toLowerCase()
+    if (size.toLowerCase() === 'auto') return '2048x2048'
+
+    const [w, h] = size.toLowerCase().split('x').map(Number)
+    if (!w || !h) return '2048x2048'
+    const reqRatio = w / h
+
+    // 先筛同朝向候选（横/竖/方），避免 16:9 映射成竖图
+    let pool = allowed.filter(s => {
+      const [aw, ah] = s.split('x').map(Number)
+      const ar = aw / ah
+      if (Math.abs(reqRatio - 1) < 0.15) return Math.abs(ar - 1) < 0.15
+      if (reqRatio > 1) return ar > 1
+      return ar < 1
+    })
+    if (pool.length === 0) pool = allowed
+
+    // 在候选里取宽高比最接近者
+    pool.sort((a, b) => {
+      const [aw, ah] = a.split('x').map(Number)
+      const [bw, bh] = b.split('x').map(Number)
+      return Math.abs(aw / ah - reqRatio) - Math.abs(bw / bh - reqRatio)
+    })
+    return pool[0]
   }
 
   private normalizeGptImage2Size(size?: string | null): string {

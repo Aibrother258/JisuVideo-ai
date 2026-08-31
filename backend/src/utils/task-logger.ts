@@ -86,7 +86,7 @@ function sanitizeValue(value: unknown): unknown {
         lower.includes('base64') ||
         lower.includes('audiohex') ||
         lower.includes('inline') ||
-        raw.startsWith('data:image/')
+        raw.startsWith('data:')
       )) {
         out[key] = truncateString(raw, 48)
         continue

@@ -56,6 +56,9 @@
             任务
             <span v-if="genTaskActiveCount" class="task-drawer-badge">{{ genTaskActiveCount }}</span>
           </button>
+          <button class="btn" title="恢复所有工作台面板默认尺寸" @click="resetAllPanelSizes">
+            恢复布局
+          </button>
           <button class="btn btn-primary" @click="panel = mergeUrl ? 'export' : (sbs.length ? 'production' : 'script')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             {{ mergeUrl ? '查看成片' : (sbs.length ? '继续制作' : '开始制作') }}
@@ -64,9 +67,14 @@
       </div>
     </header>
 
-    <div class="studio-body">
+    <div ref="studioBodyEl" class="studio-body" :style="studioBodyStyle">
     <!-- ========== LEFT SIDEBAR ========== -->
-    <aside class="sidebar">
+    <aside
+      ref="sidebarEl"
+      class="sidebar"
+      :class="{ 'has-custom-height': panelLayout.sidebarHeight > 0 }"
+      :style="sidebarStyle"
+    >
       <nav class="pipeline">
         <div
           v-for="section in sidebarSections"
@@ -121,7 +129,28 @@
           刷新数据
         </button>
       </div>
+      <div
+        class="panel-resizer panel-resizer-horizontal panel-resizer-sidebar-height"
+        role="separator"
+        aria-label="调整左侧导航高度"
+        tabindex="0"
+        title="拖动调整高度，双击恢复默认"
+        @pointerdown="startSidebarHeightResize"
+        @keydown="resizeSidebarHeightByKey"
+        @dblclick="resetPanelSize('sidebarHeight')"
+      />
     </aside>
+
+    <div
+      class="panel-resizer panel-resizer-vertical studio-sidebar-resizer"
+      role="separator"
+      aria-label="调整左侧导航宽度"
+      tabindex="0"
+      title="拖动调整宽度，双击恢复默认"
+      @pointerdown="startSidebarWidthResize"
+      @keydown="resizeSidebarWidthByKey"
+      @dblclick="resetPanelSize('sidebarWidth')"
+    />
 
     <!-- ========== MAIN CONTENT ========== -->
     <main class="main">
@@ -466,8 +495,14 @@
               </div>
             </div>
 
-            <div v-if="sbs.length" class="storyboard-workbench">
-              <aside class="storyboard-shot-list">
+            <div
+              v-if="sbs.length"
+              ref="storyboardWorkbenchEl"
+              class="storyboard-workbench"
+              :class="{ 'has-custom-height': panelLayout.storyboardWorkbenchHeight > 0 }"
+              :style="storyboardWorkbenchStyle"
+            >
+              <aside ref="storyboardListEl" class="storyboard-shot-list">
                 <div class="shot-list-head">
                   <div class="shot-list-head-main">
                     <div class="shot-list-head-copy">
@@ -542,6 +577,17 @@
                 </div>
               </aside>
 
+              <div
+                class="panel-resizer panel-resizer-vertical storyboard-column-resizer"
+                role="separator"
+                aria-label="调整分镜列表宽度"
+                tabindex="0"
+                title="拖动调整宽度，双击恢复默认"
+                @pointerdown="startStoryboardListResize"
+                @keydown="resizeStoryboardListByKey"
+                @dblclick="resetPanelSize('storyboardListWidth')"
+              />
+
               <section class="storyboard-editor-main" v-if="selectedSb">
                 <div class="sb-header-top">
                   <div class="sb-nav-group">
@@ -577,8 +623,8 @@
                 </div>
 
                 <div class="storyboard-editor-scroll">
-                  <div class="sb-split">
-                    <div class="detail-section">
+                  <div ref="storyboardSplitEl" class="sb-split" :style="storyboardSplitStyle">
+                    <div ref="storyboardDescriptionPanelEl" class="detail-section sb-description-panel">
                       <div class="detail-section-head">
                         <span class="detail-section-title">分镜描述</span>
                       </div>
@@ -592,7 +638,19 @@
                       </label>
                     </div>
 
-                    <div class="detail-section">
+                    <div
+                      class="panel-resizer panel-resizer-vertical sb-content-resizer"
+                      role="separator"
+                      aria-label="调整分镜描述与提示词宽度"
+                      tabindex="0"
+                      title="拖动调整宽度，双击恢复默认"
+                      @pointerdown="startStoryboardDescriptionResize"
+                      @keydown="resizeStoryboardDescriptionByKey"
+                      @dblclick="resetPanelSize('storyboardDescriptionWidth')"
+                    />
+
+                    <div ref="storyboardPromptStackEl" class="sb-prompt-stack" :style="storyboardPromptStackStyle">
+                    <div ref="storyboardVideoPromptEl" class="detail-section">
                       <div class="detail-section-head">
                         <span class="detail-section-title">视频提示词</span>
                         <button
@@ -615,11 +673,57 @@
                         @commit="v => updateField(selectedSb, 'video_prompt', v)"
                       />
                     </div>
+
+                    <div
+                      class="panel-resizer panel-resizer-horizontal sb-prompt-height-resizer"
+                      role="separator"
+                      aria-label="调整视频提示词与 H3 提示词高度"
+                      tabindex="0"
+                      title="拖动调整高度，双击恢复默认"
+                      @pointerdown="startStoryboardPromptHeightResize"
+                      @keydown="resizeStoryboardPromptHeightByKey"
+                      @dblclick="resetPanelSize('storyboardVideoPromptHeight')"
+                    />
+
+                    <div class="detail-section">
+                      <div class="detail-section-head">
+                        <span class="detail-section-title">MiniMax H3 大模型提示词</span>
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          :disabled="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)"
+                          @click="genMinimaxH3Prompt(selectedSb)"
+                        >
+                          <Loader2 v-if="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
+                          MiniMax H3 提示词
+                        </button>
+                      </div>
+                      <div class="detail-section-copy">根据中文版视频提示词和实际参考素材顺序生成；不会覆盖中文版</div>
+                      <textarea
+                        :value="selectedSb.minimax_h3_prompt || selectedSb.minimaxH3Prompt || ''"
+                        class="textarea"
+                        rows="14"
+                        placeholder="点击“MiniMax H3 提示词”，自动生成 T2VA / I2VA / Ref2VA 英文结构化提示词…"
+                        @blur="updateField(selectedSb, 'minimax_h3_prompt', $event.target.value)"
+                      />
+                    </div>
+                    </div>
                   </div>
                 </div>
               </section>
 
-              <aside class="storyboard-reference-panel" v-if="selectedSb">
+              <div
+                class="panel-resizer panel-resizer-vertical storyboard-column-resizer"
+                role="separator"
+                aria-label="调整参考素材栏宽度"
+                tabindex="0"
+                title="拖动调整宽度，双击恢复默认"
+                @pointerdown="startStoryboardReferenceResize"
+                @keydown="resizeStoryboardReferenceByKey"
+                @dblclick="resetPanelSize('storyboardReferenceWidth')"
+              />
+
+              <aside ref="storyboardReferenceEl" class="storyboard-reference-panel" v-if="selectedSb">
                 <div class="storyboard-ref-head">
                   <div>
                     <div class="storyboard-ref-title">参考素材</div>
@@ -666,6 +770,18 @@
                 </div>
               </aside>
             </div>
+
+            <div
+              v-if="sbs.length"
+              class="panel-resizer panel-resizer-horizontal workbench-height-resizer"
+              role="separator"
+              aria-label="调整分镜拆分工作区高度"
+              tabindex="0"
+              title="拖动调整工作区高度，双击恢复默认"
+              @pointerdown="startStoryboardWorkbenchHeightResize"
+              @keydown="resizeStoryboardWorkbenchHeightByKey"
+              @dblclick="resetPanelSize('storyboardWorkbenchHeight')"
+            />
 
             <div v-else-if="rn && rt === 'storyboard_breaker'" class="step-loading">
               <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
@@ -716,8 +832,14 @@
                 AI 生成分镜
               </button>
             </div>
-            <div v-else class="video-task-workbench has-player">
-              <section class="video-task-list">
+            <div
+              v-else
+              ref="videoWorkbenchEl"
+              class="video-task-workbench"
+              :class="{ 'has-player': !!selectedSb, 'has-custom-height': panelLayout.videoWorkbenchHeight > 0 }"
+              :style="videoWorkbenchStyle"
+            >
+              <section ref="videoTaskListEl" class="video-task-list">
                 <div class="video-task-head">
                 <div>
                   <div class="video-task-title">视频任务列表</div>
@@ -784,7 +906,20 @@
                 </div>
               </section>
 
-              <div v-if="selectedSb" class="video-task-side">
+              <div
+                v-if="selectedSb"
+                class="panel-resizer panel-resizer-vertical video-column-resizer"
+                role="separator"
+                aria-label="调整视频任务列表宽度"
+                tabindex="0"
+                title="拖动调整宽度，双击恢复默认"
+                @pointerdown="startVideoTaskListResize"
+                @keydown="resizeVideoTaskListByKey"
+                @dblclick="resetPanelSize('videoTaskListWidth')"
+              />
+
+              <div v-if="selectedSb" ref="videoTaskSideEl" class="video-task-side" :style="videoTaskSideStyle">
+              <div ref="videoPreviewStackEl" class="video-task-preview-stack">
               <aside class="video-task-player">
                 <div class="video-player-head">
                   <div class="video-player-head-info">
@@ -861,6 +996,18 @@
                   </div>
                 </div>
               </div>
+              </div>
+
+              <div
+                class="panel-resizer panel-resizer-horizontal video-row-resizer"
+                role="separator"
+                aria-label="调整视频预览与提示词区域高度"
+                tabindex="0"
+                title="拖动调整高度，双击恢复默认"
+                @pointerdown="startVideoPreviewHeightResize"
+                @keydown="resizeVideoPreviewHeightByKey"
+                @dblclick="resetPanelSize('videoPreviewHeight')"
+              />
 
               <aside class="video-task-inspector">
                 <div class="video-inspector-body">
@@ -887,8 +1034,45 @@
                     />
                   </section>
 
+                  <section class="video-inspector-section video-inspector-h3-section">
+                    <div class="video-inspector-prompt-head">
+                      <div>
+                        <span class="video-inspector-label video-inspector-label-hero">MiniMax H3 大模型提示词</span>
+                        <div class="video-inspector-hint">按实际参考素材自动选择 T2VA / I2VA / Ref2VA</div>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        :disabled="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)"
+                        @click="genMinimaxH3Prompt(selectedSb)"
+                      >
+                        <Loader2 v-if="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
+                        MiniMax H3 提示词
+                      </button>
+                    </div>
+                    <textarea
+                      :value="selectedSb.minimax_h3_prompt || selectedSb.minimaxH3Prompt || ''"
+                      class="textarea video-inspector-prompt video-inspector-h3-prompt"
+                      rows="12"
+                      placeholder="先准备中文版视频提示词，再点击上方按钮生成 H3 专用提示词…"
+                      @blur="updateField(selectedSb, 'minimax_h3_prompt', $event.target.value)"
+                    />
+                    <div v-if="['autodl', 'minimax'].includes(selectedVideoProvider) && (selectedSb.minimax_h3_prompt || selectedSb.minimaxH3Prompt)" class="video-inspector-h3-active">
+                      当前视频生成将优先使用这份 H3 提示词
+                    </div>
+                    <div v-if="(selectedSb.minimax_h3_prompt || selectedSb.minimaxH3Prompt) && !selectedSb.minimax_h3_source_hash" class="video-inspector-h3-stale">
+                      H3 提示词可能已过期：分镜内容或参考素材发生变化，请重新生成
+                    </div>
+                  </section>
+
                   <section class="video-inspector-section">
-                    <span class="video-inspector-label">参考素材</span>
+                    <div class="video-inspector-prompt-head">
+                      <div>
+                        <span class="video-inspector-label">已继承的分镜素材</span>
+                        <div class="video-inspector-hint">角色、场景和道具在「分镜拆分」中维护，此处只读继承</div>
+                      </div>
+                      <button type="button" class="btn btn-sm" @click="prodTab = 'storyboard'">管理分镜绑定</button>
+                    </div>
                     <div class="video-inspector-assets">
                       <button
                         v-for="asset in getShotReferenceAssets(selectedSb)"
@@ -907,7 +1091,8 @@
                   </section>
 
                   <section class="video-inspector-section">
-                    <span class="video-inspector-label">参考图片 / 视频 / 音频</span>
+                    <span class="video-inspector-label">额外投产参考</span>
+                    <div class="video-inspector-hint">仅用于本次视频任务，不会修改分镜的正式角色、场景或道具绑定</div>
                     <div v-if="videoRefImageUrls.length || videoRefVideoUrls.length || videoRefAudioUrls.length" class="video-ref-media-list">
                       <span v-for="(url, i) in videoRefImageUrls" :key="'ref-i-' + i" class="video-ref-media-chip">
                         图片 {{ i + 1 }}
@@ -923,15 +1108,24 @@
                       </span>
                     </div>
                     <div class="video-ref-media-actions">
-                      <button type="button" class="btn btn-sm" :disabled="uploadingRefMedia || refImageFull" @click="uploadRefMedia('image')">
-                        上传参考图片 ({{ refImageUsedCount }}/9)
-                      </button>
-                      <button type="button" class="btn btn-sm" :disabled="uploadingRefMedia || videoRefVideoUrls.length >= 3" @click="uploadRefMedia('video')">
-                        上传参考视频 ({{ videoRefVideoUrls.length }}/3)
-                      </button>
-                      <button type="button" class="btn btn-sm" :disabled="uploadingRefMedia || videoRefAudioUrls.length >= 3" @click="uploadRefMedia('audio')">
-                        上传参考音频 ({{ videoRefAudioUrls.length }}/3)
-                      </button>
+                      <div class="video-ref-action-group">
+                        <span>图片 {{ refImageUsedCount }}/9</span>
+                        <button type="button" class="btn btn-sm" :disabled="uploadingRefMedia || refImageFull" @click="uploadRefMedia('image')">本地上传</button>
+                        <button type="button" class="btn btn-sm" :disabled="refImageFull" @click="openRefAssetPicker('image')">从资产库选择</button>
+                      </div>
+                      <div class="video-ref-action-group">
+                        <span>视频 {{ videoRefVideoUrls.length }}/3</span>
+                        <button type="button" class="btn btn-sm" :disabled="uploadingRefMedia || videoRefVideoUrls.length >= 3" @click="uploadRefMedia('video')">本地上传</button>
+                        <button type="button" class="btn btn-sm" :disabled="videoRefVideoUrls.length >= 3" @click="openRefAssetPicker('video')">从资产库选择</button>
+                      </div>
+                      <div class="video-ref-action-group">
+                        <span>音频 {{ videoRefAudioUrls.length }}/3</span>
+                        <button type="button" class="btn btn-sm" :disabled="uploadingRefMedia || videoRefAudioUrls.length >= 3" @click="uploadRefMedia('audio')">本地上传</button>
+                        <button type="button" class="btn btn-sm" :disabled="videoRefAudioUrls.length >= 3" @click="openRefAssetPicker('audio')">从资产库选择</button>
+                      </div>
+                    </div>
+                    <div v-if="selectedVideoProvider === 'autodl' && videoRefVideoUrls.length" class="video-ref-media-hint">
+                      当前 AutoDL H3 工作流不接收参考视频；这些视频可在切换到 Seedance 等支持视频参考的模型后使用。
                     </div>
                     <div
                       v-if="videoRefAudioUrls.length && !getShotReferenceImages(selectedSb).length && !videoRefVideoUrls.length"
@@ -961,6 +1155,17 @@
               </aside>
               </div>
             </div>
+            <div
+              v-if="sbs.length"
+              class="panel-resizer panel-resizer-horizontal workbench-height-resizer"
+              role="separator"
+              aria-label="调整视频任务工作区高度"
+              tabindex="0"
+              title="拖动调整工作区高度，双击恢复默认"
+              @pointerdown="startVideoWorkbenchHeightResize"
+              @keydown="resizeVideoWorkbenchHeightByKey"
+              @dblclick="resetPanelSize('videoWorkbenchHeight')"
+            />
           </div>
 
           <!-- Production Navigator -->
@@ -1450,6 +1655,42 @@
         </section>
       </div>
 
+      <div v-if="refAssetPicker.open" class="overlay ref-asset-picker-overlay" @click.self="closeRefAssetPicker">
+        <section class="dialog ref-asset-picker-dialog" role="dialog" aria-modal="true" :aria-label="`选择参考${refAssetKindLabel}`">
+          <header class="dialog-head">
+            <div>
+              <h2 class="dialog-title">选择参考{{ refAssetKindLabel }}</h2>
+              <p class="ref-asset-picker-sub">可选择本剧已有资产，也可复用之前从本地上传并保存到素材库的文件。</p>
+            </div>
+            <button class="btn btn-ghost btn-icon" @click="closeRefAssetPicker"><X :size="14" /></button>
+          </header>
+          <div class="dialog-body ref-asset-picker-body">
+            <div v-if="refAssetPickerLoading" class="ref-asset-picker-empty"><Loader2 :size="18" class="animate-spin" /> 正在加载素材库</div>
+            <div v-else-if="refAssetCandidates.length" class="ref-asset-picker-grid">
+              <button
+                v-for="asset in refAssetCandidates"
+                :key="asset.key"
+                type="button"
+                :class="['ref-asset-card', { selected: isRefAssetSelected(asset), locked: isAutoBoundImageAsset(asset) }]"
+                @click="toggleRefAsset(asset)"
+              >
+                <img v-if="asset.kind === 'image'" :src="asset.thumbnail || asset.url" :alt="asset.name" loading="lazy" />
+                <video v-else-if="asset.kind === 'video'" :src="asset.url" preload="metadata" muted playsinline />
+                <div v-else class="ref-asset-audio-preview">♫</div>
+                <span class="ref-asset-card-check">{{ isAutoBoundImageAsset(asset) ? '已绑定' : isRefAssetSelected(asset) ? '已选' : '选择' }}</span>
+                <strong>{{ asset.name }}</strong>
+                <small>{{ asset.source }}</small>
+              </button>
+            </div>
+            <div v-else class="ref-asset-picker-empty">素材库里还没有{{ refAssetKindLabel }}，请先使用“本地上传”。</div>
+          </div>
+          <footer class="dialog-foot">
+            <span class="dim">已选 {{ selectedRefAssetCount }} 个</span>
+            <button class="btn btn-primary" @click="closeRefAssetPicker">完成</button>
+          </footer>
+        </section>
+      </div>
+
       <div v-if="imageViewer.open && imageViewer.src" class="overlay image-viewer-overlay" @click.self="closeImageViewer">
         <div class="dialog image-viewer-dialog">
           <div class="image-viewer-head">
@@ -1546,7 +1787,7 @@ import {
   Users, Video, FileText, FolderKanban, Clapperboard, Download, Loader2,
   MapPin, Play, Plus, X, ListTodo,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, assetLibraryAPI } from '~/composables/useApi'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
@@ -1570,6 +1811,265 @@ const storedPanel = (() => {
 let panelRestored = !!storedPanel
 const panel = ref(['production', 'export'].includes(storedPanel?.panel) ? storedPanel.panel : 'script')
 const { running: rn, runningType: rt, run: runAgent } = useAgent()
+
+// ===== 可拖拽工作台布局 =====
+// 尺寸偏好跨项目复用；0 表示使用响应式默认值。拖动后自动记忆，双击分隔线恢复默认。
+const PANEL_LAYOUT_STORE_KEY = 'huobao:studio:panel-layout:v2'
+const DEFAULT_PANEL_LAYOUT = Object.freeze({
+  sidebarWidth: 208,
+  sidebarHeight: 0,
+  videoTaskListWidth: 0,
+  videoPreviewHeight: 0,
+  videoWorkbenchHeight: 0,
+  storyboardListWidth: 0,
+  storyboardReferenceWidth: 0,
+  storyboardDescriptionWidth: 0,
+  storyboardVideoPromptHeight: 0,
+  storyboardWorkbenchHeight: 0,
+})
+
+function loadPanelLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PANEL_LAYOUT_STORE_KEY) || '{}')
+    const normalized = {}
+    for (const [key, fallback] of Object.entries(DEFAULT_PANEL_LAYOUT)) {
+      const value = Number(saved?.[key])
+      normalized[key] = Number.isFinite(value) && value >= 0 ? value : fallback
+    }
+    return normalized
+  } catch {
+    return { ...DEFAULT_PANEL_LAYOUT }
+  }
+}
+
+const panelLayout = reactive(loadPanelLayout())
+const studioBodyEl = ref(null)
+const sidebarEl = ref(null)
+const videoWorkbenchEl = ref(null)
+const videoTaskListEl = ref(null)
+const videoTaskSideEl = ref(null)
+const videoPreviewStackEl = ref(null)
+const storyboardWorkbenchEl = ref(null)
+const storyboardListEl = ref(null)
+const storyboardReferenceEl = ref(null)
+const storyboardSplitEl = ref(null)
+const storyboardDescriptionPanelEl = ref(null)
+const storyboardPromptStackEl = ref(null)
+const storyboardVideoPromptEl = ref(null)
+
+const cssPx = value => Number(value) > 0 ? `${Math.round(Number(value))}px` : undefined
+const studioBodyStyle = computed(() => ({
+  '--studio-sidebar-width': cssPx(panelLayout.sidebarWidth),
+}))
+const sidebarStyle = computed(() => panelLayout.sidebarHeight > 0 ? {
+  height: cssPx(panelLayout.sidebarHeight),
+  alignSelf: 'start',
+} : {})
+const videoWorkbenchStyle = computed(() => ({
+  '--video-task-list-width': cssPx(panelLayout.videoTaskListWidth),
+  ...(panelLayout.videoWorkbenchHeight > 0 ? {
+    height: cssPx(panelLayout.videoWorkbenchHeight),
+    flex: '0 0 auto',
+  } : {}),
+}))
+const videoTaskSideStyle = computed(() => ({
+  '--video-preview-height': cssPx(panelLayout.videoPreviewHeight),
+}))
+const storyboardWorkbenchStyle = computed(() => ({
+  '--storyboard-list-width': cssPx(panelLayout.storyboardListWidth),
+  '--storyboard-reference-width': cssPx(panelLayout.storyboardReferenceWidth),
+  ...(panelLayout.storyboardWorkbenchHeight > 0 ? {
+    height: cssPx(panelLayout.storyboardWorkbenchHeight),
+    flex: '0 0 auto',
+  } : {}),
+}))
+const storyboardSplitStyle = computed(() => ({
+  '--storyboard-description-width': cssPx(panelLayout.storyboardDescriptionWidth),
+}))
+const storyboardPromptStackStyle = computed(() => ({
+  '--storyboard-video-prompt-height': cssPx(panelLayout.storyboardVideoPromptHeight),
+}))
+
+let layoutSaveTimer = null
+function persistPanelLayout() {
+  try { localStorage.setItem(PANEL_LAYOUT_STORE_KEY, JSON.stringify(panelLayout)) } catch {}
+}
+function schedulePanelLayoutSave() {
+  if (layoutSaveTimer != null || typeof window === 'undefined') return
+  layoutSaveTimer = window.setTimeout(() => {
+    layoutSaveTimer = null
+    persistPanelLayout()
+  }, 120)
+}
+watch(panelLayout, schedulePanelLayoutSave, { deep: true })
+
+let activePanelResizeCleanup = null
+
+function panelResizeConfig(key) {
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900
+  const configs = {
+    sidebarWidth: {
+      axis: 'x', element: sidebarEl.value, min: 168,
+      max: Math.min(380, Math.max(220, (studioBodyEl.value?.clientWidth || 1280) - 560)),
+    },
+    sidebarHeight: {
+      axis: 'y', element: sidebarEl.value, min: 260,
+      max: Math.max(260, studioBodyEl.value?.clientHeight || viewportHeight - 72),
+    },
+    videoTaskListWidth: {
+      axis: 'x', element: videoTaskListEl.value, min: 280,
+      max: Math.max(320, (videoWorkbenchEl.value?.clientWidth || 1100) - 328),
+    },
+    videoPreviewHeight: {
+      axis: 'y', element: videoPreviewStackEl.value, min: 190,
+      max: Math.max(230, (videoTaskSideEl.value?.clientHeight || 720) - 220),
+    },
+    videoWorkbenchHeight: {
+      axis: 'y', element: videoWorkbenchEl.value, min: 360,
+      max: Math.max(420, viewportHeight - 126),
+    },
+    storyboardListWidth: {
+      axis: 'x', element: storyboardListEl.value, min: 140, max: 380,
+    },
+    storyboardReferenceWidth: {
+      axis: 'x', element: storyboardReferenceEl.value, min: 160, max: 400, reverse: true,
+    },
+    storyboardDescriptionWidth: {
+      axis: 'x', element: storyboardDescriptionPanelEl.value, min: 120,
+      max: Math.max(160, (storyboardSplitEl.value?.clientWidth || 900) - 148),
+    },
+    storyboardVideoPromptHeight: {
+      axis: 'y', element: storyboardVideoPromptEl.value, min: 170,
+      max: Math.max(220, (storyboardPromptStackEl.value?.clientHeight || 640) - 190),
+    },
+    storyboardWorkbenchHeight: {
+      axis: 'y', element: storyboardWorkbenchEl.value, min: 360,
+      max: Math.max(420, viewportHeight - 126),
+    },
+  }
+  return configs[key]
+}
+
+function clampedPanelSize(value, config) {
+  return Math.round(Math.min(config.max, Math.max(config.min, value)))
+}
+
+function currentPanelSize(key, config) {
+  const saved = Number(panelLayout[key])
+  if (saved > 0) return saved
+  const rect = config.element?.getBoundingClientRect?.()
+  return config.axis === 'x' ? (rect?.width || config.min) : (rect?.height || config.min)
+}
+
+function startConfiguredPanelResize(event, key) {
+  if (event.button != null && event.button !== 0) return
+  const config = panelResizeConfig(key)
+  if (!config?.element) return
+  event.preventDefault()
+  activePanelResizeCleanup?.()
+
+  const startPoint = config.axis === 'x' ? event.clientX : event.clientY
+  const startSize = currentPanelSize(key, config)
+  const direction = config.reverse ? -1 : 1
+  const cursor = config.axis === 'x' ? 'col-resize' : 'row-resize'
+  const previousCursor = document.body.style.cursor
+  const previousUserSelect = document.body.style.userSelect
+  document.body.style.cursor = cursor
+  document.body.style.userSelect = 'none'
+  document.body.classList.add('is-panel-resizing')
+
+  const onMove = moveEvent => {
+    const point = config.axis === 'x' ? moveEvent.clientX : moveEvent.clientY
+    panelLayout[key] = clampedPanelSize(startSize + ((point - startPoint) * direction), config)
+  }
+  const cleanup = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', cleanup)
+    window.removeEventListener('pointercancel', cleanup)
+    document.body.style.cursor = previousCursor
+    document.body.style.userSelect = previousUserSelect
+    document.body.classList.remove('is-panel-resizing')
+    persistPanelLayout()
+    if (activePanelResizeCleanup === cleanup) activePanelResizeCleanup = null
+  }
+  activePanelResizeCleanup = cleanup
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', cleanup)
+  window.addEventListener('pointercancel', cleanup)
+}
+
+function resizeConfiguredPanelByKey(event, key) {
+  const config = panelResizeConfig(key)
+  if (!config?.element) return
+  const negativeKey = config.axis === 'x' ? 'ArrowLeft' : 'ArrowUp'
+  const positiveKey = config.axis === 'x' ? 'ArrowRight' : 'ArrowDown'
+  if (event.key === 'Home') {
+    event.preventDefault()
+    resetPanelSize(key)
+    return
+  }
+  if (![negativeKey, positiveKey].includes(event.key)) return
+  event.preventDefault()
+  const direction = (event.key === positiveKey ? 1 : -1) * (config.reverse ? -1 : 1)
+  const step = event.shiftKey ? 48 : 16
+  panelLayout[key] = clampedPanelSize(currentPanelSize(key, config) + direction * step, config)
+}
+
+function resetPanelSize(key) {
+  panelLayout[key] = DEFAULT_PANEL_LAYOUT[key] ?? 0
+  persistPanelLayout()
+}
+
+function resetAllPanelSizes() {
+  Object.assign(panelLayout, DEFAULT_PANEL_LAYOUT)
+  persistPanelLayout()
+}
+
+function clampAllPanelSizes() {
+  for (const key of Object.keys(DEFAULT_PANEL_LAYOUT)) {
+    const config = panelResizeConfig(key)
+    const value = Number(panelLayout[key])
+    if (!config || value <= 0) continue
+    panelLayout[key] = clampedPanelSize(value, config)
+  }
+  persistPanelLayout()
+}
+
+const bindPanelResizeHandlers = key => ({
+  start: event => startConfiguredPanelResize(event, key),
+  keydown: event => resizeConfiguredPanelByKey(event, key),
+})
+const sidebarWidthResize = bindPanelResizeHandlers('sidebarWidth')
+const sidebarHeightResize = bindPanelResizeHandlers('sidebarHeight')
+const videoTaskListResize = bindPanelResizeHandlers('videoTaskListWidth')
+const videoPreviewHeightResize = bindPanelResizeHandlers('videoPreviewHeight')
+const videoWorkbenchHeightResize = bindPanelResizeHandlers('videoWorkbenchHeight')
+const storyboardListResize = bindPanelResizeHandlers('storyboardListWidth')
+const storyboardReferenceResize = bindPanelResizeHandlers('storyboardReferenceWidth')
+const storyboardDescriptionResize = bindPanelResizeHandlers('storyboardDescriptionWidth')
+const storyboardPromptHeightResize = bindPanelResizeHandlers('storyboardVideoPromptHeight')
+const storyboardWorkbenchHeightResize = bindPanelResizeHandlers('storyboardWorkbenchHeight')
+
+const startSidebarWidthResize = sidebarWidthResize.start
+const resizeSidebarWidthByKey = sidebarWidthResize.keydown
+const startSidebarHeightResize = sidebarHeightResize.start
+const resizeSidebarHeightByKey = sidebarHeightResize.keydown
+const startVideoTaskListResize = videoTaskListResize.start
+const resizeVideoTaskListByKey = videoTaskListResize.keydown
+const startVideoPreviewHeightResize = videoPreviewHeightResize.start
+const resizeVideoPreviewHeightByKey = videoPreviewHeightResize.keydown
+const startVideoWorkbenchHeightResize = videoWorkbenchHeightResize.start
+const resizeVideoWorkbenchHeightByKey = videoWorkbenchHeightResize.keydown
+const startStoryboardListResize = storyboardListResize.start
+const resizeStoryboardListByKey = storyboardListResize.keydown
+const startStoryboardReferenceResize = storyboardReferenceResize.start
+const resizeStoryboardReferenceByKey = storyboardReferenceResize.keydown
+const startStoryboardDescriptionResize = storyboardDescriptionResize.start
+const resizeStoryboardDescriptionByKey = storyboardDescriptionResize.keydown
+const startStoryboardPromptHeightResize = storyboardPromptHeightResize.start
+const resizeStoryboardPromptHeightByKey = storyboardPromptHeightResize.keydown
+const startStoryboardWorkbenchHeightResize = storyboardWorkbenchHeightResize.start
+const resizeStoryboardWorkbenchHeightByKey = storyboardWorkbenchHeightResize.keydown
 
 const localRaw = ref(''), localScript = ref('')
 const rawContent = computed(() => episode.value?.content || '')
@@ -1671,6 +2171,15 @@ const videoRefAudioUrls = ref([])
 const videoRefImageUrls = ref([])
 const videoDuration = ref(10)
 const uploadingRefMedia = ref(false)
+const mediaLibraryAssets = ref([])
+const refAssetPicker = ref({ open: false, kind: 'image' })
+const refAssetPickerLoading = ref(false)
+const REF_SELECTION_STORE_KEY = `huobao:video-refs:${dramaId}:${episodeNumber}`
+const storedShotRefSelections = ref((() => {
+  try { return JSON.parse(localStorage.getItem(REF_SELECTION_STORE_KEY) || '{}') }
+  catch { return {} }
+})())
+let restoringShotRefSelection = false
 const imageViewer = ref({ open: false, src: '', title: '' })
 const activeMerge = ref(null) // 成片大预览弹窗中正在播放的拼接记录
 const assetDetail = ref({ open: false, type: '', item: null })
@@ -1957,10 +2466,15 @@ function handleImageViewerKeydown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleImageViewerKeydown)
+  window.addEventListener('resize', clampAllPanelSizes)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleImageViewerKeydown)
+  window.removeEventListener('resize', clampAllPanelSizes)
+  if (layoutSaveTimer != null) window.clearTimeout(layoutSaveTimer)
+  layoutSaveTimer = null
+  activePanelResizeCleanup?.()
   stopGenTasksPolling()
 })
 
@@ -2069,6 +2583,118 @@ function hasMultiConfigs(options) {
 const textModelOptions = computed(() => collectModelOptions(textConfigs.value))
 const imageModelOptions = computed(() => collectModelOptions(imageConfigs.value))
 const videoModelOptions = computed(() => collectModelOptions(videoConfigs.value))
+const selectedVideoProvider = computed(() => {
+  const locked = videoConfigs.value.find(config => config.id === lockedVideoConfigId.value)
+  if (locked?.provider) return locked.provider
+  const selected = videoModelOptions.value.find(option => option.key === videoModel.value)
+  return selected?.provider || videoModelOptions.value[0]?.provider || ''
+})
+
+const refAssetKindLabel = computed(() => ({ image: '图片', video: '视频', audio: '音频' })[refAssetPicker.value.kind] || '素材')
+
+function normalizeMediaUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw || /^https?:\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('/')) return raw
+  return `/${raw}`
+}
+
+function addRefAssetCandidate(target, seen, item) {
+  const url = normalizeMediaUrl(item.url)
+  if (!url || seen.has(url)) return
+  seen.add(url)
+  target.push({ ...item, url, thumbnail: normalizeMediaUrl(item.thumbnail || '') })
+}
+
+const refAssetCandidates = computed(() => {
+  const kind = refAssetPicker.value.kind
+  const items = []
+  const seen = new Set()
+  if (kind === 'image') {
+    for (const char of visualChars.value) {
+      addRefAssetCandidate(items, seen, { key: `character-${char.id}`, kind, name: char.name || '未命名角色', source: '角色资产', url: char.image_url || char.imageUrl, thumbnail: thumbOf(assetImageSrc(char)) })
+    }
+    for (const scene of scenes.value) {
+      addRefAssetCandidate(items, seen, { key: `scene-${scene.id}`, kind, name: scene.location || '未命名场景', source: '场景资产', url: scene.image_url || scene.imageUrl, thumbnail: thumbOf(assetImageSrc(scene)) })
+    }
+    for (const prop of propItems.value) {
+      addRefAssetCandidate(items, seen, { key: `prop-${prop.id}`, kind, name: prop.name || '未命名道具', source: '道具资产', url: prop.image_url || prop.imageUrl, thumbnail: thumbOf(assetImageSrc(prop)) })
+    }
+  } else if (kind === 'video') {
+    for (const sb of sbs.value) {
+      const url = getVideoUrl(sb)
+      addRefAssetCandidate(items, seen, { key: `storyboard-video-${sb.id}`, kind, name: `分镜 ${sb.storyboard_number || sb.storyboardNumber || sb.id} · ${sb.title || '已生成视频'}`, source: '分镜视频', url })
+    }
+  }
+  for (const asset of mediaLibraryAssets.value) {
+    const assetKind = String(asset.type || '').toLowerCase()
+    if (assetKind !== kind) continue
+    addRefAssetCandidate(items, seen, {
+      key: `library-${asset.id}`,
+      kind,
+      name: asset.name || `${refAssetKindLabel.value}素材`,
+      source: '本地上传素材库',
+      url: asset.url || asset.local_path || asset.localPath,
+      thumbnail: asset.thumbnail_url || asset.thumbnailUrl,
+    })
+  }
+  return items
+})
+
+function selectedRefList(kind = refAssetPicker.value.kind) {
+  if (kind === 'image') return videoRefImageUrls
+  if (kind === 'video') return videoRefVideoUrls
+  return videoRefAudioUrls
+}
+
+function isAutoBoundImageAsset(asset) {
+  if (asset?.kind !== 'image' || !selectedSb.value) return false
+  return getShotReferenceImages(selectedSb.value).includes(asset.url) && !videoRefImageUrls.value.includes(asset.url)
+}
+
+function isRefAssetSelected(asset) {
+  return isAutoBoundImageAsset(asset) || selectedRefList(asset.kind).value.includes(asset.url)
+}
+
+const selectedRefAssetCount = computed(() => selectedRefList().value.length)
+
+async function loadRefAssetLibrary() {
+  refAssetPickerLoading.value = true
+  try {
+    mediaLibraryAssets.value = await assetLibraryAPI.list({ drama_id: dramaId, episode_id: epId.value }) || []
+  } catch (error) {
+    toast.error(error.message || '素材库加载失败')
+  } finally {
+    refAssetPickerLoading.value = false
+  }
+}
+
+async function openRefAssetPicker(kind) {
+  refAssetPicker.value = { open: true, kind }
+  await loadRefAssetLibrary()
+}
+
+function closeRefAssetPicker() {
+  refAssetPicker.value = { ...refAssetPicker.value, open: false }
+}
+
+function toggleRefAsset(asset) {
+  if (isAutoBoundImageAsset(asset)) {
+    toast.info('该图片已随当前分镜绑定，无需重复选择')
+    return
+  }
+  const list = selectedRefList(asset.kind)
+  if (list.value.includes(asset.url)) {
+    list.value = list.value.filter(url => url !== asset.url)
+    return
+  }
+  const limit = asset.kind === 'image' ? 9 : 3
+  const used = asset.kind === 'image' ? refImageUsedCount.value : list.value.length
+  if (used >= limit) {
+    toast.info(`参考${({ image: '图片', video: '视频', audio: '音频' })[asset.kind]}最多 ${limit} 个`)
+    return
+  }
+  list.value = [...list.value, asset.url]
+}
 
 // 配置变化后校验持久化的模型是否仍存在（配置被删/模型被移除时回退默认，避免把失效模型传给后端）
 function pruneStaleModel(modelRef, optionsRef) {
@@ -2693,6 +3319,8 @@ async function syncExtractStatus() {
 const videoPromptBatch = ref({ running: false, total: 0, completed: 0 })
 // 单个视频提示词生成：按分镜 ID 跟踪，允许不同分镜并行生成（不走全局 rn 锁）
 const videoPromptGeneratingIds = ref([])
+// MiniMax H3 大模型提示词独立生成，不覆盖中文 video_prompt。
+const minimaxH3PromptGeneratingIds = ref([])
 // 分镜勾选：勾选后批量生成只处理所选（已有提示词也会重新生成）；未勾选时处理全部缺失
 const selectedSbIds = ref([])
 // 多选模式：进入后点击卡片=勾选/取消，底部操作条确认生成
@@ -2817,6 +3445,73 @@ async function genVideoPrompt(sb) {
     toast.error(e.message)
   } finally {
     videoPromptGeneratingIds.value = videoPromptGeneratingIds.value.filter(id => id !== sb.id)
+  }
+}
+
+function buildMinimaxH3ReferencePlan(sb) {
+  const images = getShotReferenceImages(sb)
+  const videos = [...videoRefVideoUrls.value]
+  const audios = [...videoRefAudioUrls.value]
+  const knownImages = []
+  const remember = (url, role) => {
+    const normalized = normalizeMediaUrl(url)
+    if (normalized && !knownImages.some(item => item.url === normalized)) knownImages.push({ url: normalized, role })
+  }
+  const scene = getStoryboardScene(sb)
+  remember(scene?.image_url || scene?.imageUrl, `场景设定图：${scene?.location || '未命名场景'}`)
+  for (const char of getStoryboardCharacters(sb)) remember(char.image_url || char.imageUrl, `角色设定图：${char.name}`)
+  for (const prop of getStoryboardProps(sb)) remember(prop.image_url || prop.imageUrl, `道具设定图：${prop.name}`)
+
+  const firstFrame = normalizeMediaUrl(sb?.first_frame_image || sb?.firstFrameImage || '')
+  const mode = images.length === 0 && videos.length === 0 && audios.length === 0
+    ? 'T2VA'
+    : images.length === 1 && videos.length === 0 && audios.length === 0 && firstFrame && firstFrame === images[0]
+      ? 'I2VA'
+      : 'Ref2VA'
+  const imageLines = images.map((url, index) => {
+    const known = knownImages.find(item => item.url === url)
+    const role = firstFrame && firstFrame === url ? '0.00 秒首帧' : known?.role || '用户从本地或资产库选择的补充参考图'
+    return `<Picture ${index + 1}>：${role}`
+  })
+  const videoLines = videos.map((_, index) => `<Video ${index + 1}>：用户选择的参考视频`)
+  const audioLines = audios.map((_, index) => `<Audio ${index + 1}>：用户选择的参考音频；除非中文提示词明确要求原音复用，否则作为声音参考`)
+  return {
+    mode,
+    lines: [...imageLines, ...videoLines, ...audioLines],
+  }
+}
+
+async function genMinimaxH3Prompt(sb) {
+  if (!sb || minimaxH3PromptGeneratingIds.value.includes(sb.id)) return
+  const sourcePrompt = String(sb.video_prompt || sb.videoPrompt || '').trim()
+  if (!sourcePrompt) {
+    toast.info('请先生成或填写中文版视频提示词')
+    return
+  }
+  const idx = sbs.value.indexOf(sb) + 1
+  const referencePlan = buildMinimaxH3ReferencePlan(sb)
+  minimaxH3PromptGeneratingIds.value.push(sb.id)
+  try {
+    await api.post('/agent/minimax_h3_prompt_generator/chat', {
+      message: `请为分镜 #${idx}(ID:${sb.id})生成并保存 MiniMax H3 大模型提示词(minimax_h3_prompt)。
+
+目标视频时长：${Number(sb.duration || 10)} 秒
+输入模式：${referencePlan.mode}
+实际提交给视频工作流的参考素材顺序：
+${referencePlan.lines.length ? referencePlan.lines.join('\n') : '无参考素材'}
+
+请调用 read_storyboard_context 读取该分镜。以已有中文 video_prompt 为镜头、动作、台词和声音的优先事实源，description 与 atmosphere 用于补足细节；严格按照 h3-prompt-writing Skill 的字段名、字段顺序、时间格式和引用标签写成英文结构，对白、旁白和画面文字保持中文原文。最后调用 save_minimax_h3_prompt，仅保存 storyboard_id:${sb.id} 与 minimax_h3_prompt，不得覆盖 video_prompt 或其他字段。`,
+      drama_id: dramaId,
+      episode_id: epId.value,
+      model: chatModelOverride() || undefined,
+      config_id: chatConfigId() || undefined,
+    })
+    toast.success(`分镜 #${idx} MiniMax H3 提示词已生成`)
+    await refresh()
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    minimaxH3PromptGeneratingIds.value = minimaxH3PromptGeneratingIds.value.filter(id => id !== sb.id)
   }
 }
 
@@ -3013,8 +3708,9 @@ function formatHistoryTime(iso) {
 function getShotReferenceImages(sb) {
   const refs = []
   const pushRef = (value) => {
-    if (!value || refs.includes(value) || refs.length >= 9) return
-    refs.push(value)
+    const normalized = normalizeMediaUrl(value)
+    if (!normalized || refs.includes(normalized) || refs.length >= 9) return
+    refs.push(normalized)
   }
   const scene = getStoryboardScene(sb)
   pushRef(scene?.image_url || scene?.imageUrl)
@@ -3134,19 +3830,8 @@ function toggleShotBind(sb, asset) {
   toggleStoryboardProp(sb, asset.id)
 }
 
-// 场景/角色/道具自动绑定占用的参考图片槽位（按素材卡片数，最多 9）
-const autoReferenceImageCount = computed(() => {
-  const sb = selectedSb.value
-  if (!sb) return 0
-  let count = 0
-  if (getStoryboardScene(sb)) count += 1
-  count += getStoryboardCharacters(sb).length
-  count += getStoryboardProps(sb).length
-  return Math.min(count, 9)
-})
-
-// 已占用的参考图片数（场景/角色素材 + 手动上传），展示为 n/9
-const refImageUsedCount = computed(() => Math.min(9, autoReferenceImageCount.value + videoRefImageUrls.value.length))
+// 已占用的参考图片数（只统计真实存在且已去重的图片）
+const refImageUsedCount = computed(() => selectedSb.value ? getShotReferenceImages(selectedSb.value).length : 0)
 // 是否已达 9 张上限（禁用继续上传）
 const refImageFull = computed(() => refImageUsedCount.value >= 9)
 
@@ -3215,13 +3900,51 @@ function resolveVideoPromptRefs(sb) {
   })
 }
 
-// 切换选中分镜时重置视频生成面板
-watch(selectedSb, (sb) => {
-  videoRefVideoUrls.value = []
-  videoRefAudioUrls.value = []
-  videoRefImageUrls.value = []
+function saveShotRefSelection(storyboardId = selectedSb.value?.id) {
+  if (!storyboardId || restoringShotRefSelection) return
+  const items = [
+    ...videoRefImageUrls.value.map((url, index) => ({ media_type: 'image', media_role: 'reference', url, sort_order: index })),
+    ...videoRefVideoUrls.value.map((url, index) => ({ media_type: 'video', media_role: 'reference', url, sort_order: index })),
+    ...videoRefAudioUrls.value.map((url, index) => ({ media_type: 'audio', media_role: 'reference', url, sort_order: index })),
+  ]
+  storedShotRefSelections.value[String(storyboardId)] = {
+    image: [...videoRefImageUrls.value], video: [...videoRefVideoUrls.value], audio: [...videoRefAudioUrls.value],
+  }
+  try { localStorage.setItem(REF_SELECTION_STORE_KEY, JSON.stringify(storedShotRefSelections.value)) } catch { /* ignore */ }
+  // MySQL is the canonical state; localStorage remains a fast fallback for offline/page startup.
+  storyboardAPI.saveReferenceAssets(storyboardId, items).catch(() => {})
+}
+
+async function restoreShotRefSelection(sb) {
+  const saved = storedShotRefSelections.value[String(sb?.id)] || {}
+  let durable = []
+  if (sb?.id) {
+    try { durable = await storyboardAPI.referenceAssets(sb.id) || [] } catch { durable = [] }
+  }
+  const source = durable.length ? {
+    image: durable.filter(item => item.media_type === 'image').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+    video: durable.filter(item => item.media_type === 'video').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+    audio: durable.filter(item => item.media_type === 'audio').sort((a, b) => a.sort_order - b.sort_order).map(item => item.url),
+  } : saved
+  restoringShotRefSelection = true
+  videoRefVideoUrls.value = Array.isArray(source.video) ? [...source.video] : []
+  videoRefAudioUrls.value = Array.isArray(source.audio) ? [...source.audio] : []
+  videoRefImageUrls.value = Array.isArray(source.image) ? [...source.image] : []
   videoDuration.value = Number(sb?.duration || 10)
+  restoringShotRefSelection = false
+}
+
+// 每个分镜独立记住已绑定的参考素材，切换分镜或刷新页面后无需重复选择。
+watch(selectedSb, async (sb, previousSb) => {
+  if (previousSb?.id) saveShotRefSelection(previousSb.id)
+  await restoreShotRefSelection(sb)
 })
+
+watch(
+  [videoRefImageUrls, videoRefVideoUrls, videoRefAudioUrls],
+  () => saveShotRefSelection(),
+  { deep: true },
+)
 
 function pickFile(accept, cb) {
   const input = document.createElement('input')
@@ -3257,13 +3980,21 @@ function uploadAssetImage(kind, id) {
 }
 
 function uploadRefMedia(kind) {
+  const libraryMeta = {
+    save_to_library: 1,
+    drama_id: dramaId,
+    episode_id: epId.value,
+    storyboard_id: selectedSb.value?.id,
+    category: 'reference',
+  }
   if (kind === 'image') {
     if (refImageFull.value) { toast.info('参考图片已达上限（含场景/角色素材）'); return }
     pickFile('image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', async (file) => {
       uploadingRefMedia.value = true
       try {
-        const res = await uploadAPI.image(file)
+        const res = await uploadAPI.image(file, libraryMeta)
         videoRefImageUrls.value = [...videoRefImageUrls.value, res.url]
+        await loadRefAssetLibrary()
         toast.success('参考图片已上传')
       } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
     })
@@ -3273,12 +4004,13 @@ function uploadRefMedia(kind) {
   const list = isVideo ? videoRefVideoUrls : videoRefAudioUrls
   const label = isVideo ? '视频' : '音频'
   if (list.value.length >= 3) { toast.info(`参考${label}最多 3 个`); return }
-  const accept = isVideo ? 'video/mp4,video/quicktime,video/webm,.m4v' : 'audio/mpeg,audio/wav,audio/mp4,.aac'
+  const accept = isVideo ? 'video/mp4,video/quicktime,video/webm,.m4v' : 'audio/mpeg,audio/wav,audio/mp4,audio/flac,.aac,.flac'
   pickFile(accept, async (file) => {
     uploadingRefMedia.value = true
     try {
-      const res = isVideo ? await uploadAPI.video(file) : await uploadAPI.audio(file)
+      const res = isVideo ? await uploadAPI.video(file, libraryMeta) : await uploadAPI.audio(file, libraryMeta)
       list.value = [...list.value, res.url]
+      await loadRefAssetLibrary()
       toast.success(`参考${label}已上传`)
     } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
   })
@@ -3291,10 +4023,12 @@ function removeRefMedia(kind, index) {
 
 async function genVid(sb) {
   const referenceImages = getShotReferenceImages(sb)
+  const h3Prompt = String(sb.minimax_h3_prompt || sb.minimaxH3Prompt || '').trim()
+  const useH3Prompt = ['autodl', 'minimax'].includes(selectedVideoProvider.value) && !!h3Prompt
   const params = {
     storyboard_id: sb.id,
     drama_id: dramaId,
-    prompt: resolveVideoPromptRefs(sb),
+    prompt: useH3Prompt ? h3Prompt : resolveVideoPromptRefs(sb),
     duration: Number(videoDuration.value || sb.duration || 10),
     aspect_ratio: dramaAspectRatio.value,
     generate_audio: true,
@@ -3303,6 +4037,12 @@ async function genVid(sb) {
     reference_image_urls: referenceImages,
     reference_video_urls: videoRefVideoUrls.value,
     reference_audio_urls: videoRefAudioUrls.value,
+    reference_snapshot: {
+      images: [...referenceImages],
+      videos: [...videoRefVideoUrls.value],
+      audios: [...videoRefAudioUrls.value],
+      generated_at: new Date().toISOString(),
+    },
   }
   if (params.reference_audio_urls.length && !referenceImages.length && !params.reference_video_urls.length) {
     toast.error('参考音频需要至少 1 个参考图片或视频')
@@ -3592,14 +4332,67 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
 
 .studio-body {
   display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: var(--studio-sidebar-width, 208px) 8px minmax(0, 1fr);
+  gap: 0;
   min-height: 0;
   flex: 1;
 }
 
+/* 工作台拖拽分隔线：细线保持安静，悬停时再明确提示可操作。 */
+.panel-resizer {
+  position: relative;
+  z-index: 8;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  touch-action: none;
+  outline: none;
+}
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  background: var(--surface-outline-strong);
+  opacity: 0.5;
+  transition: background 0.16s var(--ease-out), opacity 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+}
+.panel-resizer:hover::after,
+.panel-resizer:focus-visible::after {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.panel-resizer-vertical {
+  width: 8px;
+  min-width: 8px;
+  cursor: col-resize;
+}
+.panel-resizer-vertical::after {
+  top: 10px;
+  bottom: 10px;
+  left: 3px;
+  width: 2px;
+}
+.panel-resizer-horizontal {
+  width: 100%;
+  height: 8px;
+  min-height: 8px;
+  cursor: row-resize;
+}
+.panel-resizer-horizontal::after {
+  top: 3px;
+  right: 12px;
+  left: 12px;
+  height: 2px;
+}
+.studio-sidebar-resizer {
+  height: 100%;
+}
+
 /* ===== Sidebar ===== */
 .sidebar {
+  position: relative;
   width: auto;
   flex-shrink: 0;
   display: flex;
@@ -3607,6 +4400,16 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   overflow: hidden;
   min-height: 0;
   border-radius: var(--radius);
+}
+.sidebar.has-custom-height {
+  min-height: 260px;
+}
+.panel-resizer-sidebar-height {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 .back-btn {
   min-width: 40px; width: auto; height: 40px; flex-shrink: 0;
@@ -3968,10 +4771,21 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr) 280px;
-  gap: 12px;
+  grid-template-columns:
+    var(--storyboard-list-width, clamp(180px, 24%, 232px))
+    8px
+    minmax(280px, 1fr)
+    8px
+    var(--storyboard-reference-width, clamp(200px, 27%, 280px));
+  gap: 0;
   padding: 12px 14px 16px;
   overflow: hidden;
+}
+.storyboard-workbench.has-custom-height {
+  min-height: 360px;
+}
+.storyboard-column-resizer {
+  height: 100%;
 }
 .storyboard-shot-list {
   min-height: 0;
@@ -4087,7 +4901,10 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns:
+    var(--storyboard-description-width, minmax(120px, 0.9fr))
+    8px
+    minmax(140px, 1.1fr);
   align-items: stretch;
 }
 .storyboard-editor-scroll .sb-split .detail-section {
@@ -4096,8 +4913,8 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   flex-direction: column;
   gap: 10px;
 }
-.storyboard-editor-scroll .sb-split .detail-section:first-child {
-  border-right: 1px solid var(--border);
+.storyboard-editor-scroll .sb-split > .sb-description-panel {
+  border-right: none;
 }
 .storyboard-editor-scroll .sb-split .detail-section-copy {
   margin-top: -4px;
@@ -4110,12 +4927,42 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   flex: 1;
   min-height: 0;
 }
-@media (max-width: 1200px) {
-  .storyboard-editor-scroll .sb-split { grid-template-columns: 1fr; }
-  .storyboard-editor-scroll .sb-split .detail-section:first-child {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+.sb-content-resizer,
+.sb-prompt-height-resizer {
+  align-self: stretch;
+}
+.sb-prompt-stack {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows:
+    var(--storyboard-video-prompt-height, minmax(210px, 1fr))
+    8px
+    minmax(190px, 1fr);
+  overflow: hidden;
+}
+.storyboard-editor-scroll .sb-prompt-stack > .detail-section {
+  min-height: 0;
+  overflow-y: auto;
+}
+.workbench-height-resizer {
+  flex: 0 0 8px;
+  margin-top: -6px;
+}
+@media (max-width: 900px) {
+  .storyboard-workbench {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
   }
+  .storyboard-column-resizer { display: none; }
+  .storyboard-shot-list,
+  .storyboard-editor-main,
+  .storyboard-reference-panel { min-height: 280px; }
+  .storyboard-editor-scroll .sb-split { display: flex; flex-direction: column; overflow-y: auto; }
+  .storyboard-editor-scroll .sb-split > .sb-description-panel { border-bottom: 1px solid var(--border); }
+  .sb-prompt-stack { display: flex; flex-direction: column; overflow: visible; }
+  .sb-content-resizer,
+  .sb-prompt-height-resizer { display: none; }
 }
 /* 上一条 / 下一条导航 */
 .sb-nav-group {
@@ -4874,22 +5721,48 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(460px, 55%);
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--surface-outline);
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
 }
 .video-task-workbench.has-player {
-  grid-template-columns: minmax(0, 1fr) minmax(430px, 52%);
+  grid-template-columns:
+    var(--video-task-list-width, minmax(0, 1fr))
+    8px
+    minmax(320px, 52%);
+}
+.video-task-workbench.has-custom-height {
+  min-height: 360px;
+}
+.video-column-resizer {
+  height: 100%;
 }
 .video-task-side {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(160px, 30%) auto minmax(0, 1fr);
-  border-left: 1px solid var(--border);
+  grid-template-rows:
+    var(--video-preview-height, minmax(230px, 42%))
+    8px
+    minmax(180px, 1fr);
+  border-left: 0;
   background: var(--surface-muted);
+}
+.video-task-preview-stack {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+}
+.video-task-preview-stack .video-task-player {
+  flex: 1;
+}
+.video-row-resizer {
+  align-self: stretch;
 }
 .video-task-side .video-task-inspector {
   border-left: 0;
@@ -5270,6 +6143,25 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   justify-content: space-between;
   gap: 8px;
 }
+.video-inspector-h3-section {
+  padding-top: 14px;
+  border-top: 1px solid var(--surface-outline);
+}
+.video-inspector-hint { margin-top: 4px; color: var(--text-3); font-size: 10px; }
+.video-inspector-h3-prompt {
+  min-height: 230px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.video-inspector-h3-active {
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--success) 32%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  color: var(--success);
+  font-size: 11px;
+}
 /* MentionTextarea 内部元素需 :deep 穿透（scoped 样式默认到不了子组件内部） */
 :deep(.video-inspector-prompt) {
   min-height: 176px;
@@ -5323,7 +6215,18 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   color: var(--text-3); font-size: 13px; line-height: 1;
 }
 .video-ref-media-remove:hover { color: var(--text-0); }
-.video-ref-media-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.video-ref-media-actions { display: grid; gap: 7px; }
+.video-ref-action-group {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--surface-outline);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.video-ref-action-group > span { color: var(--text-2); font-size: 11px; font-weight: 600; }
 .video-ref-media-hint { margin-top: 6px; font-size: 11px; color: var(--warning, #b25000); }
 .video-param-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 12px; }
 .video-param-name { color: var(--text-3); flex-shrink: 0; }
@@ -5331,6 +6234,37 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
 .video-param-control { display: inline-flex; align-items: center; gap: 6px; }
 .video-param-unit { font-size: 11px; color: var(--text-3); }
 .video-duration-input { width: 64px; padding: 4px 8px; font-size: 12px; }
+
+.ref-asset-picker-overlay { z-index: 120; }
+.ref-asset-picker-dialog { width: min(920px, calc(100vw - 48px)); max-height: min(760px, calc(100vh - 48px)); }
+.ref-asset-picker-sub { margin: 4px 0 0; color: var(--text-3); font-size: 11px; }
+.ref-asset-picker-body { min-height: 260px; overflow-y: auto; }
+.ref-asset-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ref-asset-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px;
+  overflow: hidden;
+  border: 1px solid var(--surface-outline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+}
+.ref-asset-card:hover { border-color: var(--accent); }
+.ref-asset-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-bg); }
+.ref-asset-card.locked { border-color: var(--success, #2d8a55); }
+.ref-asset-card img,
+.ref-asset-card video { width: 100%; height: 112px; display: block; border-radius: calc(var(--radius) - 2px); object-fit: cover; background: #111; }
+.ref-asset-audio-preview { height: 112px; display: grid; place-items: center; border-radius: calc(var(--radius) - 2px); background: linear-gradient(145deg, var(--accent-bg), var(--bg-2)); color: var(--accent); font-size: 36px; }
+.ref-asset-card strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.ref-asset-card small { color: var(--text-3); font-size: 10px; }
+.ref-asset-card-check { position: absolute; top: 13px; right: 13px; z-index: 1; padding: 3px 6px; border-radius: 999px; background: rgba(20,20,24,.72); color: #fff; font-size: 9px; }
+.ref-asset-picker-empty { min-height: 220px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); font-size: 12px; }
 
 /* Prod grid */
 .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
@@ -5920,28 +6854,9 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
 .dim { color: var(--text-3); }
 
 @media (max-width: 1080px) {
-  .studio-body {
-    grid-template-columns: 1fr;
-  }
-
-  .video-task-workbench.has-player {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 48%);
-  }
-
   .split-layout,
   .export-split {
     flex-direction: column;
-  }
-
-  .storyboard-workbench {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
-  }
-
-  .storyboard-shot-list,
-  .storyboard-editor-main,
-  .storyboard-reference-panel {
-    min-height: 280px;
   }
 
   .sb-scene-select { max-width: none; flex: 1; }
@@ -6119,8 +7034,17 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
     justify-content: space-between;
   }
 
+  .studio-body {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-sidebar-resizer {
+    display: none;
+  }
+
   .sidebar {
     max-height: 340px;
+    height: auto !important;
   }
 
   .studio-topbar-side,
@@ -6164,6 +7088,20 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   .video-task-workbench {
     grid-template-columns: 1fr;
     overflow-y: auto;
+    height: auto !important;
+    flex: 1 1 auto !important;
+  }
+
+  .video-column-resizer,
+  .video-row-resizer,
+  .workbench-height-resizer,
+  .panel-resizer-sidebar-height {
+    display: none;
+  }
+
+  .storyboard-workbench {
+    height: auto !important;
+    flex: 1 1 auto !important;
   }
 
   .video-task-inspector {

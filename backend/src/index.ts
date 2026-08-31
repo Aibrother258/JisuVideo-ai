@@ -20,6 +20,7 @@ import agent from './routes/agent.js'
 import merge from './routes/merge.js'
 import skills from './routes/skills.js'
 import props from './routes/props.js'
+import assets from './routes/assets.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { eq } from 'drizzle-orm'
@@ -58,6 +59,7 @@ api.route('/agent', agent)
 api.route('/merge', merge)
 api.route('/skills', skills)
 api.route('/props', props)
+api.route('/assets', assets)
 
 app.route('/api/v1', api)
 
