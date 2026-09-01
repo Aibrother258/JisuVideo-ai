@@ -30,6 +30,13 @@ services:
       - NODE_ENV=production
       - PORT=5679
       - DATABASE_URL=mysql://huobao:huobao@mysql:3306/huobao_drama
+      # 浏览器来源白名单（逗号分隔）；默认 localhost:3013,localhost:5679
+      # - CORS_ORIGIN=http://localhost:3013,http://localhost:5679
+      # 参考媒体 dataURL 内联兜底提示（参考视频/音频走公网地址需配置）
+      # - PUBLIC_BASE_URL=http://your-host:5679
+      # 存储清理（默认已开启：temp 保留 24h、孤儿文件保留 30 天、每 24h 扫描）
+      # - STORAGE_CLEANUP_TEMP_TTL_HOURS=24
+      # - STORAGE_CLEANUP_ORPHAN_TTL_DAYS=30
     depends_on:
       mysql:
         condition: service_healthy

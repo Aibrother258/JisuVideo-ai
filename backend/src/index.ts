@@ -24,15 +24,20 @@ import props from './routes/props.js'
 import assets from './routes/assets.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { recoverInterruptedTasks } from './services/recovery.js'
+import { startStorageCleanup } from './utils/cleanup.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
 
 const app = new Hono()
 
-// Middleware
+// Middleware（CORS 来源环境变量化：逗号分隔，默认开发端口；生产通过 CORS_ORIGIN 配置）
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3013,http://localhost:5679')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
 app.use('*', cors({
-  origin: ['http://localhost:3013', 'http://localhost:5679'],
+  origin: corsOrigins,
   credentials: true,
 }))
 app.use('*', requestLogger)
@@ -94,5 +99,8 @@ runInterruptedTaskRecovery()
 // 防止冷重启首次扫描跳过后任务永久停留在 processing。
 const recoveryTimer = setInterval(runInterruptedTaskRecovery, 60_000)
 recoveryTimer.unref()
+
+// 存储清理定时任务：temp TTL + 孤儿文件 GC（间隔/保留时长见 utils/cleanup.ts 环境变量）
+startStorageCleanup()
 
 serve({ fetch: app.fetch, port })

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, desc } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, created, badRequest } from '../utils/response.js'
 import { generateImage, generateVideo, type VideoReferenceSnapshot } from '../services/generation.js'
@@ -137,6 +137,54 @@ app.post('/', async (c) => {
     logTaskError('TaskAPI', 'generate', { type, error: err.message })
     return badRequest(c, err.message)
   }
+})
+
+// GET /tasks/stats — 成功率统计（必须注册在 /:id 之前）
+app.get('/stats', async (c) => {
+  const rows = await db.select({
+    type: schema.sysTask.type,
+    provider: schema.sysTask.provider,
+    status: schema.sysTask.status,
+    value: count(),
+  })
+    .from(schema.sysTask)
+    .groupBy(schema.sysTask.type, schema.sysTask.provider, schema.sysTask.status)
+
+  interface Bucket { total: number; completed: number; failed: number; processing: number; success_rate: number }
+  const empty = (): Bucket => ({ total: 0, completed: 0, failed: 0, processing: 0, success_rate: 0 })
+  const add = (bucket: Bucket, status: string | null, n: number) => {
+    bucket.total += n
+    if (status === 'completed') bucket.completed += n
+    else if (status === 'failed') bucket.failed += n
+    else bucket.processing += n
+    bucket.success_rate = bucket.total ? Math.round((bucket.completed / bucket.total) * 1000) / 10 : 0
+  }
+
+  const overall = empty()
+  const byType = new Map<string, Bucket>()
+  const byProvider = new Map<string, Bucket>()
+  const byTypeProvider = new Map<string, Bucket>()
+
+  for (const row of rows) {
+    const n = Number(row.value)
+    const type = row.type || 'unknown'
+    const provider = row.provider || 'unknown'
+    add(overall, row.status, n)
+    add(byType.get(type) || byType.set(type, empty()).get(type)!, row.status, n)
+    add(byProvider.get(provider) || byProvider.set(provider, empty()).get(provider)!, row.status, n)
+    const tp = `${type}/${provider}`
+    add(byTypeProvider.get(tp) || byTypeProvider.set(tp, empty()).get(tp)!, row.status, n)
+  }
+
+  return success(c, {
+    overall,
+    by_type: [...byType.entries()].map(([type, bucket]) => ({ type, ...bucket })),
+    by_provider: [...byProvider.entries()].map(([provider, bucket]) => ({ provider, ...bucket })),
+    by_type_provider: [...byTypeProvider.entries()].map(([key, bucket]) => {
+      const [type, provider] = key.split('/')
+      return { type, provider, ...bucket }
+    }),
+  })
 })
 
 // GET /tasks/:id — 轮询任务状态

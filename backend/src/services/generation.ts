@@ -2,11 +2,12 @@
  * 统一生成任务服务 — 图片/视频生成共用 sys_task 表与同一条生命周期：
  * 创建(processing) → 适配器构建请求 → 同步完成或异步轮询 → 下载落盘 → 回写业务表
  */
+import fs from 'fs'
 import { db, getInsertId, pool, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { getActiveConfig, getActiveConfigWithId, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
-import { downloadFile, generateImageThumb, readImageAsCompressedDataUrl, readMediaAsDataUrl, saveBase64Image } from '../utils/storage.js'
+import { downloadFile, generateImageThumb, getAbsolutePath, readImageAsCompressedDataUrl, readMediaAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import { invalidateH3ForCharacter, invalidateH3ForProp, invalidateH3ForScene, invalidateH3ForStoryboards } from './h3-source.js'
@@ -715,10 +716,19 @@ function resolveReferenceMediaUrl(value: string | null | undefined, kind: 'video
       return `${base}${p}`
     }
     const localPath = raw.startsWith('/') ? raw.slice(1) : raw
+    const label = kind === 'video' ? '视频' : '音频'
     try {
+      // dataURL 内联会膨胀 ~1.37 倍，超大文件直接塞进请求体会拖垮/超时。
+      // 超过阈值提示改用 PUBLIC_BASE_URL 公网地址，而不是默默内联。
+      const sizeLimit = kind === 'video' ? 15 * 1024 * 1024 : 8 * 1024 * 1024
+      const absPath = getAbsolutePath(localPath)
+      if (fs.existsSync(absPath) && fs.statSync(absPath).size > sizeLimit) {
+        const sizeMB = (fs.statSync(absPath).size / 1024 / 1024).toFixed(1)
+        const limitMB = (sizeLimit / 1024 / 1024).toFixed(0)
+        throw new Error(`本地参考${label} ${sizeMB}MB 超过 dataURL 内联上限 ${limitMB}MB，请配置 PUBLIC_BASE_URL 使用公网地址或改用更小的文件`)
+      }
       return readMediaAsDataUrl(localPath)
     } catch (error) {
-      const label = kind === 'video' ? '视频' : '音频'
       throw new Error(`读取本地参考${label}失败：${(error as Error).message}`)
     }
   }

@@ -131,6 +131,23 @@ export function getAbsolutePath(relativePath: string): string {
 }
 
 /**
+ * 静态路径安全校验 — 拒绝路径穿越与越界读取。
+ * 只允许 `static/<子目录>/<文件名>` 形式；`..`、`.`、绝对路径、盘符一律拒绝。
+ * 供所有「把用户可控/DB 中的路径读成本地文件」的入口调用。
+ */
+export function assertSafeStaticPath(relativePath: string, label = '路径'): void {
+  const p = String(relativePath || '').replace(/\\/g, '/')
+  if (!p.startsWith('static/')) throw new Error(`${label}不是有效的存储路径`)
+  const segments = p.split('/')
+  if (segments.some(seg => seg === '..' || seg === '.' || seg === '')) {
+    throw new Error(`${label}包含非法路径段`)
+  }
+  const resolved = path.resolve(STORAGE_ROOT, '..', p)
+  const staticRoot = path.resolve(STORAGE_ROOT, '..', 'static')
+  if (!resolved.startsWith(staticRoot + path.sep)) throw new Error(`${label}越出存储目录`)
+}
+
+/**
  * 保存 Base64 编码的图片数据到本地存储
  * 用于 Gemini 等只返回 base64 数据的厂商
  */
@@ -174,6 +191,7 @@ export async function generateImageThumb(relativePath: string): Promise<string |
 }
 
 export function readImageAsDataUrl(relativePath: string): string {
+  assertSafeStaticPath(relativePath)
   const filePath = getAbsolutePath(relativePath)
   const buffer = fs.readFileSync(filePath)
   const ext = path.extname(filePath).toLowerCase()
@@ -183,6 +201,7 @@ export function readImageAsDataUrl(relativePath: string): string {
 
 /** 将本地参考视频/音频转成 data URL，供支持 Base64 素材的上游直接读取。 */
 export function readMediaAsDataUrl(relativePath: string): string {
+  assertSafeStaticPath(relativePath)
   const filePath = getAbsolutePath(relativePath)
   const buffer = fs.readFileSync(filePath)
   const ext = path.extname(filePath).toLowerCase()
@@ -198,6 +217,7 @@ export async function readImageAsCompressedDataUrl(
     quality?: number
   } = {},
 ): Promise<string> {
+  assertSafeStaticPath(relativePath)
   const filePath = getAbsolutePath(relativePath)
   const maxWidth = options.maxWidth ?? 768
   const maxHeight = options.maxHeight ?? 768
