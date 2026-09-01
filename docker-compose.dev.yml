@@ -40,6 +40,12 @@ services:
       PORT: "5679"
       DATABASE_URL: mysql://huobao:huobao@mysql:3306/huobao_drama
       STORAGE_PATH: /workspace/data/static
+      # 浏览器来源白名单（逗号分隔）
+      # CORS_ORIGIN: "http://localhost:3013,http://localhost:5679"
+      # 存储清理测试：仅报告不删除
+      # STORAGE_CLEANUP_DRY_RUN: "true"
+      # ffmpeg-static postinstall 从 GitHub 下载二进制常超时，改用 npmmirror 镜像
+      FFMPEG_BINARIES_URL: https://cdn.npmmirror.com/binaries/ffmpeg-static
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     depends_on:
