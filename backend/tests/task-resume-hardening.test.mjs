@@ -70,7 +70,11 @@ test('正常执行与恢复都通过同一条件更新租约认领，避免滚�
   assert.match(generation, /lease = await acquireTaskLease\(id\)/)
   assert.match(generation, /if \(!lease\)/)
   // 租约必须先于并发槽位取得；排队中的正常任务也不能被启动恢复误杀。
-  assert.ok(generation.indexOf('const lease = await acquireTaskLease(id)') < generation.indexOf('await slots.acquire({ id, type })'))
+  const leaseAcquireIndex = generation.indexOf('lease = await acquireTaskLease(id)')
+  const slotAcquireIndex = generation.indexOf('await slots.acquire({ id, type })')
+  assert.ok(leaseAcquireIndex >= 0, 'normal execution must acquire a lease')
+  assert.ok(slotAcquireIndex >= 0, 'normal execution must acquire a concurrency slot')
+  assert.ok(leaseAcquireIndex < slotAcquireIndex, 'lease must be acquired before waiting for a slot')
   // 创建任务时即有初始租约，避免服务启动扫描和新请求并发时的认领空窗。
   assert.match(generation, /recoveryAt: String\(Date\.now\(\) \+ TASK_LEASE_MS\)/)
   assert.match(generation, /processTask\(id, config, startTaskLease\(id, owner\)\)/)
