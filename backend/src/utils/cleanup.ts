@@ -32,7 +32,7 @@ const DRY_RUN = process.env.STORAGE_CLEANUP_DRY_RUN === 'true'
 const SCAN_SUBDIRS = ['images', 'videos', 'uploads', 'merged']
 
 /** 派生文件后缀：主文件被引用时派生文件天然保留；主文件没了才轮到它被回收 */
-const DERIVED_PATTERNS = [/_(thumb\.webp|poster\.jpg)$/]
+const DERIVED_RE = /^(.*)_(?:thumb\.webp|poster\.jpg)$/
 
 /** 从 DB 字段文本中提取 static/... 相对路径（可能存 URL、JSON 数组或 dataURL 混排） */
 function extractStaticRefs(values: Array<string | null | undefined>): Set<string> {
@@ -92,13 +92,21 @@ async function collectReferencedPaths(): Promise<Set<string>> {
   return refs
 }
 
-/** 判断文件名是否是派生文件（缩略图/海报帧），是则返回对应主文件名（不含后缀） */
-function derivedBaseName(filename: string): string | null {
-  for (const re of DERIVED_PATTERNS) {
-    const m = filename.match(re)
-    if (m) return filename.slice(0, -m[0].length)
+/** 判断文件名是否是派生文件（缩略图/海报帧），是则返回主文件 stem。
+ *  例：`uuid_thumb.webp` / `uuid_poster.jpg` → `uuid`（主文件可为 uuid.png/jpg/webp/mp4 等任意扩展名） */
+function derivedStem(filename: string): string | null {
+  const m = filename.match(DERIVED_RE)
+  return m ? m[1] : null
+}
+
+/** 同目录下是否存在该 stem 的主文件（任意扩展名） */
+function mainFileExists(dirPath: string, stem: string): boolean {
+  try {
+    if (fs.existsSync(path.join(dirPath, stem))) return true
+    return fs.readdirSync(dirPath).some(entry => entry.startsWith(stem + '.'))
+  } catch {
+    return false
   }
-  return null
 }
 
 export interface CleanupReport {
@@ -108,9 +116,12 @@ export interface CleanupReport {
   scanned_files: number
 }
 
-/** 单次清理：返回删除统计 */
-export async function runStorageCleanup(): Promise<CleanupReport> {
+/** 单次清理：返回删除统计。
+ *  opts.referencedPaths 可注入引用集（测试用，跳过 DB 查询）；
+ *  opts.dryRun 覆盖模块级 DRY_RUN。 */
+export async function runStorageCleanup(opts: { referencedPaths?: Set<string>; dryRun?: boolean } = {}): Promise<CleanupReport> {
   const report: CleanupReport = { temp_removed: 0, orphan_removed: 0, orphan_skipped_dry_run: 0, scanned_files: 0 }
+  const dryRun = opts.dryRun ?? DRY_RUN
   if (!fs.existsSync(STORAGE_ROOT)) return report
 
   // 1) temp/ TTL
@@ -122,7 +133,7 @@ export async function runStorageCleanup(): Promise<CleanupReport> {
       try { stat = fs.statSync(filePath) } catch { continue }
       if (!stat.isFile()) continue
       if (Date.now() - stat.mtimeMs > TEMP_TTL_MS) {
-        if (DRY_RUN) report.orphan_skipped_dry_run++
+        if (dryRun) report.orphan_skipped_dry_run++
         else {
           try { fs.unlinkSync(filePath); report.temp_removed++ } catch (err) { logTaskWarn('Cleanup', 'temp-remove-failed', { file: filePath, error: (err as Error).message }) }
         }
@@ -131,7 +142,18 @@ export async function runStorageCleanup(): Promise<CleanupReport> {
   }
 
   // 2) 孤儿文件 GC
-  const referenced = await collectReferencedPaths()
+  let referenced: Set<string>
+  if (opts.referencedPaths) {
+    referenced = opts.referencedPaths
+  } else {
+    // DB 抖动时引用集查询失败不阻塞清理（空引用集=所有超龄文件都是孤儿），只记录警告
+    try {
+      referenced = await collectReferencedPaths()
+    } catch (err) {
+      logTaskWarn('Cleanup', 'collect-refs-failed', { error: (err as Error).message })
+      referenced = new Set<string>()
+    }
+  }
   for (const subDir of SCAN_SUBDIRS) {
     const dirPath = path.join(STORAGE_ROOT, subDir)
     if (!fs.existsSync(dirPath)) continue
@@ -145,15 +167,12 @@ export async function runStorageCleanup(): Promise<CleanupReport> {
 
       // 被 DB 引用 → 保留
       if (referenced.has(relPath)) continue
-      // 派生文件：主文件仍存在 → 保留（主文件作为孤儿被删后，派生文件下轮回收）
-      const baseName = derivedBaseName(entry)
-      if (baseName) {
-        const mainExists = fs.existsSync(path.join(dirPath, baseName))
-        if (mainExists) continue
-      }
+      // 派生文件：主文件（同 stem 任意扩展名）仍存在 → 保留；主文件被回收后，派生文件下轮回收
+      const stem = derivedStem(entry)
+      if (stem && mainFileExists(dirPath, stem)) continue
 
       if (Date.now() - stat.mtimeMs <= ORPHAN_TTL_MS) continue
-      if (DRY_RUN) report.orphan_skipped_dry_run++
+      if (dryRun) report.orphan_skipped_dry_run++
       else {
         try { fs.unlinkSync(filePath); report.orphan_removed++ } catch (err) { logTaskWarn('Cleanup', 'orphan-remove-failed', { file: filePath, error: (err as Error).message }) }
       }
