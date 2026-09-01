@@ -250,6 +250,8 @@ export const mysqlSchemaStatements = [
     created_at VARCHAR(64) NOT NULL,
     updated_at VARCHAR(64) NOT NULL,
     completed_at VARCHAR(64),
+    recovery_at VARCHAR(64),
+    recovery_owner VARCHAR(64),
     INDEX idx_sys_task_type (type),
     INDEX idx_sys_task_drama_id (drama_id),
     INDEX idx_sys_task_storyboard_id (storyboard_id)
@@ -366,6 +368,13 @@ export async function initMySqlSchema(pool: Pool) {
   const h3Meta = new Set(h3MetaColumns.map((row: any) => row.COLUMN_NAME))
   if (!h3Meta.has('minimax_h3_source_hash')) await pool.query('ALTER TABLE storyboards ADD COLUMN minimax_h3_source_hash VARCHAR(64) AFTER minimax_h3_prompt')
   if (!h3Meta.has('minimax_h3_generated_at')) await pool.query('ALTER TABLE storyboards ADD COLUMN minimax_h3_generated_at VARCHAR(64) AFTER minimax_h3_source_hash')
+  // sys_task 恢复租约列（防多实例双重续轮询）：CREATE TABLE IF NOT EXISTS 不补列，幂等 ALTER
+  const [recoveryColumns] = await pool.query<any[]>(
+    "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_task' AND COLUMN_NAME IN ('recovery_at','recovery_owner')",
+  )
+  const recoveryCols = new Set(recoveryColumns.map((row: any) => row.COLUMN_NAME))
+  if (!recoveryCols.has('recovery_at')) await pool.query('ALTER TABLE sys_task ADD COLUMN recovery_at VARCHAR(64) AFTER completed_at')
+  if (!recoveryCols.has('recovery_owner')) await pool.query('ALTER TABLE sys_task ADD COLUMN recovery_owner VARCHAR(64) AFTER recovery_at')
   await pool.query(`CREATE TABLE IF NOT EXISTS storyboard_reference_assets (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, storyboard_id INT NOT NULL, asset_id INT,
     media_type VARCHAR(16) NOT NULL, media_role VARCHAR(32) NOT NULL DEFAULT 'reference',

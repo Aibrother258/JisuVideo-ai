@@ -4,7 +4,7 @@
  */
 import { db, getInsertId, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
-import { getActiveConfig, getConfigById } from './ai.js'
+import { getActiveConfig, getActiveConfigId, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
 import { downloadFile, generateImageThumb, readImageAsCompressedDataUrl, readMediaAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
@@ -74,12 +74,35 @@ interface GenerateVideoParams {
   configId?: number
 }
 
+interface ResolvedConfig {
+  config: AIConfig
+  /** 实际生效的配置 ID：请求指定的有效则用指定，失效/未指定则用当前启用配置 */
+  configId: number | null
+}
+
+/**
+ * 解析任务实际使用的生成配置。
+ * 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退当前启用配置；
+ * 返回「实际生效」的配置 ID，供 createTask 持久化（重启恢复精确找回原配置，
+ * 不落回 provider+model 猜测）。
+ */
+async function resolveConfig(type: 'image' | 'video', requestedConfigId?: number): Promise<ResolvedConfig> {
+  if (requestedConfigId) {
+    const cfg = await getConfigById(requestedConfigId)
+    if (cfg) return { config: cfg, configId: requestedConfigId }
+  }
+  const [config, configId] = await Promise.all([getActiveConfig(type), getActiveConfigId(type)])
+  if (!config) {
+    throw new Error(type === 'image'
+      ? '未配置图片模型，请先到「设置」页添加并启用 AI 服务'
+      : '未配置视频模型，请先到「设置」页添加并启用 AI 服务')
+  }
+  return { config, configId }
+}
+
 export async function generateImage(params: GenerateImageParams): Promise<number> {
-  // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置，避免生成被旧引用卡死
-  const config = params.configId
-    ? (await getConfigById(params.configId)) ?? await getActiveConfig('image')
-    : await getActiveConfig('image')
-  if (!config) throw new Error('未配置图片模型，请先到「设置」页添加并启用 AI 服务')
+  // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置；configId 为实际生效 ID
+  const { config, configId } = await resolveConfig('image', params.configId)
 
   const id = await createTask('image', config, {
     storyboardId: params.storyboardId,
@@ -93,7 +116,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     size: params.size || '1920x1080',
     frameType: params.frameType,
     referenceImages: params.referenceImages,
-  }, params.configId)
+  }, configId)
 
   logTaskStart('ImageTask', 'enqueue', {
     id,
@@ -113,11 +136,8 @@ export async function generateImage(params: GenerateImageParams): Promise<number
 }
 
 export async function generateVideo(params: GenerateVideoParams): Promise<number> {
-  // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置
-  const config = params.configId
-    ? (await getConfigById(params.configId)) ?? await getActiveConfig('video')
-    : await getActiveConfig('video')
-  if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
+  // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置；configId 为实际生效 ID
+  const { config, configId } = await resolveConfig('video', params.configId)
 
   const id = await createTask('video', config, {
     storyboardId: params.storyboardId,
@@ -138,7 +158,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     // 保留高分辨率档位透传（MiniMax 768P/2K），火山等适配器内部自行归并
     resolution: ['480p', '720p', '1080p', '2K'].includes(params.resolution || '') ? params.resolution : '720p',
     referenceSnapshot: params.referenceSnapshot ?? null,
-  }, params.configId)
+  }, configId)
 
   logTaskStart('VideoTask', 'enqueue', {
     id,
@@ -170,7 +190,7 @@ async function createTask(
     model?: string | null
   },
   params: Record<string, unknown>,
-  configId?: number,
+  configId?: number | null,
 ): Promise<number> {
   const ts = now()
   const res = await db.insert(schema.sysTask).values({
@@ -359,22 +379,45 @@ async function markPolling(id: number, taskId: string | undefined) {
 async function failTask(id: number, message: string) {
   logTaskError('SysTask', 'failed', { id, error: message })
   await db.update(schema.sysTask)
-    .set({ status: 'failed', errorMsg: message, updatedAt: now() })
+    .set({ status: 'failed', errorMsg: message, updatedAt: now(), recoveryAt: null, recoveryOwner: null })
     .where(eq(schema.sysTask.id, id))
 }
 
 type SysTaskRecord = typeof schema.sysTask.$inferSelect
+
+/**
+ * 计算轮询的绝对 deadline（毫秒时间戳）。
+ * 恢复的任务沿用 params.pollDeadline 中持久化的值（重启不重置全局上限）；
+ * 无持久化值或已过期则重新生成（仅在 maxDurationMs 配置存在时启用）。
+ */
+export function computePollDeadline(
+  params: Record<string, any> | null | undefined,
+  maxDurationMs: number | null,
+): number | null {
+  if (!maxDurationMs) return null
+  const saved = Number(params?.pollDeadline)
+  if (Number.isFinite(saved) && saved > Date.now()) return saved
+  return Date.now() + maxDurationMs
+}
 
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType
   const label = taskLabel(type)
   const profile = POLL_PROFILES[type]
   const adapter = type === 'image' ? getImageAdapter(config.provider) : getVideoAdapter(config.provider)
-  const startedAt = Date.now()
+  const params = parseTaskParams(record.params)
+  // 绝对 deadline：首次进入创建并持久化，恢复的任务沿用 params.pollDeadline，
+  // 服务重启不会重置 45 分钟全局上限（连续重启也不会无限续期）
+  const deadline = computePollDeadline(params, profile.maxDurationMs)
+  if (deadline && Number(params.pollDeadline) !== deadline) {
+    await db.update(schema.sysTask)
+      .set({ params: JSON.stringify({ ...params, pollDeadline: deadline }), updatedAt: now() })
+      .where(eq(schema.sysTask.id, record.id))
+  }
 
   for (let i = 0; i < profile.attempts; i++) {
-    if (profile.maxDurationMs && Date.now() - startedAt >= profile.maxDurationMs) {
-      await failTask(record.id, `Timeout: Polling exceeded ${Math.round(profile.maxDurationMs / 60_000)} minutes`)
+    if (deadline && Date.now() >= deadline) {
+      await failTask(record.id, `Timeout: Polling exceeded ${Math.round(profile.maxDurationMs! / 60_000)} minutes`)
       return
     }
     await new Promise(r => setTimeout(r, profile.intervalMs))
@@ -390,15 +433,14 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
         url: redactUrl(url),
         attempt: i + 1,
       })
-      const remainingMs = profile.maxDurationMs
-        ? Math.max(1_000, profile.maxDurationMs - (Date.now() - startedAt))
-        : 600_000
-      // 单次轮询请求：网络错误/5xx/超时内重试 1 次，仍失败则交给外层循环等待下一轮
+      // 单次轮询请求：网络错误/5xx/超时内重试 1 次，仍失败则交给外层循环等待下一轮。
+      // 每次尝试（含重试的第二次请求）都用最新剩余时间，绝不复用已过期的剩余时间。
       const resp = await withRetry(async () => {
+        const remainingNow = deadline ? Math.max(1_000, deadline - Date.now()) : 600_000
         const r = await fetch(url, {
           method,
           headers,
-          signal: AbortSignal.timeout(remainingMs),
+          signal: AbortSignal.timeout(remainingNow),
         })
         if (!r.ok) {
           const err: any = new Error(`poll HTTP ${r.status}`)
@@ -434,6 +476,9 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
           await handleVideoComplete(record, pollResp.videoUrl, null)
           return
         }
+        // 上游返回 completed 但缺少结果 URL：立即标记失败，不应继续轮询等待
+        await failTask(record.id, '上游已返回 completed 但缺少结果 URL')
+        return
       }
       if (pollResp.status === 'failed') {
         // 上游明确失败（如内容审核拦截）属终态：立即落库，不重试不等待超时
@@ -444,7 +489,7 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
       // 已完成但下载/回写失败：向上抛由 processTask 标记失败，不能继续轮询等待
       if (completedHandling) throw err
       const exhausted = i === profile.attempts - 1
-        || (profile.maxDurationMs != null && Date.now() - startedAt >= profile.maxDurationMs)
+        || (deadline != null && Date.now() >= deadline)
       if (exhausted) {
         await failTask(record.id, `Timeout: ${err.message}`)
         return
@@ -461,7 +506,7 @@ async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)
-    .set({ resultUrl: imageUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ resultUrl: imageUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now(), recoveryAt: null, recoveryOwner: null })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('ImageTask', 'downloaded', { id: record.id, provider: record.provider, localPath })
@@ -474,7 +519,7 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)
-    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now(), recoveryAt: null, recoveryOwner: null })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('ImageTask', 'saved-base64', { id: record.id, provider: record.provider, mimeType, localPath })
@@ -517,7 +562,7 @@ async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, dura
   // 海报帧供列表/封面展示，避免前端为显示首帧缓冲整个视频
   await extractVideoPoster(localPath)
   await db.update(schema.sysTask)
-    .set({ resultUrl: videoUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ resultUrl: videoUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now(), recoveryAt: null, recoveryOwner: null })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('VideoTask', 'downloaded', { id: record.id, localPath, storyboardId: record.storyboardId, duration })

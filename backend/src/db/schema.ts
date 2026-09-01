@@ -254,6 +254,9 @@ export const sysTask = mysqlTable('sys_task', {
   createdAt: varchar('created_at', { length: 64 }).notNull(),
   updatedAt: varchar('updated_at', { length: 64 }).notNull(),
   completedAt: varchar('completed_at', { length: 64 }),
+  // 启动恢复租约：认领者的到期时间戳(ms)与标识，条件更新实现原子认领，防多实例双重续轮询
+  recoveryAt: varchar('recovery_at', { length: 64 }),
+  recoveryOwner: varchar('recovery_owner', { length: 64 }),
 })
 
 export const videoMerges = mysqlTable('video_merges', {
