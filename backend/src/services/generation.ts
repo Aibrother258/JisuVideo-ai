@@ -19,10 +19,11 @@ type TaskType = 'image' | 'video'
 
 const taskLabel = (type: TaskType) => (type === 'image' ? 'ImageTask' : 'VideoTask')
 
-// 轮询节奏：图片 5s×120（上限 10 分钟）；视频 10s×300
+// 轮询节奏：图片 5s×120（上限 10 分钟）；视频 10s×300（全局上限 45 分钟，
+// 防止单次轮询超时 10min 时极端情况累积到数十小时）
 const POLL_PROFILES: Record<TaskType, { attempts: number; intervalMs: number; maxDurationMs: number | null }> = {
   image: { attempts: 120, intervalMs: 5000, maxDurationMs: 600_000 },
-  video: { attempts: 300, intervalMs: 10_000, maxDurationMs: null },
+  video: { attempts: 300, intervalMs: 10_000, maxDurationMs: 45 * 60_000 },
 }
 
 interface GenerateImageParams {
@@ -92,7 +93,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     size: params.size || '1920x1080',
     frameType: params.frameType,
     referenceImages: params.referenceImages,
-  })
+  }, params.configId)
 
   logTaskStart('ImageTask', 'enqueue', {
     id,
@@ -137,7 +138,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     // 保留高分辨率档位透传（MiniMax 768P/2K），火山等适配器内部自行归并
     resolution: ['480p', '720p', '1080p', '2K'].includes(params.resolution || '') ? params.resolution : '720p',
     referenceSnapshot: params.referenceSnapshot ?? null,
-  })
+  }, params.configId)
 
   logTaskStart('VideoTask', 'enqueue', {
     id,
@@ -169,13 +170,15 @@ async function createTask(
     model?: string | null
   },
   params: Record<string, unknown>,
+  configId?: number,
 ): Promise<number> {
   const ts = now()
   const res = await db.insert(schema.sysTask).values({
     type,
     ...fields,
     provider: config.provider,
-    params: JSON.stringify(params),
+    // 持久化本次实际使用的配置 ID，供重启恢复时精确找回原配置（多同厂商/模型配置不猜错账号）
+    params: JSON.stringify({ ...params, configId: configId ?? null }),
     status: 'processing',
     createdAt: ts,
     updatedAt: ts,
@@ -209,14 +212,21 @@ async function processTask(id: number, config: AIConfig) {
   await slots.acquire({ id, type })
 
   try {
-    if (record.taskId) {
-      // 启动恢复路径：上游任务 ID 可能仍有效，直接续轮询而非重新提交（避免重复扣费）
-      logTaskProgress(label, 'resume-poll', { id, taskId: record.taskId, provider: config.provider })
-      await markPolling(id, record.taskId)
-      await pollTask(record, config, record.taskId)
+    // 排队等待期间任务可能已被用户删除（DELETE /tasks/:id 为物理删除）：
+    // 拿到槽位后重新查询校验，任务不存在或已非 processing 则放弃执行
+    const [fresh] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+    if (!fresh || fresh.status !== 'processing') {
+      logTaskWarn(label, 'task-not-active-after-queue', { id, status: fresh?.status ?? 'deleted' })
       return
     }
-    await runTask(record, config)
+    if (fresh.taskId) {
+      // 启动恢复路径：上游任务 ID 可能仍有效，直接续轮询而非重新提交（避免重复扣费）
+      logTaskProgress(label, 'resume-poll', { id, taskId: fresh.taskId, provider: config.provider })
+      await markPolling(id, fresh.taskId)
+      await pollTask(fresh, config, fresh.taskId)
+      return
+    }
+    await runTask(fresh, config)
   } catch (err: any) {
     logTaskError(label, 'process', { id, error: err.message })
     await failTask(id, err.message)
@@ -288,21 +298,15 @@ async function runTask(record: SysTaskRecord, config: AIConfig) {
     })
     logTaskPayload(label, 'request payload', { id, method, url, headers, body })
 
-    // 创建请求：网络错误/5xx/429/超时自动重试（最多 3 次尝试），4xx 业务错误不重试
-    const resp = await withRetry(async () => {
-      const r = await fetch(url, {
-        method,
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(600_000),
-      })
-      if (!r.ok) {
-        const err: any = new Error(`API error ${r.status}: ${await r.text()}`)
-        err.status = r.status
-        throw err
-      }
-      return r
-    }, { retries: 2, baseDelayMs: 2000, scope: label, action: 'create-request', meta: { id, provider: config.provider } })
+    // 创建请求是付费非幂等操作：不自动重试（厂商已受理但响应丢失时重试会重复扣费），
+    // 仅保留超时兜底；网络抖动导致的失败由用户在前端手动重试
+    const resp = await fetch(url, {
+      method,
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(600_000),
+    })
+    if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`)
     const result = await resp.json() as any
     logTaskPayload(label, 'response payload', { id, provider: config.provider, result })
 
@@ -370,10 +374,12 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
 
   for (let i = 0; i < profile.attempts; i++) {
     if (profile.maxDurationMs && Date.now() - startedAt >= profile.maxDurationMs) {
-      await failTask(record.id, 'Timeout: Polling exceeded 10 minutes')
+      await failTask(record.id, `Timeout: Polling exceeded ${Math.round(profile.maxDurationMs / 60_000)} minutes`)
       return
     }
     await new Promise(r => setTimeout(r, profile.intervalMs))
+    // completed 分支的下载/回写失败属终态处理错误，标记后直接失败，绝不回到轮询循环
+    let completedHandling = false
     try {
       const { url, method, headers } = adapter.buildPollRequest(config, taskId)
       logTaskProgress(label, 'poll-request', {
@@ -407,6 +413,7 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
       const pollResp: any = adapter.parsePollResponse(result)
 
       if (pollResp.status === 'completed') {
+        completedHandling = true
         if (type === 'image') {
           if (pollResp.imageUrl) {
             logTaskSuccess(label, 'poll-complete', { id: record.id, taskId, imageUrl: pollResp.imageUrl })
@@ -434,6 +441,8 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
         return
       }
     } catch (err: any) {
+      // 已完成但下载/回写失败：向上抛由 processTask 标记失败，不能继续轮询等待
+      if (completedHandling) throw err
       const exhausted = i === profile.attempts - 1
         || (profile.maxDurationMs != null && Date.now() - startedAt >= profile.maxDurationMs)
       if (exhausted) {
@@ -617,9 +626,9 @@ async function resolveReferenceMediaUrls(refs: string[] | null | undefined, kind
 // ─── 启动恢复 ─────────────────────────────────────────────────────
 
 /**
- * 恢复单个中断的生成任务（服务重启后调用）。
- * - 任务已有上游 taskId → 直接续轮询（上游任务可能仍在生成，避免重复提交扣费）
- * - 任务还在创建阶段（无 taskId）→ 重新走完整提交流程
+ * 恢复单个中断的生成任务（服务重启后调用，仅续跑、绝不重提）。
+ * - 有上游 taskId → 续轮询（上游任务可能仍在生成，不重复提交不重复扣费）
+ * - 无 taskId → 创建请求已发出但响应丢失（可能已扣费），标记失败让用户手动重试
  * 通过 processTask 统一受并发信号量约束。
  */
 export async function resumeTaskById(id: number): Promise<void> {
@@ -628,22 +637,44 @@ export async function resumeTaskById(id: number): Promise<void> {
   const type = record.type as TaskType
   const label = taskLabel(type)
 
+  if (!record.taskId) {
+    // 无法区分「请求未发出」与「已扣费但响应丢失」，安全起见不自动重提
+    await failTask(id, '服务重启，任务在提交阶段中断。为避免重复扣费已停止自动重试，请手动重新生成')
+    return
+  }
+
   const config = await findConfigForTask(record)
   if (!config) {
     await failTask(id, '服务重启后未找到可用的模型配置，任务已标记失败，请重新生成')
     return
   }
-  logTaskProgress(label, 'resume', { id, type, hasTaskId: !!record.taskId, provider: config.provider })
+  logTaskProgress(label, 'resume', { id, type, hasTaskId: true, provider: config.provider })
   await processTask(id, config)
 }
 
 /**
  * 为恢复的任务查找可用模型配置。
- * 优先精确匹配：同 provider 且模型列表包含该任务所用模型的启用配置（保住集锁定的配置语义）；
- * 找不到再回退到当前启用配置（保证任务能继续，配置差异由模型侧容错）。
+ * 1) 优先用创建时持久化的 config_id 精确恢复（多同厂商/模型配置不选错 Base URL/账号）；
+ * 2) 旧任务无 config_id 时按 provider+model 精确匹配；
+ * 3) 都找不到回退当前启用配置（保证任务能继续，配置差异由模型侧容错）。
  */
 async function findConfigForTask(record: SysTaskRecord): Promise<AIConfig | null> {
   const type = record.type as TaskType
+  const params = parseTaskParams(record.params)
+  const savedConfigId = Number(params.configId)
+  if (Number.isInteger(savedConfigId) && savedConfigId > 0) {
+    const cfg = await getConfigById(savedConfigId)
+    if (cfg) {
+      logTaskProgress('SysTask', 'resume-config-by-id', {
+        id: record.id,
+        configId: savedConfigId,
+        provider: cfg.provider,
+        model: cfg.model,
+      })
+      return cfg
+    }
+    logTaskWarn('SysTask', 'resume-config-by-id-missing', { id: record.id, configId: savedConfigId })
+  }
   if (record.provider && record.model) {
     try {
       const rows = await db.select().from(schema.aiServiceConfigs)

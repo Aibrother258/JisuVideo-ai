@@ -99,7 +99,12 @@ async function saveMediaUpload(
   if (!allowedExt.has(ext) || (mimeKnown && !allowedMime.has(file.type))) {
     return badRequest(c, `仅支持 ${Array.from(allowedExt).join('/')} 格式的${label}文件`)
   }
+  // 先用 file.size 预检（不读进内存），超大文件直接拒绝
+  if (file.size > maxBytes) {
+    return badRequest(c, `${label}文件大小不能超过 ${Math.round(maxBytes / 1024 / 1024)}MB`)
+  }
   const buffer = await file.arrayBuffer()
+  // 双保险：file.size 可能被伪造，落盘前按实际字节数再校验一次
   if (buffer.byteLength > maxBytes) {
     return badRequest(c, `${label}文件大小不能超过 ${Math.round(maxBytes / 1024 / 1024)}MB`)
   }
