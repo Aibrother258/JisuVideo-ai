@@ -204,6 +204,9 @@ async function createTask(
   configId?: number | null,
 ): Promise<number> {
   const ts = now()
+  // 插入即写入初始租约：服务刚启动时 recovery 扫描与新请求可并发，不能让刚入队的
+  // processing 任务在 processTask 第一次认领前暴露为“无 taskId、无租约”。
+  const owner = newLeaseOwner(-1)
   const res = await db.insert(schema.sysTask).values({
     type,
     ...fields,
@@ -213,10 +216,12 @@ async function createTask(
     status: 'processing',
     createdAt: ts,
     updatedAt: ts,
+    recoveryAt: String(Date.now() + TASK_LEASE_MS),
+    recoveryOwner: owner,
   })
 
   const id = getInsertId(res)
-  processTask(id, config).catch(err => {
+  processTask(id, config, startTaskLease(id, owner)).catch(err => {
     logTaskError(taskLabel(type), 'process', { id, error: err.message })
     console.error(`${taskLabel(type)} ${id} failed:`, err)
   })
@@ -232,23 +237,27 @@ function parseTaskParams(raw: string | null | undefined): Record<string, any> {
   }
 }
 
-async function processTask(id: number, config: AIConfig) {
-  const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
-  if (!record || record.status !== 'processing') return
-  const type = record.type as TaskType
-  const label = taskLabel(type)
-  const slots = type === 'image' ? imageSlot : videoSlot
-
-  // 先认领、再排队：等待并发槽位的任务同样处于 processing，必须持有租约。
-  // 否则滚动重启扫描会把“尚未提交、没有 taskId”的正常排队任务误判为中断。
-  const lease = await acquireTaskLease(id)
-  if (!lease) {
-    logTaskWarn(label, 'lease-not-acquired', { id })
-    return
-  }
-
+async function processTask(id: number, config: AIConfig, initialLease?: TaskLease) {
+  let type: TaskType | null = null
+  let label = 'SysTask'
   let slotAcquired = false
+  let lease = initialLease ?? null
   try {
+    const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+    if (!record || record.status !== 'processing') return
+    type = record.type as TaskType
+    label = taskLabel(type)
+    const slots = type === 'image' ? imageSlot : videoSlot
+
+    // 先认领、再排队：等待并发槽位的任务同样处于 processing，必须持有租约。
+    // 否则滚动重启扫描会把“尚未提交、没有 taskId”的正常排队任务误判为中断。
+    if (!lease) {
+      lease = await acquireTaskLease(id)
+      if (!lease) {
+        logTaskWarn(label, 'lease-not-acquired', { id })
+        return
+      }
+    }
     // 并发控制：超过厂商配额的生成任务排队等待，防止批量提交打爆 API
     await slots.acquire({ id, type })
     slotAcquired = true
@@ -271,8 +280,11 @@ async function processTask(id: number, config: AIConfig) {
     logTaskError(label, 'process', { id, error: err.message })
     await failTask(id, err.message)
   } finally {
-    if (slotAcquired) slots.release({ id, type })
-    await releaseTaskLease(id, lease)
+    if (slotAcquired && type) {
+      const slots = type === 'image' ? imageSlot : videoSlot
+      slots.release({ id, type })
+    }
+    if (lease) await releaseTaskLease(id, lease)
   }
 }
 
@@ -288,6 +300,10 @@ async function acquireTaskLease(id: number): Promise<TaskLease | null> {
     [String(claimedAt + TASK_LEASE_MS), owner, now(), id, 'processing', claimedAt],
   )
   if ((res?.affectedRows ?? 0) !== 1) return null
+  return startTaskLease(id, owner)
+}
+
+function startTaskLease(id: number, owner: string): TaskLease {
   const heartbeat = setInterval(() => {
     refreshTaskLease(id, owner).catch(err => {
       logTaskWarn('SysTask', 'lease-heartbeat-failed', { id, error: err.message })

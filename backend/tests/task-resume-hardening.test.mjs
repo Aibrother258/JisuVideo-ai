@@ -71,6 +71,9 @@ test('正常执行与恢复都通过同一条件更新租约认领，避免滚�
   assert.match(generation, /if \(!lease\)/)
   // 租约必须先于并发槽位取得；排队中的正常任务也不能被启动恢复误杀。
   assert.ok(generation.indexOf('const lease = await acquireTaskLease(id)') < generation.indexOf('await slots.acquire({ id, type })'))
+  // 创建任务时即有初始租约，避免服务启动扫描和新请求并发时的认领空窗。
+  assert.match(generation, /recoveryAt: String\(Date\.now\(\) \+ TASK_LEASE_MS\)/)
+  assert.match(generation, /processTask\(id, config, startTaskLease\(id, owner\)\)/)
   // recovery 不另写租约，而是进入统一 processTask 路径
   assert.match(recovery, /resumeTaskById\(task\.id\)/)
   assert.doesNotMatch(recovery, /UPDATE sys_task SET recovery_at/)
@@ -78,6 +81,12 @@ test('正常执行与恢复都通过同一条件更新租约认领，避免滚�
   assert.match(recovery, /const leaseUntil = Number\(task\.recoveryAt\)/)
   assert.match(recovery, /leaseUntil > claimTime/)
   assert.match(recovery, /WHERE id = \? AND status = \? AND \(recovery_at IS NULL OR recovery_at = \\'\\' OR CAST\(recovery_at AS UNSIGNED\) < \?\)/)
+})
+
+test('冷重启跳过有效租约后会周期复扫，租约到期不会永久卡在 processing', () => {
+  const index = read('src/index.ts')
+  assert.match(index, /const recoveryTimer = setInterval\(runInterruptedTaskRecovery, 60_000\)/)
+  assert.match(index, /recoveryTimer\.unref\(\)/)
 })
 
 test('sys_task 增加 recovery_at / recovery_owner 列（含已有库幂等 ALTER）', () => {

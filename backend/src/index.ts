@@ -84,7 +84,15 @@ console.log(`🚀 Huobao Drama TS server on http://localhost:${port}`)
 
 // 进程重启后内存中的轮询线程全部丢失：视频任务可凭上游 taskId 续跑（避免已产生费用的任务丢失），
 // 拼接任务与图片任务无恢复价值则标记 failed，避免前端一直显示"生成中"
-recoverInterruptedTasks()
-  .catch(err => console.error('启动恢复中断任务失败:', err?.message))
+const runInterruptedTaskRecovery = () => {
+  recoverInterruptedTasks()
+    .catch(err => console.error('恢复中断任务失败:', err?.message))
+}
+
+runInterruptedTaskRecovery()
+// 旧实例崩溃后遗留的租约会在最长五分钟后过期。周期扫描接管到期租约，
+// 防止冷重启首次扫描跳过后任务永久停留在 processing。
+const recoveryTimer = setInterval(runInterruptedTaskRecovery, 60_000)
+recoveryTimer.unref()
 
 serve({ fetch: app.fetch, port })
