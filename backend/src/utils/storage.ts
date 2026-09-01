@@ -3,32 +3,97 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { once } from 'events'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 import { v4 as uuid } from 'uuid'
+import { logTaskProgress, redactUrl } from './task-logger.js'
+import { withRetry } from './retry.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const STORAGE_ROOT = process.env.STORAGE_PATH || path.resolve(__dirname, '../../../data/static')
 
+export interface DownloadOptions {
+  /** 最大下载字节数，超限中止并删除半成品（默认不限制） */
+  maxBytes?: number
+  /** 单次下载尝试总超时 ms，默认 10 分钟 */
+  timeoutMs?: number
+  /** 失败重试次数（不含首次），默认 2 */
+  retries?: number
+}
+
 /**
- * 下载远程文件到本地存储
+ * 下载远程文件到本地存储。
+ * - 流式写盘，避免大文件整体进内存（视频可达数百 MB）
+ * - 可选 maxBytes 限制，Content-Length 预检 + 边写边计数双保险
+ * - 网络错误/5xx/超时自动重试，4xx 不重试
  */
-export async function downloadFile(url: string, subDir: string): Promise<string> {
-  const dir = path.join(STORAGE_ROOT, subDir)
-  fs.mkdirSync(dir, { recursive: true })
+export async function downloadFile(url: string, subDir: string, options: DownloadOptions = {}): Promise<string> {
+  const maxBytes = options.maxBytes
+  const timeoutMs = options.timeoutMs ?? 600_000
+  const retries = options.retries ?? 2
 
-  const ext = getExtFromUrl(url)
-  const filename = `${uuid()}${ext}`
-  const filePath = path.join(dir, filename)
+  return withRetry(async () => {
+    const dir = path.join(STORAGE_ROOT, subDir)
+    fs.mkdirSync(dir, { recursive: true })
 
-  const resp = await fetch(url)
-  if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
+    const ext = getExtFromUrl(url)
+    const filename = `${uuid()}${ext}`
+    const filePath = path.join(dir, filename)
 
-  const buffer = Buffer.from(await resp.arrayBuffer())
-  fs.writeFileSync(filePath, buffer)
+    logTaskProgress('Storage', 'download-start', {
+      subDir,
+      url: redactUrl(url),
+      maxBytes: maxBytes ? `${Math.round(maxBytes / 1024 / 1024)}MB` : undefined,
+      timeoutMs,
+    })
 
-  // 返回相对路径（供 API 返回给前端）
-  return `static/${subDir}/${filename}`
+    const resp = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+    if (!resp.ok) {
+      const err: any = new Error(`Download failed: ${resp.status}`)
+      err.status = resp.status
+      throw err
+    }
+
+    // Content-Length 预检：上游声明超限直接中止，避免浪费带宽下载
+    const contentLength = Number(resp.headers.get('content-length') || '0')
+    if (maxBytes && contentLength > maxBytes) {
+      await resp.body?.cancel?.()
+      throw new Error(`Download rejected: content-length ${Math.round(contentLength / 1024 / 1024)}MB exceeds ${Math.round(maxBytes / 1024 / 1024)}MB`)
+    }
+    if (!resp.body) throw new Error('Download failed: response has no body')
+
+    // 流式写盘：边下边写，实时计数，超限即时清理
+    let received = 0
+    const out = fs.createWriteStream(filePath)
+    try {
+      for await (const chunk of resp.body as any) {
+        received += chunk.length
+        if (maxBytes && received > maxBytes) {
+          out.destroy()
+          await resp.body.cancel?.()
+          throw new Error(`Download aborted: exceeded ${Math.round(maxBytes / 1024 / 1024)}MB limit`)
+        }
+        if (!out.write(chunk)) await once(out, 'drain')
+      }
+      out.end()
+      await once(out, 'finish')
+    } catch (err) {
+      out.destroy()
+      fs.promises.unlink(filePath).catch(() => {}) // 清理半成品
+      throw err
+    }
+
+    logTaskProgress('Storage', 'download-done', { subDir, url: redactUrl(url), bytes: received })
+    // 返回相对路径（供 API 返回给前端）
+    return `static/${subDir}/${filename}`
+  }, {
+    retries,
+    baseDelayMs: 1500,
+    scope: 'Storage',
+    action: 'download',
+    meta: { subDir, url: redactUrl(url) },
+  })
 }
 
 /**

@@ -6,6 +6,10 @@ import { saveUploadedFile, generateImageThumb, thumbPathFor } from '../utils/sto
 
 const app = new Hono()
 
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif'])
+const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'])
+const IMAGE_MAX = 10 * 1024 * 1024 // 10MB
+
 // POST /upload/image
 app.post('/image', async (c) => {
   const body = await c.req.parseBody()
@@ -13,6 +17,17 @@ app.post('/image', async (c) => {
 
   if (!file || !(file instanceof File)) {
     return badRequest(c, 'file is required')
+  }
+
+  const ext = extOf(file.name)
+  // MIME 可伪造，扩展名兜底；空 / octet-stream 视为未知类型，仅按扩展名校验
+  const mimeKnown = file.type && file.type !== 'application/octet-stream'
+  if (!IMAGE_EXT.has(ext) || (mimeKnown && !IMAGE_MIME.has(file.type))) {
+    return badRequest(c, `仅支持 ${Array.from(IMAGE_EXT).join('/')} 格式的图片`)
+  }
+  // 先用 file.size 预检（无需读进内存），超限直接拒绝
+  if (file.size > IMAGE_MAX) {
+    return badRequest(c, `图片大小不能超过 ${Math.round(IMAGE_MAX / 1024 / 1024)}MB`)
   }
 
   const buffer = await file.arrayBuffer()
@@ -84,7 +99,12 @@ async function saveMediaUpload(
   if (!allowedExt.has(ext) || (mimeKnown && !allowedMime.has(file.type))) {
     return badRequest(c, `仅支持 ${Array.from(allowedExt).join('/')} 格式的${label}文件`)
   }
+  // 先用 file.size 预检（不读进内存），超大文件直接拒绝
+  if (file.size > maxBytes) {
+    return badRequest(c, `${label}文件大小不能超过 ${Math.round(maxBytes / 1024 / 1024)}MB`)
+  }
   const buffer = await file.arrayBuffer()
+  // 双保险：file.size 可能被伪造，落盘前按实际字节数再校验一次
   if (buffer.byteLength > maxBytes) {
     return badRequest(c, `${label}文件大小不能超过 ${Math.round(maxBytes / 1024 / 1024)}MB`)
   }
