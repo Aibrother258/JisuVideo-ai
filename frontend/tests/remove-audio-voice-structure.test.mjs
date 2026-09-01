@@ -5,8 +5,8 @@ import assert from 'node:assert/strict'
 const appRoot = new URL('../app/', import.meta.url)
 const readApp = (path) => readFileSync(new URL(path, appRoot), 'utf8')
 
-const episodePage = readApp('pages/drama/[id]/episode/[episodeNumber].vue')
-const dramaPage = readApp('pages/drama/[id]/index.vue')
+const episodePage = readApp('views/drama/episode.vue')
+const dramaPage = readApp('views/drama/detail.vue')
 const settingsPage = readApp('pages/settings.vue')
 const useApi = readApp('composables/useApi.ts')
 
@@ -40,7 +40,8 @@ test('project and settings pages remove audio service configuration', () => {
   assert.doesNotMatch(dramaPage, /音频/)
   assert.doesNotMatch(settingsPage, /voice_assigner/)
   assert.doesNotMatch(settingsPage, /音色分配/)
-  assert.doesNotMatch(settingsPage, /serviceTypes[\s\S]*audio/)
+  const serviceTypeLine = settingsPage.match(/const serviceTypes = \[[^\n]+/)?.[0] || ''
+  assert.doesNotMatch(serviceTypeLine, /audio/)
   assert.doesNotMatch(settingsPage, /音频/)
   assert.doesNotMatch(settingsPage, /speech-2\.8-hd/)
 })

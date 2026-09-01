@@ -3,6 +3,7 @@ import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { bodyLimit } from 'hono/body-limit'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -38,6 +39,10 @@ app.use('*', cors({
 }))
 app.use('*', requestLogger)
 app.use('*', errorHandler)
+app.use('/api/v1/dramas/*', bodyLimit({
+  maxSize: 2 * 1024 * 1024,
+  onError: c => c.json({ code: 413, message: '请求内容超过 2MB 限制' }, 413),
+}))
 
 // Health check
 app.get('/api/v1/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))

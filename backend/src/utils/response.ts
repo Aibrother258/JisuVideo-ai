@@ -12,6 +12,10 @@ export function badRequest(c: Context, message = 'bad request') {
   return c.json({ code: 400, message }, 400)
 }
 
+export function conflict(c: Context, message = 'conflict') {
+  return c.json({ code: 409, message }, 409)
+}
+
 export function notFound(c: Context, message = 'not found') {
   return c.json({ code: 404, message }, 404)
 }

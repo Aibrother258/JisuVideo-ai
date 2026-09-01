@@ -7,7 +7,7 @@ services:
       MYSQL_PASSWORD: huobao
       MYSQL_ROOT_PASSWORD: huobao_root
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
@@ -21,7 +21,7 @@ services:
   huobao-drama:
     build: .
     ports:
-      - "5679:5679"
+      - "127.0.0.1:5679:5679"
     volumes:
       - ./data:/app/data
       # skills 可在设置页在线编辑,且 workspace 是 Agent 文件读写 jail 根,需持久化

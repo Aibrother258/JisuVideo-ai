@@ -6,7 +6,7 @@ const root = new URL('..', import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
 test('add episode dialog asks for a title and a fixed video resolution', () => {
-  const page = read('app/pages/drama/[id]/index.vue')
+  const page = read('app/views/drama/detail.vue')
 
   // 删除图片/视频服务选择 UI
   assert.doesNotMatch(page, /图片生成服务/)
@@ -35,7 +35,7 @@ test('add episode dialog asks for a title and a fixed video resolution', () => {
 })
 
 test('addEpisode posts drama_id, title and resolution', () => {
-  const page = read('app/pages/drama/[id]/index.vue')
+  const page = read('app/views/drama/detail.vue')
 
   const addEpisodeBody = page.slice(page.indexOf('async function addEpisode'), page.indexOf('onMounted(load)'))
   assert.match(addEpisodeBody, /drama_id: dramaId/)
@@ -47,7 +47,7 @@ test('addEpisode posts drama_id, title and resolution', () => {
 })
 
 test('episode card resolution is editable via a dropdown persisted to episodes.resolution', () => {
-  const page = read('app/pages/drama/[id]/index.vue')
+  const page = read('app/views/drama/detail.vue')
 
   // 卡片上的分辨率标签 + 下拉修改
   assert.match(page, /点击修改本集视频分辨率/)
@@ -58,7 +58,7 @@ test('episode card resolution is editable via a dropdown persisted to episodes.r
 })
 
 test('add episode dialog does not preload config lists', () => {
-  const page = read('app/pages/drama/[id]/index.vue')
+  const page = read('app/views/drama/detail.vue')
 
   assert.doesNotMatch(page, /loadConfigs/)
   assert.doesNotMatch(page, /aiConfigAPI\.list/)

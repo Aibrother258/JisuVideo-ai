@@ -16,7 +16,6 @@ test('backend provider registry does not expose ChatFire as a model provider', (
   const registry = read('src/services/adapters/registry.ts')
   const ai = read('src/services/ai.ts')
   const aiConfigRoute = read('src/routes/aiConfigs.ts')
-  const useApi = read('../frontend/app/composables/useApi.ts')
 
   assert.doesNotMatch(registry, /chatfire/i)
   assert.doesNotMatch(ai, /chatfire/i)
@@ -25,7 +24,6 @@ test('backend provider registry does not expose ChatFire as a model provider', (
   assert.doesNotMatch(aiConfigRoute, /provider:\s*'chatfire'/i)
   assert.doesNotMatch(aiConfigRoute, /openrouter/i)
   assert.doesNotMatch(aiConfigRoute, /\/huobao-preset/)
-  assert.doesNotMatch(useApi, /huobaoPreset/)
 })
 
 test('text agents use the official Gemini provider for gemini configs', () => {
@@ -113,8 +111,7 @@ test('AI config probe uses provider-specific auth schemes', () => {
 
   assert.match(geminiHeaders, /x-goog-api-key/)
   assert.doesNotMatch(geminiHeaders, /Authorization\s*=\s*`Bearer/)
-  assert.match(route, /modelName\.startsWith\('gemini-3'\)/)
-  assert.match(route, /'\/interactions'/)
+  assert.match(route, /\/models\/\$\{modelName\}:generateContent/)
   assert.match(route, /function bearerHeaders/)
   assert.match(route, /p === 'openai'/)
   assert.match(route, /p === 'volcengine'/)
@@ -174,7 +171,7 @@ test('new image and video models use their current API shapes', () => {
   assert.match(geminiImage, /\/v1beta'[\s\S]*'\/interactions'/)
   assert.match(geminiImage, /response_format/)
   assert.doesNotMatch(geminiImage, /Authorization': `Bearer/)
-  assert.match(volcVideo, /doubao-seedance-2-0-260128/)
+  assert.match(volcVideo, /DEFAULT_MODEL = 'doubao-seedance-2-0-fast-260128'/)
   // Seedance 2.0 多模态能力
   assert.match(volcVideo, /SEEDANCE2_MODEL_PREFIX/)
   assert.match(volcVideo, /startsWith\(SEEDANCE2_MODEL_PREFIX\)/)

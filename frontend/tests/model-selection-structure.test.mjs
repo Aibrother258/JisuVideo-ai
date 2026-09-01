@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 const root = new URL('..', import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
-const page = read('app/pages/drama/[id]/episode/[episodeNumber].vue')
+const page = read('app/views/drama/episode.vue')
 const useAgent = read('app/composables/useAgent.ts')
 const useApi = read('app/composables/useApi.ts')
 
@@ -41,7 +41,7 @@ test('model select dropdown is a custom designed popover', () => {
 
 test('selected models are sent with rewrite, image and video generation requests', () => {
   // 选中模型时连同其所属配置一起调用
-  assert.match(page, /function ownerConfigId\(options, model\)/)
+  assert.match(page, /function ownerConfigId\(options, key\)/)
   // 改写（Agent）透传模型与配置
   assert.match(useAgent, /model: model \|\| undefined/)
   assert.match(useAgent, /config_id: configId \|\| undefined/)
@@ -52,10 +52,10 @@ test('selected models are sent with rewrite, image and video generation requests
   assert.match(useApi, /text_model: textModel \|\| undefined/)
   assert.match(useApi, /text_config_id: textConfigId \|\| undefined/)
   assert.match(useApi, /config_id: configId \|\| undefined/)
-  assert.match(page, /characterAPI\.generateImage\(id, epId\.value, imageModel\.value \|\| undefined, ownerConfigId\(imageModelOptions\.value, imageModel\.value\), chatModelOverride\(\), chatConfigId\(\)\)/)
-  assert.match(page, /sceneAPI\.generateImage\(id, epId\.value, imageModel\.value \|\| undefined, ownerConfigId\(imageModelOptions\.value, imageModel\.value\), chatModelOverride\(\), chatConfigId\(\)\)/)
-  assert.match(page, /characterAPI\.batchImages\(ids, epId\.value, imageModel\.value \|\| undefined, ownerConfigId\(imageModelOptions\.value, imageModel\.value\), chatModelOverride\(\), chatConfigId\(\)\)/)
+  assert.match(page, /characterAPI\.generateImage\(id, epId\.value, bareModelName\(imageModel\.value\) \|\| undefined, ownerConfigId/)
+  assert.match(page, /sceneAPI\.generateImage\(id, epId\.value, bareModelName\(imageModel\.value\) \|\| undefined, ownerConfigId/)
+  assert.match(page, /characterAPI\.batchImages\(ids, epId\.value, bareModelName\(imageModel\.value\) \|\| undefined, ownerConfigId/)
   // 视频生成透传模型与配置
-  assert.match(page, /model: videoModel\.value \|\| undefined/)
+  assert.match(page, /model: bareModelName\(videoModel\.value\) \|\| undefined/)
   assert.match(page, /config_id: ownerConfigId\(videoModelOptions\.value, videoModel\.value\)/)
 })

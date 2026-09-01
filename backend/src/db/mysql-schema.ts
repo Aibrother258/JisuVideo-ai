@@ -4,7 +4,7 @@ export const mysqlSchemaStatements = [
   `CREATE TABLE IF NOT EXISTS dramas (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     title TEXT NOT NULL,
-    description TEXT,
+    description LONGTEXT,
     genre TEXT,
     style VARCHAR(64) DEFAULT '3d',
     aspect_ratio VARCHAR(16) DEFAULT '16:9',
@@ -13,7 +13,7 @@ export const mysqlSchemaStatements = [
     status VARCHAR(64) NOT NULL DEFAULT 'draft',
     thumbnail TEXT,
     tags TEXT,
-    metadata TEXT,
+    metadata LONGTEXT,
     created_at VARCHAR(64) NOT NULL,
     updated_at VARCHAR(64) NOT NULL,
     deleted_at VARCHAR(64)
@@ -24,9 +24,9 @@ export const mysqlSchemaStatements = [
     drama_id INT NOT NULL,
     episode_number INT NOT NULL,
     title TEXT NOT NULL,
-    content TEXT,
-    script_content TEXT,
-    description TEXT,
+    content LONGTEXT,
+    script_content LONGTEXT,
+    description LONGTEXT,
     duration INT DEFAULT 0,
     status VARCHAR(64) DEFAULT 'draft',
     video_url TEXT,
@@ -36,7 +36,25 @@ export const mysqlSchemaStatements = [
     resolution VARCHAR(16) DEFAULT '720p',
     created_at VARCHAR(64) NOT NULL,
     updated_at VARCHAR(64) NOT NULL,
-    deleted_at VARCHAR(64)
+    deleted_at VARCHAR(64),
+    UNIQUE KEY uq_episodes_drama_number (drama_id, episode_number)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS episode_plan_drafts (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    drama_id INT NOT NULL,
+    source_hash VARCHAR(64) NOT NULL,
+    content_fingerprint VARCHAR(64) NOT NULL,
+    generated_fingerprint VARCHAR(64),
+    version INT NOT NULL DEFAULT 1,
+    selected_episode_number INT,
+    resolution VARCHAR(16) NOT NULL DEFAULT '720p',
+    plan_json LONGTEXT NOT NULL,
+    revision_history LONGTEXT,
+    generated_episode_ids LONGTEXT,
+    created_at VARCHAR(64) NOT NULL,
+    updated_at VARCHAR(64) NOT NULL,
+    UNIQUE KEY uq_episode_plan_drafts_drama (drama_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS characters (
@@ -321,6 +339,19 @@ export const mysqlDataSeedStatements = stylePresetSeeds.map((s) => ({
 export async function initMySqlSchema(pool: Pool) {
   for (const statement of mysqlSchemaStatements) {
     await pool.query(statement)
+  }
+  // 用户正文和剧本允许 20 万字符，必须使用 LONGTEXT；ALTER MODIFY 为幂等的数据保留迁移。
+  await pool.query('ALTER TABLE dramas MODIFY COLUMN description LONGTEXT, MODIFY COLUMN metadata LONGTEXT')
+  await pool.query('ALTER TABLE episodes MODIFY COLUMN content LONGTEXT, MODIFY COLUMN script_content LONGTEXT, MODIFY COLUMN description LONGTEXT')
+  const [episodeNumberIndexes] = await pool.query<any[]>(
+    "SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'episodes' AND INDEX_NAME = 'uq_episodes_drama_number' LIMIT 1",
+  )
+  if (!episodeNumberIndexes.length) {
+    const [duplicates] = await pool.query<any[]>(
+      'SELECT drama_id, episode_number FROM episodes GROUP BY drama_id, episode_number HAVING COUNT(*) > 1 LIMIT 1',
+    )
+    if (duplicates.length) throw new Error('episodes 存在重复集号，无法建立唯一索引；请先人工处理重复数据')
+    await pool.query('ALTER TABLE episodes ADD UNIQUE KEY uq_episodes_drama_number (drama_id, episode_number)')
   }
   // CREATE TABLE IF NOT EXISTS 不会给已有表补列；启动时幂等补齐新增生产字段。
   const [h3PromptColumns] = await pool.query<any[]>(
