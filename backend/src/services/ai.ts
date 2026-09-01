@@ -86,9 +86,18 @@ export function invalidateAIConfigCache(): void {
   configCache.clear()
 }
 
-export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfig | null> {
-  const cacheKey = `active:${serviceType}`
-  const cached = cacheGet<AIConfig | null>(cacheKey)
+export interface ActiveAIConfig {
+  id: number
+  config: AIConfig
+}
+
+/**
+ * 一次读取当前启用配置及其 ID。
+ * 生成任务必须从同一行取得配置和 ID，避免配置优先级切换时使用 A 却持久化 B。
+ */
+export async function getActiveConfigWithId(serviceType: ServiceType): Promise<ActiveAIConfig | null> {
+  const cacheKey = `activeWithId:${serviceType}`
+  const cached = cacheGet<ActiveAIConfig | null>(cacheKey)
   if (cached !== undefined) return cached
 
   const rows = (await db.select().from(schema.aiServiceConfigs)
@@ -122,8 +131,13 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
     model: models[0] || '',
     temperature: parseConfigTemperature(active.settings),
   }
-  cacheSet(cacheKey, config)
-  return config
+  const resolved = { id: active.id, config }
+  cacheSet(cacheKey, resolved)
+  return resolved
+}
+
+export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfig | null> {
+  return (await getActiveConfigWithId(serviceType))?.config ?? null
 }
 
 export async function getTextConfig(): Promise<AIConfig> {
@@ -136,18 +150,7 @@ export async function getTextConfig(): Promise<AIConfig> {
  * 取某服务类型当前启用且优先级最高的官方配置 ID（创建集时自动锁定用）
  */
 export async function getActiveConfigId(serviceType: ServiceType): Promise<number | null> {
-  const cacheKey = `activeId:${serviceType}`
-  const cached = cacheGet<number | null>(cacheKey)
-  if (cached !== undefined) return cached
-
-  const rows = (await db.select().from(schema.aiServiceConfigs)
-    .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
-  )
-    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider))
-    .sort((a, b) => (b.priority || 0) - (a.priority || 0))
-  const id = rows[0]?.id ?? null
-  if (id !== null) cacheSet(cacheKey, id)
-  return id
+  return (await getActiveConfigWithId(serviceType))?.id ?? null
 }
 
 export async function getConfigById(id: number): Promise<AIConfig | null> {

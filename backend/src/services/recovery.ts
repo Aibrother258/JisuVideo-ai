@@ -2,8 +2,8 @@
  * 启动恢复 — 处理上次进程中断留下的中间状态：
  * 1. 命名锁（GET_LOCK）串行化恢复入口，多实例/滚动重启时同一时间只有一个实例执行扫描
  * 2. video_merges 残留 processing → failed（FFmpeg 拼接是本地操作，重启即中断且无上游任务可续）
- * 3. sys_task 中有上游 taskId 的视频任务 → 条件更新原子认领后续跑（轮询只读，不重复提交不重复扣费）；
- *    recovery_at 租约列保证同一任务只有认领成功的一方启动后台轮询，双实例不会双重续轮询
+ * 3. sys_task 中有上游 taskId 的视频任务 → 交给统一任务执行器续跑（轮询只读，不重复提交不重复扣费）；
+ *    执行器自身以 recovery_at 租约原子认领，正常运行与恢复路径使用同一机制，双实例不会双重续轮询
  * 4. 图片任务 / 无 taskId 的视频任务（可能已扣费）→ 标 failed 引导手动重试，绝不自动重提
  */
 import { eq } from 'drizzle-orm'
@@ -11,11 +11,6 @@ import { db, pool, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { resumeTaskById } from './generation.js'
-
-/** 认领租约时长：覆盖视频轮询全局上限(45min)+缓冲，租约内另一实例不得重新认领 */
-const LEASE_MS = 60 * 60_000
-/** 当前实例标识（认领者写入 recovery_owner） */
-const INSTANCE_ID = `${process.pid}:${Date.now()}`
 
 export async function recoverInterruptedTasks(): Promise<void> {
   const startedAt = Date.now()
@@ -55,20 +50,8 @@ export async function recoverInterruptedTasks(): Promise<void> {
       const tasks = await db.select().from(schema.sysTask).where(eq(schema.sysTask.status, 'processing'))
       for (const task of tasks) {
         if (task.type === 'video' && task.taskId) {
-          // 有上游 taskId：条件更新原子认领（唯一将 recovery_at 写入本租约窗口的实例才算认领成功），
-          // 只有认领成功的一方启动后台续跑——双实例/滚动重启不会对同一任务双重续轮询/双下载回写。
-          // 租约到期后（60min，覆盖 45min 全局轮询上限）才允许其他实例重新认领。
-          const claimedAt = Date.now()
-          const [claimRes] = await conn.query(
-            'UPDATE sys_task SET recovery_at = ?, recovery_owner = ?, updated_at = ? WHERE id = ? AND status = ? AND (recovery_at IS NULL OR recovery_at = \'\' OR CAST(recovery_at AS UNSIGNED) < ?)',
-            [String(claimedAt + LEASE_MS), INSTANCE_ID, now(), task.id, 'processing', claimedAt],
-          )
-          const affected = claimRes?.affectedRows ?? 0
-          if (affected !== 1) {
-            logTaskWarn('Recovery', 'claim-skipped', { id: task.id, reason: 'already claimed within lease window' })
-            continue
-          }
-          // 轮询只读，不重复提交不重复扣费，后台异步执行
+          // 不在扫描器里另写一套租约：resumeTaskById -> processTask 会对正常任务和恢复任务
+          // 使用同一个条件更新认领；认领失败者直接退出，避免滚动重启时重复续轮询。
           resumeTaskById(task.id).catch(err => {
             logTaskError('Recovery', 'resume-failed', { id: task.id, error: err.message })
           })

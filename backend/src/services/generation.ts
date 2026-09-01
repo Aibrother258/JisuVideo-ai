@@ -2,9 +2,9 @@
  * 统一生成任务服务 — 图片/视频生成共用 sys_task 表与同一条生命周期：
  * 创建(processing) → 适配器构建请求 → 同步完成或异步轮询 → 下载落盘 → 回写业务表
  */
-import { db, getInsertId, schema } from '../db/index.js'
+import { db, getInsertId, pool, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
-import { getActiveConfig, getActiveConfigId, getConfigById } from './ai.js'
+import { getActiveConfig, getActiveConfigWithId, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
 import { downloadFile, generateImageThumb, readImageAsCompressedDataUrl, readMediaAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
@@ -14,10 +14,21 @@ import type { AIConfig } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 import { withRetry } from '../utils/retry.js'
 import { videoSlot, imageSlot } from '../utils/concurrency.js'
+import { computePollDeadline } from '../utils/task-lifecycle.js'
 
 type TaskType = 'image' | 'video'
 
 const taskLabel = (type: TaskType) => (type === 'image' ? 'ImageTask' : 'VideoTask')
+
+// 所有执行者（正常提交和启动恢复）共用同一租约；不能只在恢复扫描时认领，
+// 否则滚动重启会接管仍在运行的任务并造成双轮询/双回写。
+const TASK_LEASE_MS = 5 * 60_000
+const TASK_LEASE_HEARTBEAT_MS = 60_000
+
+interface TaskLease {
+  owner: string
+  heartbeat: ReturnType<typeof setInterval>
+}
 
 // 轮询节奏：图片 5s×120（上限 10 分钟）；视频 10s×300（全局上限 45 分钟，
 // 防止单次轮询超时 10min 时极端情况累积到数十小时）
@@ -91,13 +102,13 @@ async function resolveConfig(type: 'image' | 'video', requestedConfigId?: number
     const cfg = await getConfigById(requestedConfigId)
     if (cfg) return { config: cfg, configId: requestedConfigId }
   }
-  const [config, configId] = await Promise.all([getActiveConfig(type), getActiveConfigId(type)])
-  if (!config) {
+  const active = await getActiveConfigWithId(type)
+  if (!active) {
     throw new Error(type === 'image'
       ? '未配置图片模型，请先到「设置」页添加并启用 AI 服务'
       : '未配置视频模型，请先到「设置」页添加并启用 AI 服务')
   }
-  return { config, configId }
+  return { config: active.config, configId: active.id }
 }
 
 export async function generateImage(params: GenerateImageParams): Promise<number> {
@@ -231,7 +242,13 @@ async function processTask(id: number, config: AIConfig) {
   // 并发控制：超过厂商配额的生成任务排队等待，防止批量提交打爆 API
   await slots.acquire({ id, type })
 
+  let lease: TaskLease | null = null
   try {
+    lease = await acquireTaskLease(id)
+    if (!lease) {
+      logTaskWarn(label, 'lease-not-acquired', { id })
+      return
+    }
     // 排队等待期间任务可能已被用户删除（DELETE /tasks/:id 为物理删除）：
     // 拿到槽位后重新查询校验，任务不存在或已非 processing 则放弃执行
     const [fresh] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
@@ -242,8 +259,8 @@ async function processTask(id: number, config: AIConfig) {
     if (fresh.taskId) {
       // 启动恢复路径：上游任务 ID 可能仍有效，直接续轮询而非重新提交（避免重复扣费）
       logTaskProgress(label, 'resume-poll', { id, taskId: fresh.taskId, provider: config.provider })
-      await markPolling(id, fresh.taskId)
-      await pollTask(fresh, config, fresh.taskId)
+      const pollingRecord = await markPolling(fresh, fresh.taskId)
+      await pollTask(pollingRecord, config, fresh.taskId)
       return
     }
     await runTask(fresh, config)
@@ -251,8 +268,47 @@ async function processTask(id: number, config: AIConfig) {
     logTaskError(label, 'process', { id, error: err.message })
     await failTask(id, err.message)
   } finally {
+    if (lease) await releaseTaskLease(id, lease)
     slots.release({ id, type })
   }
+}
+
+function newLeaseOwner(id: number): string {
+  return `${process.pid}:${id}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`
+}
+
+async function acquireTaskLease(id: number): Promise<TaskLease | null> {
+  const owner = newLeaseOwner(id)
+  const claimedAt = Date.now()
+  const [res] = await pool.query<any>(
+    'UPDATE sys_task SET recovery_at = ?, recovery_owner = ?, updated_at = ? WHERE id = ? AND status = ? AND (recovery_at IS NULL OR recovery_at = \'\' OR CAST(recovery_at AS UNSIGNED) < ?)',
+    [String(claimedAt + TASK_LEASE_MS), owner, now(), id, 'processing', claimedAt],
+  )
+  if ((res?.affectedRows ?? 0) !== 1) return null
+  const heartbeat = setInterval(() => {
+    refreshTaskLease(id, owner).catch(err => {
+      logTaskWarn('SysTask', 'lease-heartbeat-failed', { id, error: err.message })
+    })
+  }, TASK_LEASE_HEARTBEAT_MS)
+  return { owner, heartbeat }
+}
+
+async function refreshTaskLease(id: number, owner: string): Promise<void> {
+  const until = Date.now() + TASK_LEASE_MS
+  await pool.query(
+    'UPDATE sys_task SET recovery_at = ?, updated_at = ? WHERE id = ? AND status = ? AND recovery_owner = ?',
+    [String(until), now(), id, 'processing', owner],
+  )
+}
+
+async function releaseTaskLease(id: number, lease: TaskLease): Promise<void> {
+  clearInterval(lease.heartbeat)
+  await pool.query(
+    'UPDATE sys_task SET recovery_at = NULL, recovery_owner = NULL, updated_at = ? WHERE id = ? AND recovery_owner = ?',
+    [now(), id, lease.owner],
+  ).catch(err => {
+    logTaskWarn('SysTask', 'lease-release-failed', { id, error: err.message })
+  })
 }
 
 /** 任务主体：构建并提交生成请求，处理同步结果或进入轮询 */
@@ -351,8 +407,8 @@ async function runTask(record: SysTaskRecord, config: AIConfig) {
         throw new Error('No image URL or base64 data in response')
       }
 
-      await markPolling(id, taskId)
-      await pollTask(record, config, taskId!)
+      const pollingRecord = await markPolling(record, taskId)
+      await pollTask(pollingRecord, config, taskId!)
       return
     }
 
@@ -365,15 +421,19 @@ async function runTask(record: SysTaskRecord, config: AIConfig) {
       return
     }
 
-    await markPolling(id, taskId)
-    await pollTask(record, config, taskId!)
+    const pollingRecord = await markPolling(record, taskId)
+    await pollTask(pollingRecord, config, taskId!)
 }
 
-async function markPolling(id: number, taskId: string | undefined) {
+async function markPolling(record: SysTaskRecord, taskId: string | undefined): Promise<SysTaskRecord> {
+  const params = parseTaskParams(record.params)
+  const deadline = computePollDeadline(params, POLL_PROFILES[record.type as TaskType].maxDurationMs)
+  const nextParams = deadline == null ? params : { ...params, pollDeadline: deadline }
   await db.update(schema.sysTask)
-    .set({ taskId, status: 'processing', updatedAt: now() })
-    .where(eq(schema.sysTask.id, id))
-  logTaskProgress('SysTask', 'poll-start', { id, taskId })
+    .set({ taskId, params: JSON.stringify(nextParams), status: 'processing', updatedAt: now() })
+    .where(eq(schema.sysTask.id, record.id))
+  logTaskProgress('SysTask', 'poll-start', { id: record.id, taskId, deadline })
+  return { ...record, taskId: taskId ?? null, params: JSON.stringify(nextParams) }
 }
 
 async function failTask(id: number, message: string) {
@@ -385,35 +445,15 @@ async function failTask(id: number, message: string) {
 
 type SysTaskRecord = typeof schema.sysTask.$inferSelect
 
-/**
- * 计算轮询的绝对 deadline（毫秒时间戳）。
- * 恢复的任务沿用 params.pollDeadline 中持久化的值（重启不重置全局上限）；
- * 无持久化值或已过期则重新生成（仅在 maxDurationMs 配置存在时启用）。
- */
-export function computePollDeadline(
-  params: Record<string, any> | null | undefined,
-  maxDurationMs: number | null,
-): number | null {
-  if (!maxDurationMs) return null
-  const saved = Number(params?.pollDeadline)
-  if (Number.isFinite(saved) && saved > Date.now()) return saved
-  return Date.now() + maxDurationMs
-}
-
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType
   const label = taskLabel(type)
   const profile = POLL_PROFILES[type]
   const adapter = type === 'image' ? getImageAdapter(config.provider) : getVideoAdapter(config.provider)
   const params = parseTaskParams(record.params)
-  // 绝对 deadline：首次进入创建并持久化，恢复的任务沿用 params.pollDeadline，
-  // 服务重启不会重置 45 分钟全局上限（连续重启也不会无限续期）
+  // markPolling 已将 deadline 与 taskId 一起原子持久化；恢复的任务只沿用它，
+  // 绝不因重启或已过期的 deadline 重新授予新的全局窗口。
   const deadline = computePollDeadline(params, profile.maxDurationMs)
-  if (deadline && Number(params.pollDeadline) !== deadline) {
-    await db.update(schema.sysTask)
-      .set({ params: JSON.stringify({ ...params, pollDeadline: deadline }), updatedAt: now() })
-      .where(eq(schema.sysTask.id, record.id))
-  }
 
   for (let i = 0; i < profile.attempts; i++) {
     if (deadline && Date.now() >= deadline) {
@@ -421,6 +461,10 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
       return
     }
     await new Promise(r => setTimeout(r, profile.intervalMs))
+    if (deadline && Date.now() >= deadline) {
+      await failTask(record.id, `Timeout: Polling exceeded ${Math.round(profile.maxDurationMs! / 60_000)} minutes`)
+      return
+    }
     // completed 分支的下载/回写失败属终态处理错误，标记后直接失败，绝不回到轮询循环
     let completedHandling = false
     try {
