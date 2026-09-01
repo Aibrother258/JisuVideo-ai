@@ -17,7 +17,6 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { db, schema } from '../db/index.js'
 import { logTaskProgress, logTaskSuccess, logTaskWarn } from './task-logger.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -48,6 +47,9 @@ function extractStaticRefs(values: Array<string | null | undefined>): Set<string
 
 /** 汇总 DB 中所有被引用的 static 相对路径 */
 async function collectReferencedPaths(): Promise<Set<string>> {
+  // 延迟加载数据库：注入引用集的本地清理/回归测试无需建立 MySQL 连接；
+  // 实际定时清理仍在首次收集引用时加载并使用同一数据库模块。
+  const { db, schema } = await import('../db/index.js')
   const refs = new Set<string>()
   const tables: Array<{ rows: Array<Record<string, string | null | undefined>> }> = []
   const q1 = await db.select({
