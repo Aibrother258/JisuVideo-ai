@@ -31,6 +31,10 @@ const secretKeys = new Set([
   'secret_key',
   'password',
 ])
+const creativeContentKeys = new Set([
+  'content', 'description', 'source_content', 'script_content', 'review_note', 'review_notes',
+  'plan', 'prompt', 'final_prompt', 'image_prompt', 'video_prompt', 'minimax_h3_prompt',
+])
 
 function redactRequestBody(text: string): string {
   try {
@@ -41,16 +45,20 @@ function redactRequestBody(text: string): string {
       const output: Record<string, unknown> = {}
       for (const [key, child] of Object.entries(input as Record<string, unknown>)) {
         const normalized = key.toLowerCase().replace(/[-\s]/g, '_')
-        output[key] = secretKeys.has(normalized) || normalized.includes('token') || normalized.includes('password')
-          ? '***'
-          : visit(child)
+        if (secretKeys.has(normalized) || normalized.includes('token') || normalized.includes('password')) {
+          output[key] = '***'
+        } else if (creativeContentKeys.has(normalized) || normalized.endsWith('_prompt')) {
+          const size = typeof child === 'string' || Array.isArray(child) ? child.length : undefined
+          output[key] = size === undefined ? '<creative content omitted>' : `<creative content omitted:${size}>`
+        } else {
+          output[key] = visit(child)
+        }
       }
       return output
     }
     return JSON.stringify(visit(value))
   } catch {
-    return text
-      .replace(/("(?:api[_-]?key|authorization|access[_-]?token|token|secret[_-]?key|password)"\s*:\s*")[^"]*(")/gi, '$1***$2')
+    return `<unparseable body omitted:${text.length}>`
   }
 }
 
@@ -67,7 +75,10 @@ export const requestLogger: MiddlewareHandler = async (c, next) => {
   let bodyInfo = ''
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
     const contentType = c.req.header('content-type') || ''
-    if (contentType.toLowerCase().startsWith('multipart/form-data')) {
+    const containsCreativeContent = /\/dramas\/(?:analyze-source|import-source|\d+\/(?:analyze-episodes|episode-plan|episodes\/from-plan))$/.test(path)
+    if (containsCreativeContent) {
+      bodyInfo = `\n  ${colors.dim}body: <creative content omitted>${colors.reset}`
+    } else if (contentType.toLowerCase().startsWith('multipart/form-data')) {
       bodyInfo = `\n  ${colors.dim}body: <multipart file omitted>${colors.reset}`
     } else {
     try {

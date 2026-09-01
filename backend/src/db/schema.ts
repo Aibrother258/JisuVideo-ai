@@ -1,12 +1,12 @@
 /**
  * Drizzle schema - MySQL column mappings.
  */
-import { mysqlTable, text, int, double, boolean, primaryKey, varchar } from 'drizzle-orm/mysql-core'
+import { mysqlTable, text, longtext, int, double, boolean, primaryKey, uniqueIndex, varchar } from 'drizzle-orm/mysql-core'
 
 export const dramas = mysqlTable('dramas', {
   id: int('id').primaryKey().autoincrement(),
   title: text('title').notNull(),
-  description: text('description'),
+  description: longtext('description'),
   genre: text('genre'),
   style: varchar('style', { length: 64 }).default('3d'),
   aspectRatio: varchar('aspect_ratio', { length: 16 }).default('16:9'),
@@ -15,7 +15,7 @@ export const dramas = mysqlTable('dramas', {
   status: varchar('status', { length: 64 }).notNull().default('draft'),
   thumbnail: text('thumbnail'),
   tags: text('tags'),
-  metadata: text('metadata'),
+  metadata: longtext('metadata'),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
   updatedAt: varchar('updated_at', { length: 64 }).notNull(),
   deletedAt: varchar('deleted_at', { length: 64 }),
@@ -26,9 +26,9 @@ export const episodes = mysqlTable('episodes', {
   dramaId: int('drama_id').notNull(),
   episodeNumber: int('episode_number').notNull(),
   title: text('title').notNull(),
-  content: text('content'),
-  scriptContent: text('script_content'),
-  description: text('description'),
+  content: longtext('content'),
+  scriptContent: longtext('script_content'),
+  description: longtext('description'),
   duration: int('duration').default(0),
   status: varchar('status', { length: 64 }).default('draft'),
   videoUrl: text('video_url'),
@@ -39,7 +39,27 @@ export const episodes = mysqlTable('episodes', {
   createdAt: varchar('created_at', { length: 64 }).notNull(),
   updatedAt: varchar('updated_at', { length: 64 }).notNull(),
   deletedAt: varchar('deleted_at', { length: 64 }),
-})
+}, table => ({
+  dramaEpisodeNumberUnique: uniqueIndex('uq_episodes_drama_number').on(table.dramaId, table.episodeNumber),
+}))
+
+export const episodePlanDrafts = mysqlTable('episode_plan_drafts', {
+  id: int('id').primaryKey().autoincrement(),
+  dramaId: int('drama_id').notNull(),
+  sourceHash: varchar('source_hash', { length: 64 }).notNull(),
+  contentFingerprint: varchar('content_fingerprint', { length: 64 }).notNull(),
+  generatedFingerprint: varchar('generated_fingerprint', { length: 64 }),
+  version: int('version').notNull().default(1),
+  selectedEpisodeNumber: int('selected_episode_number'),
+  resolution: varchar('resolution', { length: 16 }).notNull().default('720p'),
+  planJson: longtext('plan_json').notNull(),
+  revisionHistory: longtext('revision_history'),
+  generatedEpisodeIds: longtext('generated_episode_ids'),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+  updatedAt: varchar('updated_at', { length: 64 }).notNull(),
+}, table => ({
+  dramaUnique: uniqueIndex('uq_episode_plan_drafts_drama').on(table.dramaId),
+}))
 
 export const characters = mysqlTable('characters', {
   id: int('id').primaryKey().autoincrement(),

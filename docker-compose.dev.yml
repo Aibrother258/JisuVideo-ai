@@ -9,7 +9,7 @@ services:
       MYSQL_PASSWORD: huobao
       MYSQL_ROOT_PASSWORD: huobao_root
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       # 与生产 Compose 复用同一 MySQL 数据卷；启动开发栈前会先停生产应用容器。
       - mysql-data:/var/lib/mysql
@@ -29,9 +29,10 @@ services:
     command: >-
       sh -c "npm ci && exec npm run dev"
     ports:
-      - "5679:5679"
+      - "127.0.0.1:5679:5679"
     volumes:
       - ./backend:/workspace/backend
+      - ./frontend:/workspace/frontend:ro
       - ./data:/workspace/data
       - backend-dev-node-modules:/workspace/backend/node_modules
     environment:
@@ -60,7 +61,7 @@ services:
     command: >-
       sh -c "npm ci && exec npm run dev -- --host 0.0.0.0"
     ports:
-      - "3013:3013"
+      - "127.0.0.1:3013:3013"
     volumes:
       - ./frontend:/workspace/frontend
       - frontend-dev-node-modules:/workspace/frontend/node_modules

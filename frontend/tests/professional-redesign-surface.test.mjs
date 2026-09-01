@@ -5,8 +5,8 @@ import assert from 'node:assert/strict'
 const studioCss = readFileSync(new URL('../app/assets/studio.css', import.meta.url), 'utf8')
 const indexPage = readFileSync(new URL('../app/pages/index.vue', import.meta.url), 'utf8')
 const defaultLayout = readFileSync(new URL('../app/layouts/default.vue', import.meta.url), 'utf8')
-const episodeWorkbench = readFileSync(new URL('../app/pages/drama/[id]/episode/[episodeNumber].vue', import.meta.url), 'utf8')
-const dramaDetail = readFileSync(new URL('../app/pages/drama/[id]/index.vue', import.meta.url), 'utf8')
+const episodeWorkbench = readFileSync(new URL('../app/views/drama/episode.vue', import.meta.url), 'utf8')
+const dramaDetail = readFileSync(new URL('../app/views/drama/detail.vue', import.meta.url), 'utf8')
 const settingsPage = readFileSync(new URL('../app/pages/settings.vue', import.meta.url), 'utf8')
 
 function cssBlock(source, selector) {
@@ -77,10 +77,10 @@ test('workbench active navigation uses quiet system-blue accents', () => {
   const pipeActive = cssBlock(episodeWorkbench, '.pipe-item.active')
   const iconActive = cssBlock(episodeWorkbench, '.icon-active')
 
-  assert.match(pipeActive, /background:\s*var\(--accent-bg\)/)
-  assert.match(pipeActive, /color:\s*var\(--accent-text\)/)
+  assert.match(pipeActive, /background:\s*var\(--sel-bg\)/)
+  assert.match(pipeActive, /color:\s*var\(--sel-text\)/)
   assert.doesNotMatch(pipeActive, /inset 3px 0 0 var\(--accent\)/)
-  assert.match(iconActive, /background:\s*var\(--accent\)/)
+  assert.match(iconActive, /background:\s*var\(--sel\)/)
 })
 
 test('workbench completed navigation uses quiet success states', () => {

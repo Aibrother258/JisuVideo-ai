@@ -40,15 +40,15 @@ test('project launcher keeps controls simple', () => {
   assert.doesNotMatch(page, /最近活动/)
 })
 
-test('create dialog fixes aspect ratio at project creation', () => {
+test('create dialog offers AI-ranked aspect ratios at project creation', () => {
   assert.match(page, /画面比例/)
   assert.match(page, /form\.aspect_ratio/)
-  assert.match(page, /aspectRatioOptions/)
+  assert.match(page, /analysis\?\.aspect_ratios/)
+  assert.match(page, /ratioIcon/)
   assert.match(page, /aspect_ratio: '16:9'/)
-  assert.match(page, /创建后固定/)
-  assert.match(page, /16:9 · 横屏/)
-  assert.match(page, /9:16 · 竖屏/)
-  assert.match(page, /1:1 · 方形/)
+  assert.match(page, /创建后项目内统一使用/)
+  assert.match(page, /value === '9:16'/)
+  assert.match(page, /value === '1:1'/)
   assert.doesNotMatch(page, /计划集数/)
 })
 

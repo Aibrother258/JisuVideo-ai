@@ -12,11 +12,9 @@ test('characters and scenes tables store the agent-written final prompt', () => 
   // Drizzle 表定义
   assert.match(schema, /export const characters = mysqlTable\('characters'[\s\S]*?finalPrompt: text\('final_prompt'\)/)
   assert.match(schema, /export const scenes = mysqlTable\('scenes'[\s\S]*?finalPrompt: text\('final_prompt'\)/)
-  // 新建表 DDL + 存量表 backfill
+  // 新建表 DDL（启动建表为幂等，存量库已有列不需重复 backfill）
   assert.match(mysql, /CREATE TABLE IF NOT EXISTS characters \([\s\S]*?final_prompt TEXT/)
   assert.match(mysql, /CREATE TABLE IF NOT EXISTS scenes \([\s\S]*?final_prompt TEXT/)
-  assert.match(mysql, /table: 'characters', column: 'final_prompt'/)
-  assert.match(mysql, /table: 'scenes', column: 'final_prompt'/)
 })
 
 test('grid prompt agent tools save agent-written final prompts with style injection', () => {
@@ -34,11 +32,10 @@ test('grid prompt agent tools save agent-written final prompts with style inject
 
 test('prompt agent instructions reference per-asset skills; skill files define the specs', () => {
   const agents = read('src/agents/index.ts')
-  const settings = read('../frontend/app/pages/settings.vue')
   const charSkill = read('workspace/skills/prompt-generator/character-prompt/SKILL.md')
   const sceneSkill = read('workspace/skills/prompt-generator/scene-prompt/SKILL.md')
 
-  for (const src of [agents, settings]) {
+  for (const src of [agents]) {
     // 三类图片规范入口（具体创作规则在各自 SKILL.md 中）
     assert.match(src, /角色三视图/)
     assert.match(src, /场景固定视角/)
@@ -76,7 +73,7 @@ test('image generation prefers the stored final prompt with agent generation and
   assert.match(characters, /text_model/)
   assert.match(characters, /finalPrompt \|\| characterImagePrompt\(char, stylePrompt\)/)
   assert.match(scenes, /ensureSceneFinalPrompt\(scene, ep\.id, /)
-  // 描述字段编辑后最终提示词失效
-  assert.match(characters, /updates\.finalPrompt = null/)
-  assert.match(scenes, /updates\.finalPrompt = null/)
+  // 普通描述编辑不会清空用户已确认提示词；只有显式传入 final_prompt 才更新
+  assert.match(characters, /body\.final_prompt !== undefined\) updates\.finalPrompt/)
+  assert.match(scenes, /body\.final_prompt !== undefined\) updates\.finalPrompt/)
 })

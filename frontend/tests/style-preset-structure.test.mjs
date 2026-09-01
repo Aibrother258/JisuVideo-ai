@@ -5,11 +5,20 @@ import assert from 'node:assert/strict'
 const root = new URL('..', import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
-test('project creation dialog only asks for title and visual style', () => {
+test('project creation starts from source content and offers AI-generated choices', () => {
   const page = read('app/pages/index.vue')
 
-  assert.match(page, /新建项目/)
+  assert.match(page, /从内容创建项目/)
+  assert.match(page, /小说、短文或故事内容/)
+  assert.match(page, /AI 提炼项目方案/)
+  assert.match(page, /dramaAPI\.analyzeSource/)
+  assert.match(page, /analysis\?\.titles/)
   assert.match(page, /视觉风格/)
+  assert.match(page, /已有风格/)
+  assert.match(page, /新风格/)
+  assert.match(page, /确认创建.*并加入风格预设库/)
+  assert.match(page, /stylePresetAPI\.create/)
+  assert.match(page, /description: sourceContent\.value\.trim\(\)/)
   assert.doesNotMatch(page, /total_episodes/)
   assert.doesNotMatch(page, /计划集数/)
   // 硬编码风格列表已移除，预设来自 API
@@ -23,6 +32,8 @@ test('project creation dialog only asks for title and visual style', () => {
 test('useApi exposes style preset endpoints', () => {
   const useApi = read('app/composables/useApi.ts')
 
+  assert.match(useApi, /analyzeSource/)
+  assert.match(useApi, /\/dramas\/analyze-source/)
   assert.match(useApi, /stylePresetAPI/)
   assert.match(useApi, /\/style-presets/)
   assert.match(useApi, /\?all=1/)

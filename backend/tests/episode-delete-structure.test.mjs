@@ -21,7 +21,7 @@ test('drama queries exclude soft-deleted episodes', () => {
   // 列表聚合与详情都过滤 deletedAt
   const matches = dramas.match(/isNull\(schema\.episodes\.deletedAt\)/g) || []
   assert.ok(matches.length >= 2, `expected >=2 deletedAt filters, got ${matches.length}`)
-  // 新建集时下一集号也忽略软删集
+  // 新建集计算集号时保留软删记录，满足同项目集号永久唯一约束
   const episodes = read('src/routes/episodes.ts')
-  assert.match(episodes, /isNull\(schema\.episodes\.deletedAt\)/)
+  assert.match(episodes, /where\(eq\(schema\.episodes\.dramaId, body\.drama_id\)\)/)
 })

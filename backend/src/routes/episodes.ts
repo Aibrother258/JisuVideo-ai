@@ -21,9 +21,9 @@ app.post('/', async (c) => {
   if (!imageConfigId) return badRequest(c, '未找到启用的图片生成配置，请先在设置中心添加')
   const ts = now()
 
-  // Get next episode number（忽略已软删的集，删除中间集后新集号可复用空位之后的最大值）
+  // 集号在同一项目内永久唯一；软删记录仍占用旧集号，避免与历史分镜/任务产生歧义。
   const existing = await db.select().from(schema.episodes)
-    .where(and(eq(schema.episodes.dramaId, body.drama_id), isNull(schema.episodes.deletedAt)))
+    .where(eq(schema.episodes.dramaId, body.drama_id))
     .orderBy(schema.episodes.episodeNumber)
   const nextNum = existing.length ? Math.max(...existing.map(e => e.episodeNumber)) + 1 : 1
 
@@ -62,6 +62,9 @@ app.put('/:id', async (c) => {
     if (key in body) updates[key] = body[key]
   }
   if (Object.keys(updates).length === 0) return badRequest(c, 'no valid fields')
+  if ('title' in updates && String(updates.title).trim().length > 200) return badRequest(c, '剧集标题不能超过 200 字')
+  if ('content' in updates && String(updates.content || '').length > 250_000) return badRequest(c, '剧集原文不能超过 25 万字')
+  if ('description' in updates && String(updates.description || '').length > 4000) return badRequest(c, '剧集摘要不能超过 4000 字')
   if ('resolution' in updates && !['480p', '720p'].includes(updates.resolution)) {
     return badRequest(c, 'resolution 只支持 480p / 720p')
   }

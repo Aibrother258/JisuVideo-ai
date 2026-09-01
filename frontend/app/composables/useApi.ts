@@ -1,11 +1,20 @@
 const BASE = '/api/v1'
 
+function summarizeForLog(value: any, depth = 0): any {
+  if (typeof value === 'string') return `<text:${value.length}>`
+  if (Array.isArray(value)) return `<array:${value.length}>`
+  if (!value || typeof value !== 'object') return value
+  if (depth >= 1) return '<object>'
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, summarizeForLog(child, depth + 1)]))
+}
+
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
   const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } }
   if (body) opts.body = JSON.stringify(body)
 
   const start = performance.now()
-  console.log(`%c[API] %c${method} %c${path}`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', body || '')
+  const bodySummary = summarizeForLog(body)
+  console.log(`%c[API] %c${method} %c${path}`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', bodySummary || '')
 
   try {
     const resp = await fetch(`${BASE}${path}`, opts)
@@ -14,7 +23,10 @@ async function req<T = any>(method: string, path: string, body?: any): Promise<T
 
     if (!resp.ok || (json.code && json.code >= 400)) {
       console.log(`%c[API] %c${method} ${path} %c${resp.status} %c${ms}ms`, 'color:#888', 'color:#ef5350', 'color:#ef5350;font-weight:bold', 'color:#888', json.message || '')
-      throw new Error(json.message || `${resp.status}`)
+      const error: any = new Error(json.message || `${resp.status}`)
+      error.status = resp.status
+      error.code = json.code
+      throw error
     }
 
     console.log(`%c[API] %c${method} ${path} %c${resp.status} %c${ms}ms`, 'color:#888', 'color:#66bb6a', 'color:#66bb6a;font-weight:bold', 'color:#888')
@@ -38,6 +50,12 @@ export const api = {
 export const dramaAPI = {
   list: () => api.get<{ items: any[] }>('/dramas'),
   get: (id: number) => api.get(`/dramas/${id}`),
+  importSource: (url: string) => api.post('/dramas/import-source', { url }),
+  analyzeSource: (content: string) => api.post('/dramas/analyze-source', { content }),
+  analyzeEpisodes: (id: number, data: { content: string; episode_count?: number; resolution: string; expected_version: number; review_notes?: Array<{ episode_number: number; title?: string; summary?: string; note: string }> }) => api.post(`/dramas/${id}/analyze-episodes`, data),
+  getEpisodePlan: (id: number) => api.get(`/dramas/${id}/episode-plan`),
+  saveEpisodePlan: (id: number, data: { source_content: string; plan: any; resolution: string; selected_episode_number?: number | null; expected_version: number }) => api.put(`/dramas/${id}/episode-plan`, data),
+  createEpisodesFromPlan: (id: number, data: { expected_version: number }) => api.post(`/dramas/${id}/episodes/from-plan`, data),
   create: (data: any) => api.post('/dramas', data),
   update: (id: number, data: any) => api.put(`/dramas/${id}`, data),
   del: (id: number) => api.del(`/dramas/${id}`),

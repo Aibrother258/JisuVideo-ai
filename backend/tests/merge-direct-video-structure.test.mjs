@@ -9,10 +9,11 @@ const useApi = readFileSync(new URL('../../frontend/app/composables/useApi.ts', 
 const composeRoutePath = new URL('../src/routes/compose.ts', import.meta.url)
 const composeServicePath = new URL('../src/services/ffmpeg-compose.ts', import.meta.url)
 
-test('episode merge uses generated videos directly without requiring compose output', () => {
+test('episode merge uses available generated videos directly without requiring compose output', () => {
   assert.doesNotMatch(mergeService, /Only composed storyboards can be merged/)
   assert.match(mergeService, /sb\.videoUrl\s*\|\|\s*sb\.composedVideoUrl/)
-  assert.match(mergeService, /readyVideos\.length !== storyboards\.length/)
+  assert.match(mergeService, /clips\.length === 0/)
+  assert.match(mergeService, /允许部分拼接/)
 })
 
 test('compose workflow is no longer exposed through API surfaces', () => {
