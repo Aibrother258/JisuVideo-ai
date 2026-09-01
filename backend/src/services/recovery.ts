@@ -49,6 +49,14 @@ export async function recoverInterruptedTasks(): Promise<void> {
     try {
       const tasks = await db.select().from(schema.sysTask).where(eq(schema.sysTask.status, 'processing'))
       for (const task of tasks) {
+        const claimTime = Date.now()
+        const leaseUntil = Number(task.recoveryAt)
+        // 正常执行与恢复执行都在 processTask 中取得租约。启动扫描只能接管已过期/无租约的任务，
+        // 不能把另一实例正在提交、尚未拿到上游 taskId 的任务误判为“无 taskId 中断”。
+        if (Number.isFinite(leaseUntil) && leaseUntil > claimTime) {
+          logTaskWarn('Recovery', 'claim-skipped', { id: task.id, reason: 'active worker lease' })
+          continue
+        }
         if (task.type === 'video' && task.taskId) {
           // 不在扫描器里另写一套租约：resumeTaskById -> processTask 会对正常任务和恢复任务
           // 使用同一个条件更新认领；认领失败者直接退出，避免滚动重启时重复续轮询。
@@ -63,13 +71,19 @@ export async function recoverInterruptedTasks(): Promise<void> {
             ? '服务重启，任务在提交阶段中断。为避免重复扣费请手动重新生成'
             : '服务重启，图片任务已中断，请重试'
           try {
-            await db.update(schema.sysTask)
-              .set({ status: 'failed', errorMsg: msg, updatedAt: now() })
-              .where(eq(schema.sysTask.id, task.id))
+            // 扫描到无租约后，另一个执行者可能恰好已认领任务；条件更新确保不覆盖新租约。
+            const [failRes] = await conn.query(
+              'UPDATE sys_task SET status = ?, error_msg = ?, updated_at = ? WHERE id = ? AND status = ? AND (recovery_at IS NULL OR recovery_at = \'\' OR CAST(recovery_at AS UNSIGNED) < ?)',
+              ['failed', msg, now(), task.id, 'processing', claimTime],
+            )
+            if ((failRes?.affectedRows ?? 0) !== 1) {
+              logTaskWarn('Recovery', 'claim-skipped', { id: task.id, reason: 'claimed while scanning' })
+              continue
+            }
+            failed++
           } catch (err: any) {
             logTaskError('Recovery', 'task-fail-failed', { id: task.id, error: err.message })
           }
-          failed++
         }
       }
     } catch (err: any) {

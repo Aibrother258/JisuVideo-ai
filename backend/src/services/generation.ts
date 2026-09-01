@@ -239,16 +239,19 @@ async function processTask(id: number, config: AIConfig) {
   const label = taskLabel(type)
   const slots = type === 'image' ? imageSlot : videoSlot
 
-  // 并发控制：超过厂商配额的生成任务排队等待，防止批量提交打爆 API
-  await slots.acquire({ id, type })
+  // 先认领、再排队：等待并发槽位的任务同样处于 processing，必须持有租约。
+  // 否则滚动重启扫描会把“尚未提交、没有 taskId”的正常排队任务误判为中断。
+  const lease = await acquireTaskLease(id)
+  if (!lease) {
+    logTaskWarn(label, 'lease-not-acquired', { id })
+    return
+  }
 
-  let lease: TaskLease | null = null
+  let slotAcquired = false
   try {
-    lease = await acquireTaskLease(id)
-    if (!lease) {
-      logTaskWarn(label, 'lease-not-acquired', { id })
-      return
-    }
+    // 并发控制：超过厂商配额的生成任务排队等待，防止批量提交打爆 API
+    await slots.acquire({ id, type })
+    slotAcquired = true
     // 排队等待期间任务可能已被用户删除（DELETE /tasks/:id 为物理删除）：
     // 拿到槽位后重新查询校验，任务不存在或已非 processing 则放弃执行
     const [fresh] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
@@ -268,8 +271,8 @@ async function processTask(id: number, config: AIConfig) {
     logTaskError(label, 'process', { id, error: err.message })
     await failTask(id, err.message)
   } finally {
-    if (lease) await releaseTaskLease(id, lease)
-    slots.release({ id, type })
+    if (slotAcquired) slots.release({ id, type })
+    await releaseTaskLease(id, lease)
   }
 }
 

@@ -69,9 +69,15 @@ test('正常执行与恢复都通过同一条件更新租约认领，避免滚�
   assert.match(generation, /recovery_owner = \?/, 'heartbeat and release must be owner-scoped')
   assert.match(generation, /lease = await acquireTaskLease\(id\)/)
   assert.match(generation, /if \(!lease\)/)
+  // 租约必须先于并发槽位取得；排队中的正常任务也不能被启动恢复误杀。
+  assert.ok(generation.indexOf('const lease = await acquireTaskLease(id)') < generation.indexOf('await slots.acquire({ id, type })'))
   // recovery 不另写租约，而是进入统一 processTask 路径
   assert.match(recovery, /resumeTaskById\(task\.id\)/)
   assert.doesNotMatch(recovery, /UPDATE sys_task SET recovery_at/)
+  // 无 taskId 的任务只有在扫描时无有效租约、且条件更新仍成立时才会被标失败。
+  assert.match(recovery, /const leaseUntil = Number\(task\.recoveryAt\)/)
+  assert.match(recovery, /leaseUntil > claimTime/)
+  assert.match(recovery, /WHERE id = \? AND status = \? AND \(recovery_at IS NULL OR recovery_at = \\'\\' OR CAST\(recovery_at AS UNSIGNED\) < \?\)/)
 })
 
 test('sys_task 增加 recovery_at / recovery_owner 列（含已有库幂等 ALTER）', () => {
