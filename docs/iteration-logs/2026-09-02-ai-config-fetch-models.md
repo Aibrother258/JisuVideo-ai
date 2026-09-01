@@ -74,3 +74,57 @@
 
 - 若用户反馈某中转站拉取为空，可按其实际返回格式扩展 `parseModelIds`。
 - 可在编辑态下拉框中预填「最近使用模型」，进一步减少手输。
+
+---
+
+# 复核处理（2026-09-02，PR #7 CHANGES_REQUESTED）
+
+## 评审意见 1：SSRF 出站请求防护 ✅
+
+新增 `backend/src/utils/endpoint-guard.ts`，统一收口 `/ai-configs/test` 与 `/ai-configs/models` 的出站请求：
+
+- **协议限制**：仅 `http/https`，`file://`、`ftp://` 等拒绝
+- **地址校验**：DNS 解析后拒绝私网/回环/链路本地/CGNAT/组播等保留地址
+  （IPv4：0/8、10/8、127/8、100.64/10、169.254/16、172.16/12、192.168/16、198.18/15、224+；
+  IPv6：`::1`、`fc00::/7`、`fe80::/10`、组播）；IP 字面量直接判断不查 DNS
+- **受控开关**：`ALLOW_PRIVATE_AI_ENDPOINTS=true` 显式放行本地/私网 AI 网关（默认拒绝），dev compose 已加注释说明
+- **逐跳重定向校验**：手动跟随（`redirect:'manual'`），每一跳重新校验目标地址；
+  **跨 origin 跳转丢弃 Authorization / x-goog-api-key 与请求体**，防 Key 随跳转泄漏
+- **受限读取**：响应体上限 2MiB（`readBodyLimited`），防异常服务拖垮内存
+- 被拒时前端/接口返回明确提示：`该地址被安全策略拒绝（不支持私网/本机地址）…`
+
+## 评审意见 2：响应加固与 mock fetch 回归测试 ✅
+
+- 模型 ID **去重**（`new Set`）+ **数量上限**（`MAX_MODELS = 200`）
+- 新增 `backend/tests/ai-config-models.test.mjs`（mock fetch + 可注入 DNS）：
+  1. 官方格式成功（openai `data[].id`）✅
+  2. 候选端点回退（首候选 404 → 下一候选成功，对应 gemini v1beta→v1 兜底）✅
+  3. 401/403 响应透出（供路由短路判定）✅
+  4. 超大响应拒绝（`readBodyLimited` 超限抛错）✅
+  5. SSRF：15 类私网/保留 IP 识别、域名解析到私网拒绝、IP 字面量拒绝、非 http(s) 协议拒绝、重定向到私网拒绝 ✅
+  6. 跨 origin 重定向丢弃鉴权头与请求体 ✅
+  7. 路由接线静态断言（safeFetch / 去重 / 上限 / 私网提示）✅
+
+## 产品交互补充 ✅
+
+1. **复选框选择 + 「加入当前配置」**：拉取结果改为明确勾选语义（checkbox 样式 chips），
+   勾选多个后点「加入当前配置」去重写入当前配置模型列表；未勾选不写入；手工输入保留
+2. **「配置为生图模型」快捷入口**（当前配置为 text/video 时显示）：
+   - 勾选模型后点击 → 校验 provider 是否在图片服务白名单（gemini / openai），
+     不兼容则明确提示「该服务商不在图片服务白名单，无法配置为生图模型」
+   - 兼容则**预填图片服务配置草稿**（Base URL / API Key / Provider / 勾选模型），
+     由用户确认后保存；取消/关闭不落库，不静默新建或覆盖现有图片配置
+   - 保存与测试沿用既有图片服务商白名单与连通性校验（后端 `isOfficialProvider` + `/test`）
+
+## 验证
+
+- `tsc --noEmit` 通过
+- 新增 `backend/tests/ai-config-models.test.mjs` 共 12 条回归测试全部通过（容器内，文件级 suite pass）
+- 接口实测（容器内 node 请求）：
+  - `autodl` + video → `ok:true, source:"fixed"` 固定提示 ✅
+  - `openai` + 无效 key → `API Key 无效或未填写`（401 短路）✅
+  - `openai` + 不可达地址 → `无法从该 Base URL 拉取模型` 兜底 ✅
+  - `autodl` + 非 video 服务类型 → 400 `Unsupported service_type/provider` ✅
+  - `/models` + 私网 base_url（`http://127.0.0.1:9999`）→ `该地址被安全策略拒绝…ALLOW_PRIVATE_AI_ENDPOINTS=true` ✅
+  - `/test` + 私网 base_url（`http://192.168.1.10`）→ 同样被拒 ✅
+- 前端 dev HMR 无编译错误 ✅

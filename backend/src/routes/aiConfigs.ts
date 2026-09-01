@@ -6,8 +6,12 @@ import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
 import { invalidateAIConfigCache, isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
+import { UnsafeEndpointError, safeFetch } from '../utils/endpoint-guard.js'
 
 const app = new Hono()
+
+/** 单次拉取最多返回的模型数（防超大列表拖垮设置页渲染） */
+const MAX_MODELS = 200
 
 /** 归一化 temperature 入参：null=未设置；合法值 0~2；非法抛错 */
 function normalizeTemperature(v: any): number | null {
@@ -178,12 +182,11 @@ app.post('/models', async (c) => {
     const probeUrl = redactUrl(probe.url)
     logTaskProgress('AIConfig', 'models-fetch-start', { provider, url: probeUrl })
     try {
-      const resp = await fetch(probe.url, {
+      const { resp, body: text } = await safeFetch(probe.url, {
         method: probe.method,
         headers: probe.headers,
         signal: AbortSignal.timeout(10000),
       })
-      const text = await resp.text()
       if (resp.status === 401 || resp.status === 403) {
         logTaskError('AIConfig', 'models-fetch-unauthorized', { provider, status: resp.status, url: probeUrl })
         return success(c, { ok: false, models: [], source: probeUrl, message: 'API Key 无效或未填写' })
@@ -192,14 +195,24 @@ app.post('/models', async (c) => {
         lastError = `HTTP ${resp.status}`
         continue
       }
-      const models = parseModelIds(text)
-      if (!models) {
+      const parsed = parseModelIds(text)
+      if (!parsed) {
         lastError = 'response format unexpected'
+        continue
+      }
+      // 去重 + 数量上限
+      const models = [...new Set(parsed)].slice(0, MAX_MODELS)
+      if (!models.length) {
+        lastError = 'empty model list'
         continue
       }
       logTaskSuccess('AIConfig', 'models-fetch-done', { provider, count: models.length, url: probeUrl })
       return success(c, { ok: true, models, source: probeUrl })
     } catch (error: any) {
+      if (error instanceof UnsafeEndpointError) {
+        logTaskError('AIConfig', 'models-fetch-blocked', { provider, url: probeUrl, reason: error.message })
+        return success(c, { ok: false, models: [], source: probeUrl, message: '该地址被安全策略拒绝（不支持私网/本机地址）；如确需本地 AI 网关，请在后端设置 ALLOW_PRIVATE_AI_ENDPOINTS=true' })
+      }
       lastError = error.message
       logTaskError('AIConfig', 'models-fetch-failed', { provider, url: probeUrl, error: error.message })
     }
@@ -288,12 +301,11 @@ app.post('/test', async (c) => {
   })
 
   try {
-    const resp = await fetch(probe.url, {
+    const { resp, body: text } = await safeFetch(probe.url, {
       method: probe.method,
       headers: probe.headers,
       body: probe.body ? JSON.stringify(probe.body) : undefined,
     })
-    const text = await resp.text()
     const isAutoDL = body.provider.toLowerCase() === 'autodl'
     const reachable = [200, 204, 400, 401, 403, 404].includes(resp.status)
     const authenticated = !isAutoDL || ![401, 403].includes(resp.status)
@@ -327,6 +339,9 @@ app.post('/test', async (c) => {
     }
     return success(c, payload)
   } catch (error: any) {
+    const message = error instanceof UnsafeEndpointError
+      ? '该地址被安全策略拒绝（不支持私网/本机地址）；如确需本地 AI 网关，请在后端设置 ALLOW_PRIVATE_AI_ENDPOINTS=true'
+      : (error.message || '请求失败')
     logTaskError('AIConfig', 'probe-failed', {
       provider: body.provider,
       url: probeUrl,
@@ -337,7 +352,7 @@ app.post('/test', async (c) => {
       reachable: false,
       method: probe.method,
       url: probeUrl,
-      message: error.message || '请求失败',
+      message,
       response_preview: '',
     })
   }
