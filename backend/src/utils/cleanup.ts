@@ -118,8 +118,13 @@ export interface CleanupReport {
 
 /** 单次清理：返回删除统计。
  *  opts.referencedPaths 可注入引用集（测试用，跳过 DB 查询）；
+ *  opts.collectRefs 可注入引用集查询实现（测试用，模拟 DB 失败）；
  *  opts.dryRun 覆盖模块级 DRY_RUN。 */
-export async function runStorageCleanup(opts: { referencedPaths?: Set<string>; dryRun?: boolean } = {}): Promise<CleanupReport> {
+export async function runStorageCleanup(opts: {
+  referencedPaths?: Set<string>
+  collectRefs?: () => Promise<Set<string>>
+  dryRun?: boolean
+} = {}): Promise<CleanupReport> {
   const report: CleanupReport = { temp_removed: 0, orphan_removed: 0, orphan_skipped_dry_run: 0, scanned_files: 0 }
   const dryRun = opts.dryRun ?? DRY_RUN
   if (!fs.existsSync(STORAGE_ROOT)) return report
@@ -143,38 +148,45 @@ export async function runStorageCleanup(opts: { referencedPaths?: Set<string>; d
 
   // 2) 孤儿文件 GC
   let referenced: Set<string>
+  let refsKnown = true
   if (opts.referencedPaths) {
     referenced = opts.referencedPaths
   } else {
-    // DB 抖动时引用集查询失败不阻塞清理（空引用集=所有超龄文件都是孤儿），只记录警告
+    // 引用集查询失败时绝不能以空集合继续孤儿 GC：任何短暂 MySQL 故障、启动迁移期间
+    // 字段不可用等，都会把仍在使用的素材全部误判为孤儿删除（本清理服务启动即运行，
+    // 风险被放大）。失败时本轮跳过孤儿 GC，仅保留安全的 temp TTL 清理。
     try {
-      referenced = await collectReferencedPaths()
+      referenced = await (opts.collectRefs ?? collectReferencedPaths)()
     } catch (err) {
       logTaskWarn('Cleanup', 'collect-refs-failed', { error: (err as Error).message })
+      logTaskWarn('Cleanup', 'orphan-gc-skipped', { reason: 'referenced-paths-unavailable' })
       referenced = new Set<string>()
+      refsKnown = false
     }
   }
-  for (const subDir of SCAN_SUBDIRS) {
-    const dirPath = path.join(STORAGE_ROOT, subDir)
-    if (!fs.existsSync(dirPath)) continue
-    for (const entry of fs.readdirSync(dirPath)) {
-      const filePath = path.join(dirPath, entry)
-      let stat: fs.Stats | null = null
-      try { stat = fs.statSync(filePath) } catch { continue }
-      if (!stat.isFile()) continue
-      report.scanned_files++
-      const relPath = `static/${subDir}/${entry}`
+  if (refsKnown) {
+    for (const subDir of SCAN_SUBDIRS) {
+      const dirPath = path.join(STORAGE_ROOT, subDir)
+      if (!fs.existsSync(dirPath)) continue
+      for (const entry of fs.readdirSync(dirPath)) {
+        const filePath = path.join(dirPath, entry)
+        let stat: fs.Stats | null = null
+        try { stat = fs.statSync(filePath) } catch { continue }
+        if (!stat.isFile()) continue
+        report.scanned_files++
+        const relPath = `static/${subDir}/${entry}`
 
-      // 被 DB 引用 → 保留
-      if (referenced.has(relPath)) continue
-      // 派生文件：主文件（同 stem 任意扩展名）仍存在 → 保留；主文件被回收后，派生文件下轮回收
-      const stem = derivedStem(entry)
-      if (stem && mainFileExists(dirPath, stem)) continue
+        // 被 DB 引用 → 保留
+        if (referenced.has(relPath)) continue
+        // 派生文件：主文件（同 stem 任意扩展名）仍存在 → 保留；主文件被回收后，派生文件下轮回收
+        const stem = derivedStem(entry)
+        if (stem && mainFileExists(dirPath, stem)) continue
 
-      if (Date.now() - stat.mtimeMs <= ORPHAN_TTL_MS) continue
-      if (dryRun) report.orphan_skipped_dry_run++
-      else {
-        try { fs.unlinkSync(filePath); report.orphan_removed++ } catch (err) { logTaskWarn('Cleanup', 'orphan-remove-failed', { file: filePath, error: (err as Error).message }) }
+        if (Date.now() - stat.mtimeMs <= ORPHAN_TTL_MS) continue
+        if (dryRun) report.orphan_skipped_dry_run++
+        else {
+          try { fs.unlinkSync(filePath); report.orphan_removed++ } catch (err) { logTaskWarn('Cleanup', 'orphan-remove-failed', { file: filePath, error: (err as Error).message }) }
+        }
       }
     }
   }

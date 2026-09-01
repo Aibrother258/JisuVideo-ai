@@ -82,6 +82,24 @@ test('GC 保留被引用主文件及其缩略图/海报（同 stem 任意扩展�
   assert.equal(fs.existsSync(path.join(storageRoot, 'temp/fresh-list.txt')), true, '新鲜 temp 文件保留')
 })
 
+test('引用集查询失败时跳过孤儿 GC：主资源/派生资源全部保留，temp TTL 照常清理', async () => {
+  // 重建一组超龄"在用"文件（此前用例已删除孤儿）
+  writeOld('images/fail-main.png')
+  writeOld('images/fail-main_thumb.webp')
+  writeOld('temp/stale2.txt')
+
+  // 模拟 DB 抖动：引用集查询直接抛错（如启动迁移期间字段不可用）
+  const failingCollect = async () => { throw new Error('mysql connection lost') }
+  const report = await runStorageCleanup({ collectRefs: failingCollect, dryRun: false })
+
+  assert.equal(report.orphan_removed, 0, '引用集失败时孤儿 GC 不删除任何文件')
+  assert.equal(report.scanned_files, 0, '引用集失败时本轮不扫描产物目录')
+  assert.equal(report.temp_removed, 1, 'temp TTL 清理不受影响，仍删除过期列表')
+  assert.equal(fs.existsSync(path.join(storageRoot, 'images/fail-main.png')), true, '无引用集时主资源保留')
+  assert.equal(fs.existsSync(path.join(storageRoot, 'images/fail-main_thumb.webp')), true, '无引用集时派生缩略图保留')
+  assert.equal(fs.existsSync(path.join(storageRoot, 'temp/stale2.txt')), false, '过期 temp 文件正常删除')
+})
+
 test('dry-run 模式不删除任何文件', async () => {
   fs.writeFileSync(path.join(storageRoot, 'images/dry-run-target.png'), 'x')
   fs.utimesSync(path.join(storageRoot, 'images/dry-run-target.png'), OLD, OLD)
