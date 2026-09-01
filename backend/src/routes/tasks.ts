@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { and, eq, desc } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, created, badRequest } from '../utils/response.js'
 import { generateImage, generateVideo, type VideoReferenceSnapshot } from '../services/generation.js'
@@ -147,17 +147,20 @@ app.get('/:id', async (c) => {
   return success(c, row || null)
 })
 
-// GET /tasks — 按 type / storyboard_id / drama_id 过滤
+// GET /tasks — 按 type / storyboard_id / drama_id 过滤（条件下推 SQL，避免全表内存过滤）
 app.get('/', async (c) => {
   const type = c.req.query('type')
   const storyboardId = c.req.query('storyboard_id')
   const dramaId = c.req.query('drama_id')
 
-  let rows = await db.select().from(schema.sysTask)
+  const conds = []
+  if (type) conds.push(eq(schema.sysTask.type, type))
+  if (storyboardId) conds.push(eq(schema.sysTask.storyboardId, Number(storyboardId)))
+  if (dramaId) conds.push(eq(schema.sysTask.dramaId, Number(dramaId)))
 
-  if (type) rows = rows.filter(r => r.type === type)
-  if (storyboardId) rows = rows.filter(r => r.storyboardId === Number(storyboardId))
-  if (dramaId) rows = rows.filter(r => r.dramaId === Number(dramaId))
+  const rows = conds.length
+    ? await db.select().from(schema.sysTask).where(and(...conds)).orderBy(desc(schema.sysTask.createdAt))
+    : await db.select().from(schema.sysTask).orderBy(desc(schema.sysTask.createdAt))
 
   return success(c, rows)
 })

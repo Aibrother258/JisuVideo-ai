@@ -61,7 +61,36 @@ export function getTextProviderBaseUrl(config: AIConfig) {
 const lastLoggedActiveConfigKey = new Map<string, string>()
 const lastLoggedConfigByIdKey = new Map<number, string>()
 
+// 配置 TTL 缓存：长剧本改写/批量生成会在极短时间内重复解析同一配置，
+// 避免每次 DB 往返。配置变更（新增/编辑/启停）时调用 invalidateAIConfigCache() 清空。
+interface CacheEntry<T> { value: T; expiresAt: number }
+const configCache = new Map<string, CacheEntry<unknown>>()
+const CONFIG_CACHE_TTL_MS = 10_000
+
+function cacheGet<T>(key: string): T | undefined {
+  const entry = configCache.get(key)
+  if (!entry) return undefined
+  if (Date.now() >= entry.expiresAt) {
+    configCache.delete(key)
+    return undefined
+  }
+  return entry.value as T
+}
+
+function cacheSet<T>(key: string, value: T): void {
+  configCache.set(key, { value, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS })
+}
+
+/** 配置发生变更后调用：清空全部缓存，下次读取走 DB */
+export function invalidateAIConfigCache(): void {
+  configCache.clear()
+}
+
 export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfig | null> {
+  const cacheKey = `active:${serviceType}`
+  const cached = cacheGet<AIConfig | null>(cacheKey)
+  if (cached !== undefined) return cached
+
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
@@ -86,13 +115,15 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
       priority: active.priority,
     })
   }
-  return {
+  const config: AIConfig = {
     provider: active.provider || '',
     baseUrl: active.baseUrl,
     apiKey: active.apiKey,
     model: models[0] || '',
     temperature: parseConfigTemperature(active.settings),
   }
+  cacheSet(cacheKey, config)
+  return config
 }
 
 export async function getTextConfig(): Promise<AIConfig> {
@@ -105,15 +136,25 @@ export async function getTextConfig(): Promise<AIConfig> {
  * 取某服务类型当前启用且优先级最高的官方配置 ID（创建集时自动锁定用）
  */
 export async function getActiveConfigId(serviceType: ServiceType): Promise<number | null> {
+  const cacheKey = `activeId:${serviceType}`
+  const cached = cacheGet<number | null>(cacheKey)
+  if (cached !== undefined) return cached
+
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
     .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider))
     .sort((a, b) => (b.priority || 0) - (a.priority || 0))
-  return rows[0]?.id ?? null
+  const id = rows[0]?.id ?? null
+  if (id !== null) cacheSet(cacheKey, id)
+  return id
 }
 
 export async function getConfigById(id: number): Promise<AIConfig | null> {
+  const cacheKey = `byId:${id}`
+  const cached = cacheGet<AIConfig | null>(cacheKey)
+  if (cached !== undefined) return cached
+
   const [row] = await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.id, id))
   if (!row || !row.isActive) {
@@ -139,11 +180,13 @@ export async function getConfigById(id: number): Promise<AIConfig | null> {
       serviceType: row.serviceType,
     })
   }
-  return {
+  const config: AIConfig = {
     provider: row.provider || '',
     baseUrl: row.baseUrl,
     apiKey: row.apiKey,
     model: models[0] || '',
     temperature: parseConfigTemperature(row.settings),
   }
+  cacheSet(cacheKey, config)
+  return config
 }

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, isNull, like, desc } from 'drizzle-orm'
+import { and, eq, isNull, like, desc, inArray, count } from 'drizzle-orm'
 import { db, getInsertId, pool, schema } from '../db/index.js'
 import { success, badRequest, conflict, notFound, created, now } from '../utils/response.js'
 import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
@@ -249,44 +249,73 @@ async function saveEpisodePlanDraft(options: {
   }
 }
 
-// GET /dramas - List dramas
+// GET /dramas - List dramas（过滤/分页/聚合计数全部下推 SQL，避免全表扫描 + N+1）
 app.get('/', async (c) => {
-  const page = Number(c.req.query('page') || 1)
-  const pageSize = Number(c.req.query('page_size') || 20)
+  const page = Math.max(1, Number(c.req.query('page') || 1))
+  const pageSizeRaw = Number(c.req.query('page_size') || 20)
+  const pageSize = Math.min(100, Math.max(1, pageSizeRaw))
   const status = c.req.query('status')
   const keyword = c.req.query('keyword')
 
-  const allRows = await db.select().from(schema.dramas)
-    .where(isNull(schema.dramas.deletedAt))
+  const conds = [isNull(schema.dramas.deletedAt)]
+  if (status) conds.push(eq(schema.dramas.status, status))
+  if (keyword) conds.push(like(schema.dramas.title, `%${keyword}%`))
+  const where = and(...conds)
+
+  const total = (await db.select({ value: count() }).from(schema.dramas).where(where))[0]?.value ?? 0
+  const rows = await db.select().from(schema.dramas)
+    .where(where)
     .orderBy(desc(schema.dramas.updatedAt))
-  let filtered = allRows
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
 
-  if (status) filtered = filtered.filter(d => d.status === status)
-  if (keyword) filtered = filtered.filter(d => d.title.includes(keyword))
+  const ids = rows.map(r => r.id)
+  // 聚合计数：3 次 GROUP BY + 1 次轻量列表查询代替每行 4 次 N+1
+  const [epCounts, charCounts, sceneCounts, epRows] = await Promise.all([
+    ids.length
+      ? db.select({ dramaId: schema.episodes.dramaId, value: count() }).from(schema.episodes)
+        .where(and(inArray(schema.episodes.dramaId, ids), isNull(schema.episodes.deletedAt)))
+        .groupBy(schema.episodes.dramaId)
+      : Promise.resolve([]),
+    ids.length
+      ? db.select({ dramaId: schema.characters.dramaId, value: count() }).from(schema.characters)
+        .where(and(inArray(schema.characters.dramaId, ids), isNull(schema.characters.deletedAt)))
+        .groupBy(schema.characters.dramaId)
+      : Promise.resolve([]),
+    ids.length
+      ? db.select({ dramaId: schema.scenes.dramaId, value: count() }).from(schema.scenes)
+        .where(and(inArray(schema.scenes.dramaId, ids), isNull(schema.scenes.deletedAt)))
+        .groupBy(schema.scenes.dramaId)
+      : Promise.resolve([]),
+    ids.length
+      ? db.select({ id: schema.episodes.id, dramaId: schema.episodes.dramaId, episodeNumber: schema.episodes.episodeNumber })
+        .from(schema.episodes)
+        .where(and(inArray(schema.episodes.dramaId, ids), isNull(schema.episodes.deletedAt)))
+        .orderBy(desc(schema.episodes.createdAt))
+      : Promise.resolve([]),
+  ])
+  const epCountMap = new Map(epCounts.map(r => [r.dramaId, Number(r.value)]))
+  const charCountMap = new Map(charCounts.map(r => [r.dramaId, Number(r.value)]))
+  const sceneCountMap = new Map(sceneCounts.map(r => [r.dramaId, Number(r.value)]))
+  const epByDrama = new Map<number, typeof epRows>()
+  for (const ep of epRows) {
+    const arr = epByDrama.get(ep.dramaId) || []
+    arr.push(ep)
+    epByDrama.set(ep.dramaId, arr)
+  }
 
-  const total = filtered.length
-  const items = filtered.slice((page - 1) * pageSize, page * pageSize)
-
-  // Attach episode/character/scene counts
-  const enriched = await Promise.all(items.map(async (drama) => {
-    const eps = await db.select().from(schema.episodes)
-      .where(and(eq(schema.episodes.dramaId, drama.id), isNull(schema.episodes.deletedAt)))
-    const chars = await db.select().from(schema.characters)
-      .where(eq(schema.characters.dramaId, drama.id))
-    const scns = await db.select().from(schema.scenes)
-      .where(eq(schema.scenes.dramaId, drama.id))
-    return {
-      ...toSnakeCase(drama),
-      tags: drama.tags ? JSON.parse(drama.tags) : [],
-      total_episodes: eps.length,
-      episodes: toSnakeCaseArray(eps),
-      characters: toSnakeCaseArray(chars),
-      scenes: toSnakeCaseArray(scns),
-    }
+  const items = rows.map(drama => ({
+    ...toSnakeCase(drama),
+    tags: drama.tags ? JSON.parse(drama.tags) : [],
+    total_episodes: epCountMap.get(drama.id) ?? 0,
+    // 列表只带剧集轻量字段（id/集号），供前端算「第几集」；大字段走详情接口
+    episodes: (epByDrama.get(drama.id) || []).map(toSnakeCase),
+    character_count: charCountMap.get(drama.id) ?? 0,
+    scene_count: sceneCountMap.get(drama.id) ?? 0,
   }))
 
   return success(c, {
-    items: enriched,
+    items,
     pagination: { page, page_size: pageSize, total, total_pages: Math.ceil(total / pageSize) },
   })
 })
@@ -627,14 +656,13 @@ app.post('/:id/episodes/from-plan', async (c) => {
 
 // GET /dramas/stats — must be before /:id
 app.get('/stats', async (c) => {
-  const all = await db.select().from(schema.dramas).where(isNull(schema.dramas.deletedAt))
-  const byStatus = Object.entries(
-    all.reduce((acc, d) => {
-      acc[d.status || 'draft'] = (acc[d.status || 'draft'] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-  ).map(([status, count]) => ({ status, count }))
-  return success(c, { total: all.length, by_status: byStatus })
+  const rows = await db.select({ status: schema.dramas.status, value: count() })
+    .from(schema.dramas)
+    .where(isNull(schema.dramas.deletedAt))
+    .groupBy(schema.dramas.status)
+  const total = rows.reduce((acc, r) => acc + Number(r.value), 0)
+  const byStatus = rows.map(r => ({ status: r.status || 'draft', count: Number(r.value) }))
+  return success(c, { total, by_status: byStatus })
 })
 
 // GET /dramas/:id - Get drama detail
@@ -688,44 +716,50 @@ app.delete('/:id', async (c) => {
   return success(c)
 })
 
-// PUT /dramas/:id/characters - Save characters
+// PUT /dramas/:id/characters - Save characters（事务化 + 批量 insert）
 app.put('/:id/characters', async (c) => {
   const dramaId = Number(c.req.param('id'))
   const body = await c.req.json()
   const chars = body.characters || []
   const ts = now()
 
-  for (const char of chars) {
-    if (char.id) {
-      await db.update(schema.characters).set({ ...char, updatedAt: ts }).where(eq(schema.characters.id, char.id))
-    } else {
-      await db.insert(schema.characters).values({ ...char, dramaId, createdAt: ts, updatedAt: ts })
+  await db.transaction(async (tx) => {
+    const updates = chars.filter((char: any) => char.id)
+    const inserts = chars.filter((char: any) => !char.id)
+    for (const char of updates) {
+      await tx.update(schema.characters).set({ ...char, updatedAt: ts }).where(eq(schema.characters.id, char.id))
     }
-  }
+    if (inserts.length) {
+      await tx.insert(schema.characters).values(inserts.map((char: any) => ({ ...char, dramaId, createdAt: ts, updatedAt: ts })))
+    }
+  })
   return success(c)
 })
 
-// PUT /dramas/:id/episodes - Save episodes
+// PUT /dramas/:id/episodes - Save episodes（事务化 + 批量 insert）
 app.put('/:id/episodes', async (c) => {
   const dramaId = Number(c.req.param('id'))
   const body = await c.req.json()
   const episodes = body.episodes || []
   const ts = now()
 
-  for (const ep of episodes) {
-    if (ep.id) {
-      await db.update(schema.episodes).set({ ...ep, updatedAt: ts }).where(eq(schema.episodes.id, ep.id))
-    } else {
-      await db.insert(schema.episodes).values({
+  await db.transaction(async (tx) => {
+    const updates = episodes.filter((ep: any) => ep.id)
+    const inserts = episodes.filter((ep: any) => !ep.id)
+    for (const ep of updates) {
+      await tx.update(schema.episodes).set({ ...ep, updatedAt: ts }).where(eq(schema.episodes.id, ep.id))
+    }
+    if (inserts.length) {
+      await tx.insert(schema.episodes).values(inserts.map((ep: any) => ({
         ...ep,
         dramaId,
         episodeNumber: ep.episode_number || ep.episodeNumber || 1,
         title: ep.title || '未命名',
         createdAt: ts,
         updatedAt: ts,
-      })
+      })))
     }
-  }
+  })
   return success(c)
 })
 

@@ -105,19 +105,15 @@ app.put('/:id/reference-assets', async (c) => {
 })
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
-  await db.delete(schema.storyboardCharacters)
-    .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
-
-
   const uniqueIds = [...new Set((characterIds || []).filter(Boolean))]
-  if (!uniqueIds.length) return
-
-  for (const characterId of uniqueIds) {
-    await db.insert(schema.storyboardCharacters).values({
-      storyboardId,
-      characterId,
-    })
-  }
+  // 整表替换放一个事务，批量 insert：中途失败不留下半套关联
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.storyboardCharacters)
+      .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
+    if (uniqueIds.length) {
+      await tx.insert(schema.storyboardCharacters).values(uniqueIds.map(characterId => ({ storyboardId, characterId })))
+    }
+  })
 }
 
 async function getStoryboardCharacterIds(storyboardId: number) {
@@ -127,18 +123,14 @@ async function getStoryboardCharacterIds(storyboardId: number) {
 }
 
 async function syncStoryboardProps(storyboardId: number, propIds: number[]) {
-  await db.delete(schema.storyboardProps)
-    .where(eq(schema.storyboardProps.storyboardId, storyboardId))
-
   const uniqueIds = [...new Set((propIds || []).filter(Boolean))]
-  if (!uniqueIds.length) return
-
-  for (const propId of uniqueIds) {
-    await db.insert(schema.storyboardProps).values({
-      storyboardId,
-      propId,
-    })
-  }
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.storyboardProps)
+      .where(eq(schema.storyboardProps.storyboardId, storyboardId))
+    if (uniqueIds.length) {
+      await tx.insert(schema.storyboardProps).values(uniqueIds.map(propId => ({ storyboardId, propId })))
+    }
+  })
 }
 
 async function getStoryboardPropIds(storyboardId: number) {
