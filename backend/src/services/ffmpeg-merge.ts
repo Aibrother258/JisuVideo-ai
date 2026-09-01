@@ -8,7 +8,7 @@ import { v4 as uuid } from 'uuid'
 import { db, getInsertId, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../utils/response.js'
-import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { ffmpeg, checkFfmpegSuite } from '../utils/ffmpeg.js'
 
@@ -89,66 +89,120 @@ export async function mergeEpisodeVideos(episodeId: number, dramaId: number, sto
   return mergeId
 }
 
+/** ffprobe 读取单镜头编码信息；读取失败返回 null（视为不一致，走重编码兜底） */
+function probeClip(filePath: string): Promise<{
+  vCodec: string; width: number; height: number; fps: number; hasAudio: boolean; aCodec: string
+} | null> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err || !metadata?.streams) { resolve(null); return }
+      const video = metadata.streams.find(s => s.codec_type === 'video')
+      const audio = metadata.streams.find(s => s.codec_type === 'audio')
+      if (!video) { resolve(null); return }
+      resolve({
+        vCodec: video.codec_name || '',
+        width: Number(video.width) || 0,
+        height: Number(video.height) || 0,
+        fps: parseFrameRate(video.avg_frame_rate),
+        hasAudio: Boolean(audio),
+        aCodec: audio?.codec_name || '',
+      })
+    })
+  })
+}
+
+/** '30000/1001' → 29.97；解析失败返回 0 */
+function parseFrameRate(raw: string | undefined): number {
+  if (!raw) return 0
+  const parts = String(raw).split('/')
+  const num = Number(parts[0])
+  const den = Number(parts[1])
+  if (!Number.isFinite(num) || !den) return 0
+  return Math.round((num / den) * 100) / 100
+}
+
 async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
-  // 生成 concat 列表文件
   const listDir = path.join(STORAGE_ROOT, 'temp')
   fs.mkdirSync(listDir, { recursive: true })
   const listPath = path.join(listDir, `${uuid()}.txt`)
-
-  const listContent = videos
-    .map(v => `file '${toAbsPath(v)}'`)
-    .join('\n')
-  fs.writeFileSync(listPath, listContent, 'utf-8')
-
-  // 输出文件
   const outputDir = path.join(STORAGE_ROOT, 'merged')
   fs.mkdirSync(outputDir, { recursive: true })
   const outputFilename = `${uuid()}.mp4`
   const outputPath = path.join(outputDir, outputFilename)
 
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg()
-      .input(listPath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
-      .outputOptions([
-        '-fflags', '+genpts',
-        '-c:v', 'libx264',
-        '-preset', 'medium',
-        '-crf', '23',
-        '-c:a', 'aac',
-        '-ar', '48000',
-        '-b:a', '192k',
-        '-movflags', '+faststart',
-      ])
-      .output(outputPath)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run()
+  try {
+    const listContent = videos
+      .map(v => `file '${toAbsPath(v)}'`)
+      .join('\n')
+    fs.writeFileSync(listPath, listContent, 'utf-8')
 
-  })
+    // 一致性预检：所有镜头编码(均 h264)/分辨率/帧率一致、音频全 aac（或无音频）
+    // → -c copy 秒级快速拼接；任一不一致才全量重编码，避免拼接产物卡顿/音画不同步
+    const probes = await Promise.all(videos.map(v => probeClip(toAbsPath(v))))
+    const first = probes[0]
+    let consistent = false
+    if (probes.length === videos.length && first) {
+      const all = probes.filter((p): p is NonNullable<typeof p> => p !== null)
+      consistent = all.length === probes.length
+        && all.every(p => p.vCodec === first.vCodec && p.width === first.width && p.height === first.height && p.fps === first.fps)
+        && all.every(p => !p.hasAudio || p.aCodec === 'aac')
+    }
+    const useCopy = consistent && first?.vCodec === 'h264'
 
-  // 清理临时文件
-  fs.unlinkSync(listPath)
+    logTaskProgress('MergeTask', 'probe', {
+      mergeId,
+      clips: videos.length,
+      consistent,
+      mode: useCopy ? 'copy' : 'reencode',
+      codec: first?.vCodec || 'unknown',
+      resolution: first ? `${first.width}x${first.height}` : 'unknown',
+    })
 
-  // 获取时长
-  const duration = await getVideoDuration(outputPath)
+    await new Promise<void>((resolve, reject) => {
+      // setTimeout 是 fluent-ffmpeg 的运行时方法（@types 缺失），用 any 桥接
+      const command: any = (ffmpeg() as any)
+        .input(listPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions(useCopy
+          // 快路径：流复制，不重新编码
+          ? ['-fflags', '+genpts', '-c', 'copy', '-movflags', '+faststart']
+          // 兜底：全量重编码（veryfast 起步，兼顾速度与体积）
+          : ['-fflags', '+genpts', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+            '-c:a', 'aac', '-ar', '48000', '-b:a', '192k', '-movflags', '+faststart'])
+        .output(outputPath)
+        .setTimeout(30 * 60_000) // 超时 30 分钟（fluent-ffmpeg 会 kill 进程并触发 timeout/error）
+        .on('end', () => resolve())
+        .on('timeout', () => reject(new Error('ffmpeg merge timed out after 30 minutes')))
+        .on('error', (err: any) => reject(err))
+      command.run()
+    })
 
-  const mergedRelative = `static/merged/${outputFilename}`
+    // 成功：清理列表文件，更新成片记录
+    try { fs.unlinkSync(listPath) } catch {}
 
-  // 成片海报帧（导出页封面用）
-  await extractVideoPoster(mergedRelative)
+    const duration = await getVideoDuration(outputPath)
+    const mergedRelative = `static/merged/${outputFilename}`
+    await extractVideoPoster(mergedRelative)
 
-  // 更新 merge 记录
-  await db.update(schema.videoMerges)
-    .set({ status: 'completed', mergedUrl: mergedRelative, duration, completedAt: now() })
-    .where(eq(schema.videoMerges.id, mergeId))
+    await db.update(schema.videoMerges)
+      .set({ status: 'completed', mergedUrl: mergedRelative, duration, completedAt: now() })
+      .where(eq(schema.videoMerges.id, mergeId))
+    await db.update(schema.episodes)
+      .set({ videoUrl: mergedRelative, updatedAt: now() })
+      .where(eq(schema.episodes.id, episodeId))
 
-  // 更新 episode
-  await db.update(schema.episodes)
-    .set({ videoUrl: mergedRelative, updatedAt: now() })
-    .where(eq(schema.episodes.id, episodeId))
-
-  logTaskSuccess('MergeTask', 'episode-merge', { mergeId, episodeId, output: mergedRelative, duration, clips: videos.length })
+    logTaskSuccess('MergeTask', 'episode-merge', {
+      mergeId, episodeId, output: mergedRelative, duration, clips: videos.length,
+      mode: useCopy ? 'copy' : 'reencode',
+    })
+  } catch (err) {
+    // 失败清理：concat 列表与半成品输出都要删，避免 temp/ 与 merged/ 持续堆积
+    try { fs.unlinkSync(listPath) } catch {}
+    if (fs.existsSync(outputPath)) {
+      try { fs.unlinkSync(outputPath) } catch {}
+    }
+    throw err
+  }
 }
 
 function getVideoDuration(filePath: string): Promise<number> {

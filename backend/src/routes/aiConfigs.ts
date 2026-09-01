@@ -4,7 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
-import { isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
+import { invalidateAIConfigCache, isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -162,6 +162,7 @@ app.post('/', async (c) => {
   const [row] = await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.id, getInsertId(res)))
 
+  invalidateAIConfigCache()
   return created(c, withParsedFields(row))
 })
 
@@ -289,6 +290,7 @@ app.put('/:id', async (c) => {
   }
 
   await db.update(schema.aiServiceConfigs).set(updates).where(eq(schema.aiServiceConfigs.id, id))
+  invalidateAIConfigCache()
   return success(c)
 })
 
@@ -296,6 +298,7 @@ app.put('/:id', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.delete(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, id))
+  invalidateAIConfigCache()
   return success(c)
 })
 

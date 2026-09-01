@@ -100,7 +100,7 @@
           <h2 class="project-name truncate">{{ d.title }}</h2>
           <div class="project-meta">
             <span v-if="d.style" class="tag tag-accent">{{ styleLabel(d.style) }}</span>
-            <span>{{ d.characters?.length || 0 }} 角色 · {{ d.scenes?.length || 0 }} 场景 · {{ d.episodes?.length || 0 }} 集</span>
+            <span>{{ d.character_count || 0 }} 角色 · {{ d.scene_count || 0 }} 场景 · {{ d.total_episodes || 0 }} 集</span>
           </div>
           <div class="project-foot">
             <span class="updated">

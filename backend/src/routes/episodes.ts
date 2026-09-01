@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, inArray, or, desc } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, badRequest, now } from '../utils/response.js'
 import { toSnakeCaseArray, toSnakeCase } from '../utils/transform.js'
@@ -22,33 +22,44 @@ app.post('/', async (c) => {
   const ts = now()
 
   // 集号在同一项目内永久唯一；软删记录仍占用旧集号，避免与历史分镜/任务产生歧义。
-  const existing = await db.select().from(schema.episodes)
-    .where(eq(schema.episodes.dramaId, body.drama_id))
-    .orderBy(schema.episodes.episodeNumber)
-  const nextNum = existing.length ? Math.max(...existing.map(e => e.episodeNumber)) + 1 : 1
+  // 并发建集时 max+1 可能算出相同集号，靠 (drama_id, episode_number) 唯一索引兜底，
+  // 冲突时重查重试（最多 3 次）
+  const MAX_NUM_RETRIES = 3
+  for (let attempt = 0; ; attempt++) {
+    const existing = await db.select({ episodeNumber: schema.episodes.episodeNumber })
+      .from(schema.episodes)
+      .where(eq(schema.episodes.dramaId, body.drama_id))
+      .orderBy(schema.episodes.episodeNumber)
+    const nextNum = existing.length ? Math.max(...existing.map(e => e.episodeNumber)) + 1 : 1
 
-  const res = await db.insert(schema.episodes).values({
-    dramaId: body.drama_id,
-    episodeNumber: nextNum,
-    title: body.title || `第${nextNum}集`,
-    imageConfigId,
-    videoConfigId,
-    // 视频分辨率在创建集时固定（480p/720p），后续可通过 PUT 修改
-    resolution: body.resolution === '480p' ? '480p' : '720p',
-    createdAt: ts,
-    updatedAt: ts,
-  })
+    try {
+      const res = await db.insert(schema.episodes).values({
+        dramaId: body.drama_id,
+        episodeNumber: nextNum,
+        title: body.title || `第${nextNum}集`,
+        imageConfigId,
+        videoConfigId,
+        // 视频分辨率在创建集时固定（480p/720p），后续可通过 PUT 修改
+        resolution: body.resolution === '480p' ? '480p' : '720p',
+        createdAt: ts,
+        updatedAt: ts,
+      })
 
-  const [ep] = await db.select().from(schema.episodes)
-    .where(eq(schema.episodes.id, getInsertId(res)))
-  return success(c, {
-    id: ep.id,
-    episode_number: ep.episodeNumber,
-    title: ep.title,
-    image_config_id: ep.imageConfigId,
-    video_config_id: ep.videoConfigId,
-    resolution: ep.resolution,
-  })
+      const [ep] = await db.select().from(schema.episodes)
+        .where(eq(schema.episodes.id, getInsertId(res)))
+      return success(c, {
+        id: ep.id,
+        episode_number: ep.episodeNumber,
+        title: ep.title,
+        image_config_id: ep.imageConfigId,
+        video_config_id: ep.videoConfigId,
+        resolution: ep.resolution,
+      })
+    } catch (err: any) {
+      if (err?.code === 'ER_DUP_ENTRY' && attempt < MAX_NUM_RETRIES) continue
+      throw err
+    }
+  }
 })
 
 // PUT /episodes/:id - Update episode fields
@@ -92,39 +103,39 @@ app.delete('/:id', async (c) => {
   return success(c)
 })
 
-// GET /episodes/:id/characters — characters linked to this episode
+// GET /episodes/:id/characters — characters linked to this episode（inArray 下推）
 app.get('/:id/characters', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const links = await db.select().from(schema.episodeCharacters)
     .where(eq(schema.episodeCharacters.episodeId, episodeId))
   const charIds = links.map(l => l.characterId)
   if (!charIds.length) return success(c, [])
-  const allChars = await db.select().from(schema.characters)
-  const result = allChars.filter(ch => charIds.includes(ch.id) && !ch.deletedAt)
+  const result = await db.select().from(schema.characters)
+    .where(and(inArray(schema.characters.id, charIds), isNull(schema.characters.deletedAt)))
   return success(c, toSnakeCaseArray(result))
 })
 
-// GET /episodes/:id/scenes — scenes linked to this episode
+// GET /episodes/:id/scenes — scenes linked to this episode（inArray 下推）
 app.get('/:id/scenes', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const links = await db.select().from(schema.episodeScenes)
     .where(eq(schema.episodeScenes.episodeId, episodeId))
   const sceneIds = links.map(l => l.sceneId)
   if (!sceneIds.length) return success(c, [])
-  const allScenes = await db.select().from(schema.scenes)
-  const result = allScenes.filter(sc => sceneIds.includes(sc.id) && !sc.deletedAt)
+  const result = await db.select().from(schema.scenes)
+    .where(and(inArray(schema.scenes.id, sceneIds), isNull(schema.scenes.deletedAt)))
   return success(c, toSnakeCaseArray(result))
 })
 
-// GET /episodes/:id/props — props linked to this episode
+// GET /episodes/:id/props — props linked to this episode（inArray 下推）
 app.get('/:id/props', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const links = await db.select().from(schema.episodeProps)
     .where(eq(schema.episodeProps.episodeId, episodeId))
   const propIds = links.map(l => l.propId)
   if (!propIds.length) return success(c, [])
-  const allProps = await db.select().from(schema.props)
-  const result = allProps.filter(p => propIds.includes(p.id) && !p.deletedAt)
+  const result = await db.select().from(schema.props)
+    .where(and(inArray(schema.props.id, propIds), isNull(schema.props.deletedAt)))
   return success(c, toSnakeCaseArray(result))
 })
 
@@ -167,14 +178,25 @@ app.get('/:id/video-prompts-status', async (c) => {
   return success(c, getVideoPromptBatchStatus(id))
 })
 
-// GET /episodes/:episode_id/storyboards
+// GET /episodes/:episode_id/storyboards（链接表与角色/道具查询全部 inArray 下推）
 app.get('/:episode_id/storyboards', async (c) => {
   const episodeId = Number(c.req.param('episode_id'))
   const rows = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))
     .orderBy(schema.storyboards.storyboardNumber)
+  const storyboardIds = rows.map(row => row.id)
 
-  const links = await db.select().from(schema.storyboardCharacters)
+  const [links, propLinks]: [
+    typeof schema.storyboardCharacters.$inferSelect[],
+    typeof schema.storyboardProps.$inferSelect[],
+  ] = storyboardIds.length
+    ? await Promise.all([
+        db.select().from(schema.storyboardCharacters)
+          .where(inArray(schema.storyboardCharacters.storyboardId, storyboardIds)),
+        db.select().from(schema.storyboardProps)
+          .where(inArray(schema.storyboardProps.storyboardId, storyboardIds)),
+      ])
+    : [[], []]
   const charIdsByStoryboard = new Map<number, number[]>()
   for (const link of links) {
     const arr = charIdsByStoryboard.get(link.storyboardId) || []
@@ -182,7 +204,6 @@ app.get('/:episode_id/storyboards', async (c) => {
     charIdsByStoryboard.set(link.storyboardId, arr)
   }
 
-  const propLinks = await db.select().from(schema.storyboardProps)
   const propIdsByStoryboard = new Map<number, number[]>()
   for (const link of propLinks) {
     const arr = propIdsByStoryboard.get(link.storyboardId) || []
@@ -193,14 +214,18 @@ app.get('/:episode_id/storyboards', async (c) => {
   const episodeCharLinks = await db.select().from(schema.episodeCharacters)
     .where(eq(schema.episodeCharacters.episodeId, episodeId))
   const episodeCharIds = episodeCharLinks.map(link => link.characterId)
-  const allChars = (await db.select().from(schema.characters))
-    .filter(ch => episodeCharIds.includes(ch.id) && !ch.deletedAt)
+  const allChars = episodeCharIds.length
+    ? await db.select().from(schema.characters)
+        .where(and(inArray(schema.characters.id, episodeCharIds), isNull(schema.characters.deletedAt)))
+    : []
 
   const episodePropLinks = await db.select().from(schema.episodeProps)
     .where(eq(schema.episodeProps.episodeId, episodeId))
   const episodePropIds = episodePropLinks.map(link => link.propId)
-  const allProps = (await db.select().from(schema.props))
-    .filter(p => episodePropIds.includes(p.id) && !p.deletedAt)
+  const allProps = episodePropIds.length
+    ? await db.select().from(schema.props)
+        .where(and(inArray(schema.props.id, episodePropIds), isNull(schema.props.deletedAt)))
+    : []
 
   return success(c, rows.map((row) => ({
     ...toSnakeCase(row),
@@ -224,34 +249,38 @@ app.get('/:id/generation-tasks', async (c) => {
   if (!ep) return notFound(c, 'Episode not found')
 
   const sbs = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
-  const storyboardIds = new Set(sbs.map(s => s.id))
+  const storyboardIds = sbs.map(s => s.id)
 
   const epScenes = await db.select().from(schema.episodeScenes).where(eq(schema.episodeScenes.episodeId, episodeId))
-  const sceneIds = new Set(epScenes.map(r => r.sceneId))
+  const sceneIdSet = new Set(epScenes.map(r => r.sceneId))
   // 兼容 scenes.episodeId 直挂的旧数据
   const directScenes = await db.select().from(schema.scenes).where(eq(schema.scenes.episodeId, episodeId))
-  directScenes.forEach(s => sceneIds.add(s.id))
+  directScenes.forEach(s => sceneIdSet.add(s.id))
+  const sceneIds = [...sceneIdSet]
 
   const epChars = await db.select().from(schema.episodeCharacters).where(eq(schema.episodeCharacters.episodeId, episodeId))
-  const characterIds = new Set(epChars.map(r => r.characterId))
+  const characterIds = epChars.map(r => r.characterId)
 
   const dramaProps = await db.select().from(schema.props).where(eq(schema.props.dramaId, ep.dramaId))
-  const propIds = new Set(dramaProps.map(p => p.id))
+  const propIds = dramaProps.map(p => p.id)
 
-  const allTasks = await db.select().from(schema.sysTask).where(eq(schema.sysTask.dramaId, ep.dramaId))
-  const tasks = allTasks
-    .filter(t =>
-      (t.storyboardId && storyboardIds.has(t.storyboardId)) ||
-      (t.sceneId && sceneIds.has(t.sceneId)) ||
-      (t.characterId && characterIds.has(t.characterId)) ||
-      (t.propId && propIds.has(t.propId))
-    )
-    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  // 关联键过滤下推 SQL：storyboard/scene/character/prop 任一命中即归属本集
+  const orConds = [
+    ...(storyboardIds.length ? [inArray(schema.sysTask.storyboardId, storyboardIds)] : []),
+    ...(sceneIds.length ? [inArray(schema.sysTask.sceneId, sceneIds)] : []),
+    ...(characterIds.length ? [inArray(schema.sysTask.characterId, characterIds)] : []),
+    ...(propIds.length ? [inArray(schema.sysTask.propId, propIds)] : []),
+  ]
+  const tasks = orConds.length
+    ? await db.select().from(schema.sysTask)
+        .where(and(eq(schema.sysTask.dramaId, ep.dramaId), or(...orConds)))
+        .orderBy(desc(schema.sysTask.createdAt))
+    : []
 
-  const merges = (await db.select().from(schema.videoMerges)
-    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt))))
-    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-    .slice(0, 20)
+  const merges = await db.select().from(schema.videoMerges)
+    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt)))
+    .orderBy(desc(schema.videoMerges.createdAt))
+    .limit(20)
 
   return success(c, {
     tasks: toSnakeCaseArray(tasks),
