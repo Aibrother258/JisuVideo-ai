@@ -323,7 +323,25 @@
           </label>
           <label class="field"><span class="field-label">API Key</span><input v-model="cfgForm.api_key" class="input" type="password" placeholder="sk-..." /></label>
           <label class="field"><span class="field-label">Base URL</span><input v-model="cfgForm.base_url" class="input" placeholder="https://..." /></label>
-          <label class="field"><span class="field-label">模型（逗号分隔）</span><input v-model="cfgForm.modelStr" class="input" placeholder="model-name" /></label>
+          <label class="field">
+            <span class="field-label">模型（逗号分隔）</span>
+            <div class="model-input-row">
+              <input v-model="cfgForm.modelStr" class="input" placeholder="model-name" />
+              <button type="button" class="btn btn-ghost btn-sm model-fetch-btn" :disabled="cfgFetchingModels" @click="fetchModels">
+                <Loader2 v-if="cfgFetchingModels" :size="13" class="animate-spin" />
+                <RefreshCw v-else :size="13" />
+                拉取模型
+              </button>
+            </div>
+            <div v-if="fetchedModels.length" class="model-fetch-list">
+              <button
+                v-for="m in fetchedModels" :key="m" type="button"
+                :class="['cfg-model-chip mono', { 'is-selected': modelSelected(m) }]"
+                @click="toggleFetchedModel(m)"
+              >{{ m }}</button>
+            </div>
+            <span v-if="fetchedModels.length" class="field-hint">已拉取 {{ fetchedModels.length }} 个模型，点击选择（可多选），再点一次取消。</span>
+          </label>
           <label v-if="cfgForm.service_type === 'text'" class="field">
             <span class="field-label">Temperature <span class="dim">(留空跟随服务商默认)</span></span>
             <input v-model="cfgForm.temperature" class="input" type="number" step="0.1" min="0" max="2" placeholder="如 0.6" />
@@ -435,7 +453,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Sparkles, Palette, ExternalLink, Star } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Sparkles, Palette, ExternalLink, Star, RefreshCw } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
@@ -462,6 +480,8 @@ const cfgDialog = ref(false)
 const cfgEditId = ref(null)
 const cfgTesting = ref(false)
 const cfgTestResult = ref(null)
+const cfgFetchingModels = ref(false)
+const fetchedModels = ref([])
 const huobaoApiKey = ref('')
 const huobaoSaving = ref(false)
 const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', modelStr: '', service_type: 'text', priority: 0, temperature: '' })
@@ -511,6 +531,7 @@ function applyProviderPreset(type, provider) {
   cfgForm.base_url = preset.baseUrl
   cfgForm.modelStr = preset.models.join(', ')
   cfgForm.name = `${preset.label}-${serviceMeta[type].label}`
+  fetchedModels.value = []
 }
 
 async function loadCfgs() { try { cfgs.value = await aiConfigAPI.list() } catch (e) { toast.error(e.message) } }
@@ -572,6 +593,7 @@ async function applyHuobaoQuickConfig() {
 function startAddCfg(t) {
   cfgEditId.value = null
   cfgTestResult.value = null
+  fetchedModels.value = []
   Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', modelStr: '', service_type: t, priority: 0, temperature: '' })
   const firstPreset = presetsByType(t)[0]
   if (firstPreset) applyProviderPreset(t, firstPreset.provider)
@@ -580,6 +602,7 @@ function startAddCfg(t) {
 function startEditCfg(c) {
   cfgEditId.value = c.id
   cfgTestResult.value = null
+  fetchedModels.value = []
   Object.assign(cfgForm, {
     name: c.name || '',
     provider: c.provider,
@@ -603,6 +626,40 @@ async function testCfgPayload(payload) {
     toast.error(e.message)
   } finally {
     cfgTesting.value = false
+  }
+}
+function modelSelected(m) {
+  return cfgForm.modelStr.split(',').map(s => s.trim()).filter(Boolean).includes(m)
+}
+function toggleFetchedModel(m) {
+  const list = cfgForm.modelStr.split(',').map(s => s.trim()).filter(Boolean)
+  const idx = list.indexOf(m)
+  if (idx >= 0) list.splice(idx, 1)
+  else list.push(m)
+  cfgForm.modelStr = list.join(', ')
+}
+async function fetchModels() {
+  if (!cfgForm.provider) { toast.warning('请先选择服务商'); return }
+  if (!cfgForm.base_url) { toast.warning('请先填写 Base URL'); return }
+  cfgFetchingModels.value = true
+  try {
+    const res = await aiConfigAPI.models({
+      service_type: cfgForm.service_type,
+      provider: cfgForm.provider,
+      api_key: cfgForm.api_key,
+      base_url: cfgForm.base_url,
+    })
+    if (res.ok && res.models?.length) {
+      fetchedModels.value = res.models
+      toast.success(`已拉取 ${res.models.length} 个模型，点击选择`)
+    } else {
+      fetchedModels.value = []
+      toast.warning(res.message || '未拉取到模型')
+    }
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    cfgFetchingModels.value = false
   }
 }
 async function testDraftCfg() {
@@ -1109,6 +1166,22 @@ onMounted(() => { loadCfgs(); loadAgents(); loadAllSkills(); loadStylePresets() 
   cursor: default;
 }
 .cfg-model-star { fill: currentColor; }
+.cfg-model-chip.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg, rgba(0,113,227,0.10));
+  color: var(--accent);
+  font-weight: 600;
+}
+.model-input-row { display: flex; gap: 8px; }
+.model-input-row .input { flex: 1; }
+.model-fetch-btn { flex-shrink: 0; white-space: nowrap; }
+.model-fetch-list {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  max-height: 120px; overflow-y: auto;
+  padding: 8px; border: 1px dashed var(--border); border-radius: var(--radius);
+  background: var(--bg-0);
+}
+.model-fetch-list .cfg-model-chip { padding: 3px 9px; font-size: 11px; }
 .config-empty { font-size: 12px; color: var(--text-3); padding: 14px 20px; }
 .config-switch { display: inline-flex; flex-shrink: 0; cursor: pointer; }
 .config-switch input:focus-visible + .switch { box-shadow: 0 0 0 3.5px var(--button-focus); }

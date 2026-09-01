@@ -113,6 +113,106 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
   }
 }
 
+/** 模型拉取候选端点序列：按 provider 优先官方格式，中转站(openai 兼容)格式兜底 */
+function buildModelProbes(provider: string, baseUrl: string, apiKey?: string) {
+  const p = provider.toLowerCase()
+  const probes: Array<{ method: string; url: string; headers: Record<string, string> }> = []
+  const push = (requiredPrefix: string, path: string, headers: Record<string, string>) => {
+    probes.push({ method: 'GET', url: joinProviderUrl(baseUrl, requiredPrefix, path), headers })
+  }
+
+  if (p === 'gemini') {
+    // 官方：v1beta/models?key=；new-api 中转：/v1/models Bearer 兜底
+    const url = new URL(joinProviderUrl(baseUrl, '/v1beta', '/models'))
+    if (apiKey) url.searchParams.set('key', apiKey)
+    probes.push({ method: 'GET', url: url.toString(), headers: {} })
+    push('/v1', '/models', bearerHeaders(apiKey))
+  } else if (p === 'volcengine') {
+    // ark 官方：/api/v3/models；中转站：/v1/models 兜底
+    push('/api/v3', '/models', bearerHeaders(apiKey))
+    push('/v1', '/models', bearerHeaders(apiKey))
+  } else if (p === 'minimax') {
+    // MiniMax 官方：/v2/models；兜底 /v1/models
+    push('/v2', '/models', bearerHeaders(apiKey))
+    push('/v1', '/models', bearerHeaders(apiKey))
+  } else {
+    // openai 系（官方与 openai 兼容中转站）
+    push('/v1', '/models', bearerHeaders(apiKey))
+  }
+  return probes
+}
+
+/** 兼容 openai(data[].id) 与 gemini(models[].name) 两种列表格式，name 去掉 models/ 前缀 */
+function parseModelIds(text: string): string[] | null {
+  try {
+    const json = JSON.parse(text)
+    const arr = Array.isArray(json.data) ? json.data : Array.isArray(json.models) ? json.models : null
+    if (!arr) return null
+    const ids = arr
+      .map((item: any) => String(item?.id ?? item?.name ?? '').replace(/^models\//, ''))
+      .filter(Boolean)
+    return ids.length ? ids : null
+  } catch {
+    return null
+  }
+}
+
+// POST /ai-configs/models — 拉取该 Base URL 下可用的模型列表
+app.post('/models', async (c) => {
+  const body = await c.req.json()
+  if (!body.service_type || !body.provider || !body.base_url) {
+    return badRequest(c, 'service_type, provider and base_url are required')
+  }
+  if (!isOfficialProvider(body.service_type, body.provider)) {
+    return badRequest(c, 'Unsupported service_type/provider')
+  }
+
+  const provider = body.provider.toLowerCase()
+  if (provider === 'autodl') {
+    return success(c, { ok: true, models: [], source: 'fixed', message: 'AutoDL 为固定 H3 工作流模型，无需拉取' })
+  }
+
+  const probes = buildModelProbes(provider, body.base_url, body.api_key)
+  let lastError: string | null = null
+  for (const probe of probes) {
+    const probeUrl = redactUrl(probe.url)
+    logTaskProgress('AIConfig', 'models-fetch-start', { provider, url: probeUrl })
+    try {
+      const resp = await fetch(probe.url, {
+        method: probe.method,
+        headers: probe.headers,
+        signal: AbortSignal.timeout(10000),
+      })
+      const text = await resp.text()
+      if (resp.status === 401 || resp.status === 403) {
+        logTaskError('AIConfig', 'models-fetch-unauthorized', { provider, status: resp.status, url: probeUrl })
+        return success(c, { ok: false, models: [], source: probeUrl, message: 'API Key 无效或未填写' })
+      }
+      if (!resp.ok) {
+        lastError = `HTTP ${resp.status}`
+        continue
+      }
+      const models = parseModelIds(text)
+      if (!models) {
+        lastError = 'response format unexpected'
+        continue
+      }
+      logTaskSuccess('AIConfig', 'models-fetch-done', { provider, count: models.length, url: probeUrl })
+      return success(c, { ok: true, models, source: probeUrl })
+    } catch (error: any) {
+      lastError = error.message
+      logTaskError('AIConfig', 'models-fetch-failed', { provider, url: probeUrl, error: error.message })
+    }
+  }
+  logTaskError('AIConfig', 'models-fetch-none', { provider, error: lastError })
+  return success(c, {
+    ok: false,
+    models: [],
+    source: '',
+    message: `无法从该 Base URL 拉取模型：${lastError || '未知错误'}`,
+  })
+})
+
 // GET /ai-configs?service_type=text
 app.get('/', async (c) => {
   const serviceType = c.req.query('service_type')
