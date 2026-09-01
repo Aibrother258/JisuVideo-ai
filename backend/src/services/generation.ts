@@ -12,6 +12,8 @@ import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import { invalidateH3ForCharacter, invalidateH3ForProp, invalidateH3ForScene, invalidateH3ForStoryboards } from './h3-source.js'
 import type { AIConfig } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
+import { withRetry } from '../utils/retry.js'
+import { videoSlot, imageSlot } from '../utils/concurrency.js'
 
 type TaskType = 'image' | 'video'
 
@@ -197,21 +199,47 @@ function parseTaskParams(raw: string | null | undefined): Record<string, any> {
 }
 
 async function processTask(id: number, config: AIConfig) {
-  try {
-    const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
-    if (!record) return
-    const type = record.type as TaskType
-    const label = taskLabel(type)
-    const params = parseTaskParams(record.params)
-    logTaskProgress(label, 'build-request', {
-      id,
-      provider: config.provider,
-      storyboardId: record.storyboardId,
-      sceneId: record.sceneId,
-      characterId: record.characterId,
-    })
+  const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!record || record.status !== 'processing') return
+  const type = record.type as TaskType
+  const label = taskLabel(type)
+  const slots = type === 'image' ? imageSlot : videoSlot
 
-    let url: string, method: string, headers: Record<string, string>, body: unknown
+  // 并发控制：超过厂商配额的生成任务排队等待，防止批量提交打爆 API
+  await slots.acquire({ id, type })
+
+  try {
+    if (record.taskId) {
+      // 启动恢复路径：上游任务 ID 可能仍有效，直接续轮询而非重新提交（避免重复扣费）
+      logTaskProgress(label, 'resume-poll', { id, taskId: record.taskId, provider: config.provider })
+      await markPolling(id, record.taskId)
+      await pollTask(record, config, record.taskId)
+      return
+    }
+    await runTask(record, config)
+  } catch (err: any) {
+    logTaskError(label, 'process', { id, error: err.message })
+    await failTask(id, err.message)
+  } finally {
+    slots.release({ id, type })
+  }
+}
+
+/** 任务主体：构建并提交生成请求，处理同步结果或进入轮询 */
+async function runTask(record: SysTaskRecord, config: AIConfig) {
+  const id = record.id
+  const type = record.type as TaskType
+  const label = taskLabel(type)
+  const params = parseTaskParams(record.params)
+  logTaskProgress(label, 'build-request', {
+    id,
+    provider: config.provider,
+    storyboardId: record.storyboardId,
+    sceneId: record.sceneId,
+    characterId: record.characterId,
+  })
+
+  let url: string, method: string, headers: Record<string, string>, body: unknown
 
     if (type === 'image') {
       const adapter = getImageAdapter(config.provider)
@@ -260,14 +288,21 @@ async function processTask(id: number, config: AIConfig) {
     })
     logTaskPayload(label, 'request payload', { id, method, url, headers, body })
 
-    const resp = await fetch(url, {
-      method,
-      headers,
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(600_000),
-    })
-
-    if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`)
+    // 创建请求：网络错误/5xx/429/超时自动重试（最多 3 次尝试），4xx 业务错误不重试
+    const resp = await withRetry(async () => {
+      const r = await fetch(url, {
+        method,
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(600_000),
+      })
+      if (!r.ok) {
+        const err: any = new Error(`API error ${r.status}: ${await r.text()}`)
+        err.status = r.status
+        throw err
+      }
+      return r
+    }, { retries: 2, baseDelayMs: 2000, scope: label, action: 'create-request', meta: { id, provider: config.provider } })
     const result = await resp.json() as any
     logTaskPayload(label, 'response payload', { id, provider: config.provider, result })
 
@@ -293,7 +328,7 @@ async function processTask(id: number, config: AIConfig) {
       }
 
       await markPolling(id, taskId)
-      pollTask(record, config, taskId!)
+      await pollTask(record, config, taskId!)
       return
     }
 
@@ -307,10 +342,7 @@ async function processTask(id: number, config: AIConfig) {
     }
 
     await markPolling(id, taskId)
-    pollTask(record, config, taskId!)
-  } catch (err: any) {
-    await failTask(id, err.message)
-  }
+    await pollTask(record, config, taskId!)
 }
 
 async function markPolling(id: number, taskId: string | undefined) {
@@ -355,12 +387,20 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
       const remainingMs = profile.maxDurationMs
         ? Math.max(1_000, profile.maxDurationMs - (Date.now() - startedAt))
         : 600_000
-      const resp = await fetch(url, {
-        method,
-        headers,
-        signal: AbortSignal.timeout(remainingMs),
-      })
-      if (!resp.ok) continue
+      // 单次轮询请求：网络错误/5xx/超时内重试 1 次，仍失败则交给外层循环等待下一轮
+      const resp = await withRetry(async () => {
+        const r = await fetch(url, {
+          method,
+          headers,
+          signal: AbortSignal.timeout(remainingMs),
+        })
+        if (!r.ok) {
+          const err: any = new Error(`poll HTTP ${r.status}`)
+          err.status = r.status
+          throw err
+        }
+        return r
+      }, { retries: 1, baseDelayMs: 1000, scope: label, action: 'poll-request', meta: { id: record.id, taskId, attempt: i + 1 } })
       const result = await resp.json() as any
 
       // 图片/视频 PollResponse 结构不同，这里统一按 any 取值后按 type 分支
@@ -407,7 +447,7 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
 }
 
 async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
-  const localPath = await downloadFile(imageUrl, 'images')
+  const localPath = await downloadFile(imageUrl, 'images', { maxBytes: 50 * 1024 * 1024 })
   // 列表页缩略图（前端按命名约定推导地址，失败不影响主流程）
   await generateImageThumb(localPath)
 
@@ -463,7 +503,8 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
 }
 
 async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, duration: number | null | undefined) {
-  const localPath = await downloadFile(videoUrl, 'videos')
+  // 视频下载流式写盘；上限 2GB、单次 10 分钟超时，网络中断自动重试（storage 内部处理）
+  const localPath = await downloadFile(videoUrl, 'videos', { maxBytes: 2 * 1024 * 1024 * 1024, timeoutMs: 600_000 })
   // 海报帧供列表/封面展示，避免前端为显示首帧缓冲整个视频
   await extractVideoPoster(localPath)
   await db.update(schema.sysTask)
@@ -571,4 +612,68 @@ async function resolveReferenceMediaUrls(refs: string[] | null | undefined, kind
   if (!Array.isArray(refs) || !refs.length) return []
   const items = Array.from(new Set(refs.map((item) => String(item || '').trim()).filter(Boolean)))
   return items.map((item) => resolveReferenceMediaUrl(item, kind)).filter((item): item is string => !!item)
+}
+
+// ─── 启动恢复 ─────────────────────────────────────────────────────
+
+/**
+ * 恢复单个中断的生成任务（服务重启后调用）。
+ * - 任务已有上游 taskId → 直接续轮询（上游任务可能仍在生成，避免重复提交扣费）
+ * - 任务还在创建阶段（无 taskId）→ 重新走完整提交流程
+ * 通过 processTask 统一受并发信号量约束。
+ */
+export async function resumeTaskById(id: number): Promise<void> {
+  const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!record || record.status !== 'processing') return
+  const type = record.type as TaskType
+  const label = taskLabel(type)
+
+  const config = await findConfigForTask(record)
+  if (!config) {
+    await failTask(id, '服务重启后未找到可用的模型配置，任务已标记失败，请重新生成')
+    return
+  }
+  logTaskProgress(label, 'resume', { id, type, hasTaskId: !!record.taskId, provider: config.provider })
+  await processTask(id, config)
+}
+
+/**
+ * 为恢复的任务查找可用模型配置。
+ * 优先精确匹配：同 provider 且模型列表包含该任务所用模型的启用配置（保住集锁定的配置语义）；
+ * 找不到再回退到当前启用配置（保证任务能继续，配置差异由模型侧容错）。
+ */
+async function findConfigForTask(record: SysTaskRecord): Promise<AIConfig | null> {
+  const type = record.type as TaskType
+  if (record.provider && record.model) {
+    try {
+      const rows = await db.select().from(schema.aiServiceConfigs)
+        .where(eq(schema.aiServiceConfigs.serviceType, type))
+      const matched = rows.find(r => {
+        if (!r.isActive || r.provider !== record.provider) return false
+        try {
+          const models: string[] = JSON.parse(r.model || '[]')
+          return models.includes(record.model!)
+        } catch {
+          return false
+        }
+      })
+      if (matched) {
+        logTaskProgress('SysTask', 'resume-config-matched', {
+          id: record.id,
+          configId: matched.id,
+          provider: matched.provider,
+          model: record.model,
+        })
+        return {
+          provider: matched.provider!,
+          baseUrl: matched.baseUrl,
+          apiKey: matched.apiKey,
+          model: record.model!,
+        }
+      }
+    } catch (err) {
+      logTaskWarn('SysTask', 'resume-config-lookup-failed', { id: record.id, error: (err as Error).message })
+    }
+  }
+  return getActiveConfig(type)
 }
