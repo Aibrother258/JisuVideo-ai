@@ -1,16 +1,13 @@
 <template>
   <div class="page">
-    <div class="launcher-hero">
-      <div class="head-left">
-        <h1 class="launcher-title">项目启动台</h1>
-        <p class="launcher-sub">从一个创意到一部短剧，AI 全流程为你代工</p>
-        <div class="hero-stats">
-          <span class="tag">{{ dramas.length }} 个项目</span>
-          <span class="tag tag-success">{{ dramas.filter(d => currentStatus(d) === 'active').length }} 进行中</span>
-          <span class="tag tag-accent">{{ stylePresets.length }} 种视觉风格</span>
-        </div>
+    <div class="home-top">
+      <h1 class="home-title">项目启动台</h1>
+      <div class="home-stats" aria-label="项目统计">
+        <span class="home-stat"><i class="dot is-blue"></i>{{ dramas.length }} 个项目</span>
+        <span class="home-stat"><i class="dot is-green"></i>{{ statActive }} 进行中</span>
+        <span class="home-stat"><i class="dot is-gray"></i>{{ statDraft }} 待开始</span>
       </div>
-      <button class="btn btn-primary" @click="openCreateDialog">
+      <button class="btn btn-primary home-new" @click="openCreateDialog">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -18,6 +15,8 @@
       </button>
     </div>
 
+    <div class="ws-grid">
+      <main class="ws-main">
     <div class="toolbar">
       <label class="search-box">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -74,8 +73,10 @@
         @keydown.enter.prevent="openDrama(d)"
         @keydown.space.prevent="openDrama(d)"
       >
-        <div class="project-thumb" aria-hidden="true">
-          <Film :size="34" :stroke-width="1.4" />
+        <div class="project-thumb" aria-hidden="true" :style="coverStyle(d.style)">
+          <Film v-if="!coverGradient(d.style)" class="cover-film" :size="34" :stroke-width="1.4" />
+          <div v-else class="cover-glyph">{{ coverGlyph(d.title) }}</div>
+          <span v-if="coverGradient(d.style) && styleLabel(d.style)" class="cover-style-name">{{ styleLabel(d.style) }}</span>
           <div class="status-wrap" @click.stop>
             <button type="button" class="cover-badge tag status-badge" title="点击标记项目状态" @click="statusMenuId = statusMenuId === d.id ? null : d.id">
               <span class="status-dot" :class="statusDotClass(d)"></span>
@@ -115,6 +116,12 @@
               <Clock :size="11" :stroke-width="1.8" />
               {{ fmtDate(d.updated_at || d.updatedAt) }}
             </span>
+            <button
+              v-if="continueEpisodeNumber(d)"
+              type="button"
+              class="go-episode"
+              @click.stop="openEpisode(d, continueEpisodeNumber(d))"
+            >继续 → 第 {{ continueEpisodeNumber(d) }} 集</button>
           </div>
         </div>
       </article>
@@ -132,8 +139,81 @@
       <p class="empty-desc">{{ dramas.length ? '调整搜索词或筛选条件。' : '创建后选择集开始制作。' }}</p>
       <button v-if="!dramas.length" class="btn btn-primary" @click="openCreateDialog">新建项目</button>
     </div>
+    </main>
 
-    <div v-if="showCreate" class="overlay" @click.self="closeCreateDialog">
+    <!-- 侧栏：继续上次 / 制作进度 / 风格灵感 -->
+    <aside v-if="showRail" class="ws-rail">
+      <section class="card rail-card">
+        <div class="rail-head">
+          <span class="rail-title">继续上次制作</span>
+          <span class="rail-hint">最近更新</span>
+        </div>
+        <div v-if="resumeDrama" class="rail-body">
+          <div class="resume-row">
+            <div class="resume-thumb" aria-hidden="true" :style="coverStyle(resumeDrama.style)">
+              <Film v-if="!coverGradient(resumeDrama.style)" :size="20" :stroke-width="1.5" />
+              <span v-else>{{ coverGlyph(resumeDrama.title) }}</span>
+            </div>
+            <div class="resume-main">
+              <div class="resume-title truncate">{{ resumeDrama.title }}</div>
+              <div class="resume-sub">
+                {{ styleLabel(resumeDrama.style) || '未定风格' }}
+                <span class="status-dot-mini" :class="statusDotClass(resumeDrama)"></span>{{ projectStatus(resumeDrama) }}
+              </div>
+              <button v-if="continueEpisodeNumber(resumeDrama)" class="btn btn-primary btn-sm resume-go" @click="openEpisode(resumeDrama, continueEpisodeNumber(resumeDrama))">
+                继续第 {{ continueEpisodeNumber(resumeDrama) }} 集
+              </button>
+              <button v-else class="btn btn-primary btn-sm resume-go" @click="openDrama(resumeDrama)">打开项目</button>
+            </div>
+          </div>
+        </div>
+        <div v-else class="rail-body">
+          <p class="rail-empty">还没有进行中的项目，点「新建项目」开一部。</p>
+        </div>
+      </section>
+
+      <section class="card rail-card">
+        <div class="rail-head">
+          <span class="rail-title">制作概况</span>
+          <span class="rail-hint">跨项目资产合计</span>
+        </div>
+        <div class="rail-body">
+          <div class="stat-grid">
+            <div v-for="s in railStats" :key="s.label" class="stat-cell">
+              <b>{{ s.value }}</b><span>{{ s.label }}</span>
+            </div>
+          </div>
+          <div class="rail-foot-note">进行中 {{ statActive }} · 待开始 {{ statDraft }} · 已完成 {{ statDone }}</div>
+        </div>
+      </section>
+
+      <section class="card rail-card">
+        <div class="rail-head">
+          <span class="rail-title">风格灵感</span>
+          <button type="button" class="rail-action" @click="openCreateDialog">＋ 新建</button>
+        </div>
+        <div class="rail-body style-rail-body">
+          <div v-if="stylePresets.length" class="style-grid">
+            <button
+              v-for="(p, i) in stylePresets.slice(0, 6)"
+              :key="p.value"
+              type="button"
+              class="style-swatch"
+              :style="coverStyle(p.value)"
+              :title="`用「${p.name}」风格新建项目`"
+              @click="openCreateWithStyle(p, i)"
+            >
+              <span class="style-swatch-name">{{ p.name }}</span>
+            </button>
+          </div>
+          <p v-else class="rail-empty">暂无风格预设，去设置页添加。</p>
+        </div>
+      </section>
+    </aside>
+    </div>
+  </div>
+
+  <div v-if="showCreate" class="overlay" @click.self="closeCreateDialog">
       <div class="dialog create-dialog">
         <div class="dialog-head">
           <div class="modal-icon">
@@ -361,15 +441,15 @@
         </form>
       </div>
     </div>
-    <ConfirmDialog
-      :open="!!dramaToDelete"
-      title="删除项目"
-      :message="`确定删除「${dramaToDelete?.title}」？项目下的剧集、分镜与生成记录将一并删除，此操作不可恢复。`"
-      :loading="deletingDrama"
-      @confirm="confirmDelDrama"
-      @cancel="dramaToDelete = null"
-    />
-  </div>
+
+  <ConfirmDialog
+    :open="!!dramaToDelete"
+    title="删除项目"
+    :message="`确定删除「${dramaToDelete?.title}」？项目下的剧集、分镜与生成记录将一并删除，此操作不可恢复。`"
+    :loading="deletingDrama"
+    @confirm="confirmDelDrama"
+    @cancel="dramaToDelete = null"
+  />
 </template>
 
 <script setup>
@@ -405,6 +485,8 @@ const confirmNewStyle = ref(false)
 const customStyleActive = ref(false)
 const customStyle = reactive({ name: '', prompt: '' })
 const stylePresets = ref([])
+// 「风格灵感」点击后锁定的预设：粘贴内容完成 AI 提炼时优先采用该风格
+const inspirationStyle = ref(null)
 const sourceMethods = [
   { label: '粘贴内容', value: 'paste', icon: ClipboardPaste },
   { label: '上传 TXT / MD', value: 'file', icon: Upload },
@@ -465,8 +547,74 @@ async function setDramaStatus(d, status) {
   }
 }
 
+// —— 工作台统计：全部来自真实列表数据 ——
+const statActive = computed(() => dramas.value.filter(d => currentStatus(d) === 'active').length)
+const statDraft = computed(() => dramas.value.filter(d => currentStatus(d) === 'draft').length)
+const statDone = computed(() => dramas.value.filter(d => currentStatus(d) === 'completed').length)
+
+function dramaUpdatedAt(d) {
+  return new Date(d.updated_at || d.updatedAt || 0).getTime() || 0
+}
+
+// 侧栏「继续上次制作」：最近更新且未完成的项目（全部完成时才退回最近更新的项目）
+const resumeDrama = computed(() => {
+  if (!dramas.value.length) return null
+  const sorted = [...dramas.value].sort((a, b) => dramaUpdatedAt(b) - dramaUpdatedAt(a))
+  return sorted.find(d => currentStatus(d) !== 'completed') || sorted[0]
+})
+
+const showRail = computed(() => !loading.value && !loadError.value && (dramas.value.length > 0 || stylePresets.value.length > 0))
+
+// 侧栏「制作概况」：跨项目资产合计（集 / 角色 / 场景）
+const railStats = computed(() => {
+  const sum = (key) => dramas.value.reduce((acc, d) => acc + (Number(d[key]) || 0), 0)
+  return [
+    { label: '剧集总数', value: sum('total_episodes') },
+    { label: '角色合计', value: sum('character_count') },
+    { label: '场景合计', value: sum('scene_count') },
+  ]
+})
+
 function styleLabel(key) {
   return stylePresets.value.find(p => p.value === key)?.name || key || ''
+}
+
+// —— 封面色卡：按风格 key 映射渐变；未知/自定义 key 用哈希取兜底色，不依赖任何假数据 ——
+const COVER_GRADIENTS = {
+  '3d': 'linear-gradient(135deg, #4f46e5 0%, #0ea5e9 55%, #22d3ee 100%)',
+  'anime': 'linear-gradient(135deg, #a855f7 0%, #ec4899 60%, #f43f5e 100%)',
+  'ghibli': 'linear-gradient(135deg, #16a34a 0%, #22c55e 55%, #84cc16 100%)',
+  'watercolor': 'linear-gradient(135deg, #f472b6 0%, #e879f9 55%, #818cf8 100%)',
+  'comic': 'linear-gradient(135deg, #f97316 0%, #ef4444 55%, #e11d48 100%)',
+}
+const COVER_FALLBACK = [
+  'linear-gradient(135deg, #0f2027 0%, #203a43 55%, #2c5364 100%)',
+  'linear-gradient(135deg, #42275a 0%, #734b6d 100%)',
+  'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)',
+  'linear-gradient(135deg, #355c7d 0%, #6c5b7b 55%, #c06c84 100%)',
+  'linear-gradient(135deg, #1f4037 0%, #377d63 100%)',
+  'linear-gradient(135deg, #283c86 0%, #3f6ed8 100%)',
+  'linear-gradient(135deg, #5f2c82 0%, #49a09d 100%)',
+  'linear-gradient(135deg, #141e30 0%, #35577d 100%)',
+]
+function hashStyleKey(key) {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+  return h
+}
+function coverGradient(style) {
+  return !!String(style || '').trim()
+}
+function coverStyle(style) {
+  const key = String(style || '').trim()
+  if (!key) return {}
+  const named = COVER_GRADIENTS[key]
+  return { background: named || COVER_FALLBACK[hashStyleKey(key) % COVER_FALLBACK.length] }
+}
+function coverGlyph(title) {
+  const text = String(title || '').trim()
+  if (!text) return '剧'
+  return Array.from(text)[0]
 }
 
 const filteredDramas = computed(() => {
@@ -507,11 +655,20 @@ function openCreateDialog() {
   importedSourceName.value = ''
   importedSourceUrl.value = ''
   analysis.value = null
+  inspirationStyle.value = null
   confirmNewStyle.value = false
   customStyleActive.value = false
   customStyle.name = ''
   customStyle.prompt = ''
   showCreate.value = true
+}
+
+// 点击「风格灵感」色板：预选该预设，粘贴原文完成 AI 提炼后默认采用它
+function openCreateWithStyle(preset) {
+  if (!preset?.value) return
+  openCreateDialog()
+  inspirationStyle.value = preset
+  toast.success(`已预选风格「${preset.name}」，提炼方案后默认采用，仍可手动修改`)
 }
 
 function closeCreateDialog() {
@@ -603,10 +760,26 @@ async function analyzeSource() {
   try {
     analyzing.value = true
     const result = await dramaAPI.analyzeSource(sourceContent.value.trim())
-    analysis.value = result
     form.value.title = result.titles?.[0]?.title || ''
-    const recommendedStyle = result.style_candidates?.find(item => item.recommended) || result.style_candidates?.[0]
-    form.value.style = recommendedStyle?.value || stylePresets.value[0]?.value || ''
+    // 「风格灵感」锁定的风格优先采用；否则跟随 AI 推荐
+    const locked = inspirationStyle.value
+    if (locked && stylePresets.value.some(s => s.value === locked.value)) {
+      const alreadySuggested = (result.style_candidates || []).some(item => item.value === locked.value)
+      analysis.value = alreadySuggested
+        ? result
+        : {
+            ...result,
+            style_candidates: [
+              { value: locked.value, name: locked.name, description: locked.description, reason: '你选择的灵感风格，已默认采用', source: 'existing' },
+              ...(result.style_candidates || []),
+            ],
+          }
+      form.value.style = locked.value
+    } else {
+      analysis.value = result
+      const recommendedStyle = result.style_candidates?.find(item => item.recommended) || result.style_candidates?.[0]
+      form.value.style = recommendedStyle?.value || stylePresets.value[0]?.value || ''
+    }
     const recommendedRatio = result.aspect_ratios?.find(item => item.recommended) || result.aspect_ratios?.[0]
     form.value.aspect_ratio = recommendedRatio?.value || '9:16'
     confirmNewStyle.value = false
@@ -626,7 +799,10 @@ async function analyzeThreeStyles() {
     const result = await dramaAPI.analyzeSource(sourceContent.value.trim())
     analysis.value = { ...analysis.value, style_candidates: result.style_candidates || [] }
     const first = result.style_candidates?.[0]
-    if (first) selectStyle(first)
+    if (first) {
+      inspirationStyle.value = null // 用户主动要求 AI 重匹配，放弃灵感锁定的默认风格
+      selectStyle(first)
+    }
     toast.success('已根据全文重新匹配 3 个视觉风格')
   } catch (e) {
     toast.error(e.message)
@@ -696,25 +872,31 @@ function toggleMenu(id) {
   activeMenuId.value = activeMenuId.value === id ? null : id
 }
 
-function getEpisodeNumber(d) {
-  const episodes = [...(d.episodes || [])]
-  if (!episodes.length) return 1
-  episodes.sort((a, b) => Number(a.episode_number || a.episodeNumber || 1) - Number(b.episode_number || b.episodeNumber || 1))
-  return Number(episodes[0].episode_number || episodes[0].episodeNumber || 1)
-}
-
 function getDramaPath(d) {
   return `/drama/${d.id}`
 }
 
 function openDrama(d) {
   activeMenuId.value = null
+  statusMenuId.value = null
   navigateTo(getDramaPath(d))
 }
 
-function latestEpisodeLabel(d) {
-  if (!d.episodes?.length) return '暂无剧集'
-  return `第 ${getEpisodeNumber(d)} 集`
+// 最近可继续的集号：项目已建剧集的最高集号；未建集时返回 null（按钮隐藏/改为打开项目）
+function continueEpisodeNumber(d) {
+  const numbers = (d.episodes || [])
+    .map(e => Number(e.episode_number || e.episodeNumber || 0))
+    .filter(n => n > 0)
+  if (!numbers.length) return null
+  return Math.max(...numbers)
+}
+
+// 直达剧集工作台：/drama/:id/episode/:集号
+function openEpisode(d, episodeNumber) {
+  if (!d || !episodeNumber) return
+  activeMenuId.value = null
+  statusMenuId.value = null
+  navigateTo(`/drama/${d.id}/episode/${episodeNumber}`)
 }
 
 function fmtDate(s) {
@@ -741,22 +923,212 @@ onMounted(load)
   background: var(--surface-base);
 }
 
-.launcher-hero {
+.home-top {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--sp-6);
-  padding: var(--sp-4) 0 var(--sp-6);
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-2) 0 var(--sp-6);
 }
-.head-left { display: flex; flex-direction: column; }
-.launcher-title {
-  font-size: 32px;
+.home-title {
+  margin: 0;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text-0);
 }
-.launcher-sub { color: var(--text-2); font-size: 14px; margin-top: 4px; }
-.hero-stats { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
+.home-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
+}
+.home-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.home-stat .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  flex-shrink: 0;
+}
+.home-stat .dot.is-blue { background: var(--accent); }
+.home-stat .dot.is-green { background: var(--success); }
+.home-stat .dot.is-gray { background: var(--text-3); }
+.home-new { margin-left: auto; }
+
+.ws-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: var(--sp-6);
+  align-items: start;
+}
+.ws-main { min-width: 0; }
+.ws-rail {
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
+  position: sticky;
+  top: 0;
+}
+.rail-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-5);
+}
+.rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.rail-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-0);
+}
+.rail-hint { font-size: 10.5px; color: var(--text-3); }
+.rail-action {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: 600 11.5px var(--font-body);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.rail-action:hover { text-decoration: underline; }
+.resume-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.resume-thumb {
+  position: relative;
+  width: 92px;
+  height: 54px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 19px;
+  font-weight: 800;
+  overflow: hidden;
+  background: linear-gradient(135deg, #eef1f6, #dce4f0);
+  box-shadow: var(--shadow-xs);
+}
+.resume-thumb svg { color: #6a7ba0; opacity: 0.85; }
+.resume-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.resume-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-0);
+}
+.resume-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.resume-sub .truncate { min-width: 0; }
+.status-dot-mini {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  flex-shrink: 0;
+}
+.status-dot-mini.on { background: var(--success); }
+.status-dot-mini.done { background: var(--accent); }
+.resume-go { margin-top: 4px; align-self: flex-start; }
+.rail-empty { font-size: 12px; color: var(--text-3); line-height: 1.65; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 9px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+}
+.stat-cell b {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-0);
+  line-height: 1.2;
+}
+.stat-cell span { font-size: 10px; color: var(--text-3); }
+.rail-foot-note {
+  margin-top: 2px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.style-swatch {
+  appearance: none;
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+  transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+}
+.style-swatch:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.style-swatch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--button-focus);
+}
+.style-swatch-name {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 5px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
 
 .toolbar {
   display: flex;
@@ -836,8 +1208,34 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e3edff;
-  color: #4a6fb5;
+  background: linear-gradient(135deg, #eef1f6, #dce4f0);
+  color: #6a7ba0;
+}
+.cover-film { opacity: 0.75; }
+.cover-glyph {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
+  user-select: none;
+}
+.cover-style-name {
+  position: absolute;
+  left: 10px;
+  bottom: 9px;
+  max-width: calc(100% - 20px);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cover-badge {
   position: absolute;
@@ -956,6 +1354,24 @@ onMounted(load)
   font-size: 11px;
   color: var(--text-3);
   white-space: nowrap;
+}
+.go-episode {
+  appearance: none;
+  border: none;
+  background: transparent;
+  margin-left: auto;
+  padding: 0;
+  flex: 0 0 auto;
+  font: 600 11px/1 var(--font-body);
+  color: var(--accent-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.go-episode:hover { text-decoration: underline; }
+.go-episode:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--button-focus);
 }
 
 .skeleton-card { overflow: hidden; }
@@ -1224,14 +1640,18 @@ onMounted(load)
 .ratio-choice > svg:last-child { margin-left: auto; flex: 0 0 auto; color: var(--accent); }
 .plan-foot .btn:first-child { margin-right: auto; }
 
+@media (max-width: 1100px) {
+  .ws-grid { grid-template-columns: minmax(0, 1fr) 300px; gap: var(--sp-4); }
+}
+@media (max-width: 940px) {
+  .ws-grid { grid-template-columns: minmax(0, 1fr); }
+  .ws-rail { display: none; }
+}
 @media (max-width: 760px) {
   .page { padding: 24px 16px 40px; }
-  .launcher-hero {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--sp-4);
-  }
-  .launcher-hero .btn { width: 100%; }
+  .home-top { flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
+  .home-stats { order: 3; width: 100%; justify-content: center; }
+  .home-new { margin-left: auto; }
   .toolbar { flex-wrap: wrap; }
   .search-box { width: 100%; flex: 1 1 100%; }
   .sort-select { margin-left: 0; flex: 1; }

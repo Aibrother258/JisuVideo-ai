@@ -1,8 +1,11 @@
 <template>
   <div class="settings-page">
-    <h1 class="page-title">设置中心</h1>
+    <div class="page-head">
+      <h1 class="page-title">设置中心</h1>
+      <p class="page-head-sub">服务、风格预设与 Agent 提示词统一在这里维护，保存即生效</p>
+    </div>
     <div class="settings-layout">
-      <aside class="settings-nav">
+      <aside class="settings-nav" :style="{ width: `${navWidth}px` }">
         <div v-for="g in navGroups" :key="g.id" class="nav-group">
           <div class="nav-group-label">{{ g.label }}</div>
           <button
@@ -18,32 +21,116 @@
         </div>
       </aside>
 
+      <div
+        class="pane-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        tabindex="0"
+        :aria-valuenow="navWidth"
+        aria-valuemin="168"
+        aria-valuemax="300"
+        aria-label="调整一级导航宽度"
+        @pointerdown="startPaneResize('nav', $event)"
+        @dblclick="resetPaneWidth('nav')"
+        @keydown="onPaneResizeKey('nav', $event)"
+      />
+
+      <!-- 中间二级目录：当前 tab 下的章节 / Agent 子列表 -->
+      <aside class="settings-subnav" :style="{ width: `${subWidth}px` }" aria-label="二级目录">
+        <div class="subnav-head">
+          <component :is="curTabMeta.icon" :size="15" class="subnav-head-icon" />
+          <div class="subnav-head-copy">
+            <div class="subnav-title">{{ curTabMeta.title }}</div>
+            <div class="subnav-desc">{{ curTabMeta.desc }}</div>
+          </div>
+        </div>
+        <div class="subnav-body">
+          <template v-if="tab !== 'skills'">
+            <div v-if="tab === 'agents' && agentsLoading" class="subnav-loading">
+              <div v-for="i in 3" :key="i" class="subnav-skel-row">
+                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:72%;height:12px"></div>
+              </div>
+            </div>
+            <div v-else-if="tab === 'agents' && agentsError" class="subnav-error">
+              <span>Agent 列表加载失败</span>
+              <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="11" /> 重试</button>
+            </div>
+            <p v-else-if="tab === 'agents' && !agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            <div v-else-if="tab === 'styles' && styleLoading" class="subnav-loading">
+              <div v-for="i in 4" :key="i" class="subnav-skel-row">
+                <div class="app-skeleton-line" style="width:14px;height:14px;border-radius:6px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:70%;height:12px"></div>
+              </div>
+            </div>
+            <div v-else-if="tab === 'styles' && styleError" class="subnav-error">
+              <span>风格预设加载失败</span>
+              <button class="btn btn-ghost btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="11" /> 重试</button>
+            </div>
+            <p v-else-if="tab === 'styles' && !stylePresets.length" class="config-empty">暂无风格预设</p>
+            <button
+              v-else
+              v-for="it in subItems"
+              :key="it.id"
+              :class="['subnav-item', { active: isSubActive(it) }]"
+              @click="onSubNavClick(it)"
+            >
+              <span v-if="it.icon" class="subnav-item-icon">{{ it.icon }}</span>
+              <span class="subnav-item-label">{{ it.label }}</span>
+              <span v-if="it.count != null" class="subnav-count">{{ it.count }}</span>
+            </button>
+          </template>
+          <template v-else>
+            <div class="subnav-group-title">Agent 列表</div>
+            <div v-if="agentsLoading" class="subnav-loading">
+              <div v-for="i in 3" :key="i" class="subnav-skel-row">
+                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:72%;height:12px"></div>
+              </div>
+            </div>
+            <div v-else-if="agentsError" class="subnav-error">
+              <span>Agent 列表加载失败</span>
+              <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="11" /> 重试</button>
+            </div>
+            <p v-else-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            <button
+              v-else
+              v-for="a in agentList"
+              :key="a.type"
+              :class="['subnav-item', { active: selectedAgent === a.type }]"
+              @click="selectAgent(a.type)"
+            >
+              <span class="subnav-item-icon">{{ a.icon }}</span>
+              <span class="subnav-item-label">{{ a.label }}</span>
+              <span v-if="agentSkillCount(a.type) > 0" class="subnav-count">{{ agentSkillCount(a.type) }}</span>
+            </button>
+          </template>
+        </div>
+        <div class="subnav-foot">拖动两侧分隔条调节面板宽度，双击恢复默认</div>
+      </aside>
+
+      <div
+        class="pane-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        tabindex="0"
+        :aria-valuenow="subWidth"
+        aria-valuemin="168"
+        aria-valuemax="360"
+        aria-label="调整二级目录宽度"
+        @pointerdown="startPaneResize('sub', $event)"
+        @dblclick="resetPaneWidth('sub')"
+        @keydown="onPaneResizeKey('sub', $event)"
+      />
+
       <div class="settings-content">
 
         <!-- ===== AI 服务配置 ===== -->
-        <div v-if="tab === 'ai'" class="settings-scroll">
+        <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
-            <h2 class="settings-title">AI 服务配置</h2>
-            <p class="settings-desc">先用推荐模板快速落配置，再按服务类型微调。工作台创建集时会锁定所选图片和视频能力。</p>
+            <h2 class="settings-title">AI 服务</h2>
+            <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；启用后即可被工作台自动采用，弹窗内有推荐模板可选。</p>
           </div>
-          <section class="card setup-panel">
-            <div class="setup-panel-head compact">
-              <div>
-                <div class="setup-title">手动模板</div>
-                <div class="setup-desc">选择服务类型后，直接用模板填充推荐的 `provider / base URL / model`。</div>
-              </div>
-            </div>
-            <div class="template-row">
-              <button
-                v-for="st in serviceTypes"
-                :key="st.type"
-                class="template-type-chip"
-                @click="startAddCfg(st.type)"
-              >
-                {{ st.label }}
-              </button>
-            </div>
-          </section>
           <div v-if="cfgsLoading" class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
               <div class="svc-group-head">
@@ -62,55 +149,86 @@
             <p class="app-state-desc">{{ cfgsError }}</p>
             <button class="btn btn-primary btn-sm" @click="loadCfgs(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <div v-else class="sections">
-            <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
-              <div class="svc-group-head">
-                <div class="svc-group-heading">
-                  <span class="svc-group-title">{{ st.label }}</span>
-                  <div class="svc-group-sub">{{ serviceMeta[st.type].desc }}</div>
+          <template v-else>
+            <!-- 能力总览：全部来自真实计数与默认模型解析，无假数据 -->
+            <section v-show="activeSection === 'ai-overview'" class="card cap-strip" data-sub="ai-overview">
+              <div v-for="st in serviceTypes" :key="st.type" class="cap-cell">
+                <div class="cap-cell-top">
+                  <span class="cap-badge" :class="`t-${st.type}`">{{ st.label.slice(0, 1) }}</span>
+                  <span class="cap-cell-title">{{ st.label }}服务</span>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="`添加${st.label}服务`" @click="startAddCfg(st.type)">
+                    <Plus :size="13" />
+                  </button>
                 </div>
-                <span v-if="countActive(st.type)" class="tag tag-accent">{{ countActive(st.type) }} 已启用</span>
-                <button class="btn btn-ghost btn-sm ml-auto" @click="startAddCfg(st.type)"><Plus :size="13" /> 添加</button>
-              </div>
-              <div v-for="c in byType(st.type)" :key="c.id" class="config-row">
-                <div class="provider-badge" :data-provider="c.provider">{{ c.provider.slice(0, 1).toUpperCase() }}</div>
-                <div class="config-main">
-                  <div class="config-line">
-                    <span class="config-name">{{ c.name || `${c.provider}-${c.service_type}` }}</span>
-                    <span :class="['tag', c.api_key ? 'tag-success' : 'tag-error']">{{ c.api_key ? '已配置' : '无密钥' }}</span>
-                    <span v-if="!c.is_active" class="tag">已停用</span>
-                  </div>
-                  <div class="config-models">
-                    <button
-                      v-for="m in c.model" :key="m" type="button"
-                      :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
-                      :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
-                      @click="setDefaultModel(st.type, c, m)"
-                    >
-                      <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
-                      {{ m }}
-                    </button>
-                  </div>
-                  <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
+                <div class="cap-cell-meta">
+                  <span :class="['tag', countActive(st.type) ? 'tag-success' : '']">{{ countActive(st.type) }}/{{ byType(st.type).length }} 启用</span>
+                  <span v-if="defaultModelOf(st.type)?.model" class="cap-default mono" :title="`当前默认${st.label}模型（该类型优先级最高的启用配置首位）`">
+                    <Star :size="10" class="cfg-model-star" /> {{ defaultModelOf(st.type).model }}
+                  </span>
+                  <span v-else class="cap-none">未设默认</span>
                 </div>
-                <button class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">测试</button>
-                <label class="config-switch">
-                  <input type="checkbox" class="sr-only" :checked="c.is_active" @change="toggleCfg(c)">
-                  <span class="switch" :class="{ on: c.is_active }"></span>
-                </label>
-                <button class="btn btn-ghost btn-icon btn-sm" @click="startEditCfg(c)"><Pencil :size="13" /></button>
-                <button class="btn btn-danger btn-icon btn-sm" @click="delCfg(c.id)"><Trash2 :size="13" /></button>
               </div>
-              <p v-if="!byType(st.type).length" class="config-empty">暂无配置</p>
             </section>
-          </div>
+
+            <!-- 能力组配置卡：点击二级目录在右侧切换展示 -->
+            <section
+              v-for="st in serviceTypes"
+              :key="st.type"
+              v-show="activeSection === `ai-${st.type}`"
+              class="card svc-group cap-card"
+              :data-sub="`ai-${st.type}`"
+            >
+                <div class="svc-group-head">
+                  <div class="svc-group-heading">
+                    <span class="svc-group-title">{{ st.label }}服务</span>
+                    <div class="svc-group-sub">{{ serviceMeta[st.type].desc }}</div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm ml-auto" @click="startAddCfg(st.type)"><Plus :size="13" /> 添加</button>
+                </div>
+                <div v-for="c in byType(st.type)" :key="c.id" class="config-row">
+                  <div class="provider-badge" :data-provider="c.provider">{{ c.provider.slice(0, 1).toUpperCase() }}</div>
+                  <div class="config-main">
+                    <div class="config-line">
+                      <span class="config-name">{{ c.name || `${c.provider}-${c.service_type}` }}</span>
+                      <span :class="['tag', c.api_key ? 'tag-success' : 'tag-error']">{{ c.api_key ? '已配置' : '无密钥' }}</span>
+                      <span v-if="!c.is_active" class="tag">已停用</span>
+                    </div>
+                    <div class="config-models">
+                      <button
+                        v-for="m in c.model" :key="m" type="button"
+                        :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
+                        :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
+                        @click="setDefaultModel(st.type, c, m)"
+                      >
+                        <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
+                        {{ m }}
+                      </button>
+                    </div>
+                    <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
+                    <div class="config-actions">
+                      <button class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">测试</button>
+                      <label class="config-switch">
+                        <input type="checkbox" class="sr-only" :checked="c.is_active" @change="toggleCfg(c)">
+                        <span class="switch" :class="{ on: c.is_active }"></span>
+                      </label>
+                      <button class="btn btn-ghost btn-icon btn-sm" @click="startEditCfg(c)"><Pencil :size="13" /></button>
+                      <button class="btn btn-danger btn-icon btn-sm" @click="delCfg(c.id)"><Trash2 :size="13" /></button>
+                    </div>
+                  </div>
+                </div>
+                <p v-if="!byType(st.type).length" class="config-empty">暂无配置</p>
+              </section>
+          </template>
         </div>
 
         <!-- ===== 风格预设 ===== -->
-        <div v-else-if="tab === 'styles'" class="settings-scroll">
-          <div class="settings-head">
-            <h2 class="settings-title">风格预设</h2>
-            <p class="settings-desc">创建项目时选择的视觉风格，其英文提示词片段会自动注入角色图与场景图生成。停用的风格不出现在创建选项中。</p>
+        <div v-else-if="tab === 'styles'" ref="paneRef" class="settings-scroll">
+          <div class="settings-head styles-head">
+            <div class="styles-head-copy">
+              <h2 class="settings-title">风格预设</h2>
+              <p class="settings-desc">点击左侧二级目录切换风格，右侧展示该风格完整信息并可直接编辑；停用的风格不出现在创建选项中。</p>
+            </div>
+            <button class="btn btn-ghost btn-sm ml-auto" @click="startAddStyle"><Plus :size="13" /> 添加风格</button>
           </div>
           <section v-if="styleLoading" class="card svc-group">
             <div class="svc-group-head">
@@ -128,41 +246,81 @@
             <p class="app-state-desc">{{ styleError }}</p>
             <button class="btn btn-primary btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <section v-else class="card svc-group">
+          <section v-else-if="currentStyle" class="card svc-group style-detail-card">
             <div class="svc-group-head">
+              <div class="style-detail-badge"><Palette :size="15" /></div>
               <div class="svc-group-heading">
-                <span class="svc-group-title">全部风格</span>
-                <div class="svc-group-sub">{{ stylePresets.filter(p => p.is_active).length }} 个启用 · {{ stylePresets.length }} 个总计</div>
-              </div>
-              <button class="btn btn-ghost btn-sm ml-auto" @click="startAddStyle"><Plus :size="13" /> 添加</button>
-            </div>
-            <div v-for="p in stylePresets" :key="p.id" class="config-row">
-              <div class="provider-badge style-badge"><Palette :size="15" /></div>
-              <div class="config-main">
                 <div class="config-line">
-                  <span class="config-name">{{ p.name }}</span>
-                  <span class="tag mono">{{ p.value }}</span>
-                  <span v-if="!p.is_active" class="tag">已停用</span>
+                  <span class="svc-group-title">{{ currentStyle.name }}</span>
+                  <span class="tag mono">{{ currentStyle.value }}</span>
+                  <span v-if="!currentStyle.is_active" class="tag">已停用</span>
+                  <span v-else class="tag tag-success">启用中</span>
                 </div>
-                <div class="config-sub mono truncate">{{ p.prompt }}</div>
-                <div v-if="p.description" class="config-sub truncate">{{ p.description }}</div>
+                <div class="svc-group-sub">提示词片段为英文，会在生成角色图与场景图时自动拼入提示词</div>
               </div>
-              <label class="config-switch">
-                <input type="checkbox" class="sr-only" :checked="p.is_active" @change="toggleStyle(p)">
-                <span class="switch" :class="{ on: p.is_active }"></span>
+              <label class="config-switch" :title="currentStyle.is_active ? '停用该风格' : '启用该风格'">
+                <input type="checkbox" class="sr-only" :checked="currentStyle.is_active" @change="toggleStyle(currentStyle)">
+                <span class="switch" :class="{ on: currentStyle.is_active }"></span>
               </label>
-              <button class="btn btn-ghost btn-icon btn-sm" @click="startEditStyle(p)"><Pencil :size="13" /></button>
-              <button class="btn btn-danger btn-icon btn-sm" @click="styleToDelete = p"><Trash2 :size="13" /></button>
+              <button class="btn btn-danger btn-icon btn-sm" title="删除风格" @click="styleToDelete = currentStyle"><Trash2 :size="13" /></button>
             </div>
-            <p v-if="!stylePresets.length" class="config-empty">暂无风格预设</p>
+            <div class="svc-group-body style-detail-body">
+              <div class="style-ai-bar">
+                <div class="style-ai-copy">
+                  <span>AI 一键完善</span>
+                  <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
+                  <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
+                  <Sparkles v-else :size="13" />
+                  {{ styleExpanding ? '完善中…' : 'AI 完善' }}
+                </button>
+              </div>
+              <div class="style-detail-grid">
+                <label class="field">
+                  <span class="field-label">风格名称 <span class="required">*</span></span>
+                  <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
+                </label>
+                <label class="field">
+                  <span class="field-label">风格 key <span class="required">*</span> <span class="dim">(创建后不可修改)</span></span>
+                  <input v-model="styleForm.value" class="input mono" :disabled="!!styleEditId" placeholder="如 3d、anime（小写字母/数字/中划线）" />
+                </label>
+                <label class="field field-wide">
+                  <span class="field-label">提示词片段（英文） <span class="required">*</span></span>
+                  <textarea v-model="styleForm.prompt" class="textarea" rows="4" placeholder="如 anime style, cel shading, vibrant colors, clean line art"></textarea>
+                </label>
+                <label class="field">
+                  <span class="field-label">描述</span>
+                  <input v-model="styleForm.description" class="input" placeholder="一句话说明该风格的适用场景" />
+                </label>
+                <label class="field">
+                  <span class="field-label">排序</span>
+                  <input v-model.number="styleForm.sort_order" class="input" type="number" min="0" max="999" />
+                </label>
+              </div>
+              <div class="style-detail-foot">
+                <span v-if="styleDirty" class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2">
+                  <TriangleAlert :size="11" /> 有未保存的修改
+                </span>
+                <span v-else class="dim" style="font-size:11px">修改后点击保存立即生效</span>
+                <button v-if="styleDirty" type="button" class="btn btn-ghost btn-sm" @click="discardStyleEdit">放弃修改</button>
+                <button type="button" class="btn btn-primary btn-sm ml-auto" :disabled="styleSaving || !styleDirty" @click="saveStyle">
+                  <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+                  {{ styleDirty ? '保存修改' : '已保存' }}
+                </button>
+              </div>
+            </div>
+          </section>
+          <section v-else class="card svc-group">
+            <p class="config-empty">暂无风格预设，点击右上角「添加风格」创建第一个风格</p>
           </section>
         </div>
 
         <!-- ===== Agent 配置 ===== -->
-        <div v-else-if="tab === 'agents'" class="settings-scroll">
+        <div v-else-if="tab === 'agents'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
-            <h2 class="settings-title">Agent 配置</h2>
-            <p class="settings-desc">高级区只保留 Agent 运行配置。这里可以调整模型、提示词和参数，保存后立即生效。</p>
+            <h2 class="settings-title">Prompts</h2>
+            <p class="settings-desc">Prompts 即各 Agent 的系统提示词与运行模型（保存为 workspace/prompts/*.md），点击左侧目录切换 Agent，修改后保存立即生效。</p>
           </div>
           <div v-if="agentsLoading" class="agent-list">
             <div v-for="i in 3" :key="i" class="card agent-card">
@@ -182,7 +340,14 @@
             <button class="btn btn-primary btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
           <div v-else class="agent-list">
-            <div v-for="a in agentList" :key="a.type" class="card agent-card">
+            <!-- 点击二级目录切换展示：列表仅渲染当前选中的 Agent 配置卡 -->
+            <div
+              v-for="a in agentList"
+              :key="a.type"
+              v-show="agentDetail === a.type"
+              class="card agent-card"
+              :data-sub="`agent-${a.type}`"
+            >
               <div class="agent-card-head" @click="toggleAgentEdit(a.type)">
                 <div class="agent-type-badge">{{ a.icon }}</div>
                 <div class="agent-card-heading">
@@ -219,45 +384,13 @@
         </div>
 
         <!-- ===== Skills 编辑 ===== -->
-        <div v-else-if="tab === 'skills'" class="skills-layout">
-          <!-- Agent 左侧列表 -->
-          <aside class="skills-agent-list">
-            <div class="skills-agent-title">Agent 列表</div>
-            <template v-if="agentsLoading">
-              <div v-for="i in 4" :key="i" style="display:flex;align-items:center;gap:8px;padding:8px 6px">
-                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
-                <div class="app-skeleton-line" style="width:58%;height:12px"></div>
-              </div>
-            </template>
-            <template v-else-if="agentsError">
-              <div class="app-state app-state-error compact-state">
-                <div class="app-state-title">Agent 列表加载失败</div>
-                <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
-              </div>
-            </template>
-            <template v-else>
-              <button
-                v-for="a in agentList"
-                :key="a.type"
-                :class="['skills-agent-item', { active: selectedAgent === a.type }]"
-                @click="selectAgent(a.type)"
-              >
-                <span class="agent-type-badge">{{ a.icon }}</span>
-                <span class="skills-agent-label">{{ a.label }}</span>
-                <span v-if="agentSkillCount(a.type) > 0" class="skill-count-badge">{{ agentSkillCount(a.type) }}</span>
-              </button>
-              <p v-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
-            </template>
-          </aside>
-
-          <!-- Skill 管理右侧主区域 -->
-          <div class="settings-scroll skills-main">
+        <div v-else-if="tab === 'skills'" ref="paneRef" class="settings-scroll skills-pane">
             <div class="settings-head skills-head">
               <span class="agent-type-badge skills-head-badge">{{ selectedAgentIcon }}</span>
               <div class="skills-head-copy">
                 <h2 class="settings-title">{{ selectedAgentLabel }}</h2>
                 <div class="dim" style="font-size:12px;margin-top:2px">{{ selectedAgentType }} — Skills</div>
-                <p class="settings-desc">Skills 仅作为 Agent 的高级提示词层使用，不影响工作台常规功能入口。</p>
+                <p class="settings-desc">每个 Skill 保存为独立的 SKILL.md。点击左侧 Agent 后其全部 Skill 默认展开，可直接编辑内容。</p>
               </div>
               <button class="btn btn-primary btn-sm ml-auto" @click="startAddSkill">
                 <Plus :size="13" /> 新增 Skill
@@ -299,32 +432,52 @@
                   <button class="btn btn-danger btn-icon btn-sm" style="margin-right:4px" @click.stop="skillToDelete = s.id">
                     <Trash2 :size="13" />
                   </button>
-                  <ChevronDown :size="14" :style="{ transform: editingSkill === s.id ? 'rotate(180deg)' : '', transition: '0.2s' }" />
+                  <ChevronDown :size="14" :style="{ transform: skillOpen.has(s.id) ? 'rotate(180deg)' : '', transition: '0.2s' }" />
                 </div>
-                <div v-if="editingSkill === s.id" class="skill-card-body">
-                  <textarea
-                    v-model="skillContent"
-                    class="textarea mono"
-                    rows="20"
-                    style="font-size:12px;line-height:1.6"
-                    placeholder="编写 SKILL.md 内容..."
-                  />
-                  <div class="skill-card-foot">
-                    <span class="dim" style="font-size:11px">skills/{{ s.id }}/SKILL.md</span>
-                    <span v-if="skillSaved === s.id" class="tag tag-success" style="margin-left:8px">
-                      <Check :size="10" /> 已保存
-                    </span>
-                    <button class="btn btn-primary btn-sm ml-auto" :disabled="skillSaving" @click="saveSkill(s.id)">
-                      <Loader2 v-if="skillSaving" :size="12" class="animate-spin" />
-                      保存
+                <div v-if="skillOpen.has(s.id)" class="skill-card-body">
+                  <!-- 读取失败：内联错误 + 重试，禁止出现可保存的空编辑框 -->
+                  <div v-if="skillLoadError[s.id]" class="skill-load-error">
+                    <CircleAlert :size="14" style="flex-shrink:0;color:#d9534f" />
+                    <div style="flex:1;min-width:0">
+                      <div style="font-weight:600;font-size:12.5px">SKILL.md 读取失败</div>
+                      <div class="dim" style="font-size:11px">{{ skillLoadError[s.id] }}</div>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" :disabled="skillLoadingIds.has(s.id)" @click="loadSkillContent(s.id)">
+                      <Loader2 v-if="skillLoadingIds.has(s.id)" :size="11" class="animate-spin" />
+                      <RefreshCw v-else :size="11" />
+                      重试
                     </button>
                   </div>
+                  <!-- 首次加载中 -->
+                  <div v-else-if="skillContents[s.id] === undefined" class="skill-loading">
+                    <Loader2 :size="15" class="animate-spin" style="color:var(--text-3)" />
+                    <span>正在读取 SKILL.md…</span>
+                  </div>
+                  <!-- 内容已加载：可编辑保存 -->
+                  <template v-else>
+                    <textarea
+                      v-model="skillContents[s.id]"
+                      class="textarea mono"
+                      rows="20"
+                      style="font-size:12px;line-height:1.6"
+                      placeholder="编写 SKILL.md 内容..."
+                    />
+                    <div class="skill-card-foot">
+                      <span class="dim" style="font-size:11px">skills/{{ s.id }}/SKILL.md</span>
+                      <span v-if="skillSaved === s.id" class="tag tag-success" style="margin-left:8px">
+                        <Check :size="10" /> 已保存
+                      </span>
+                      <button class="btn btn-primary btn-sm ml-auto" :disabled="skillSaving" @click="saveSkill(s.id)">
+                        <Loader2 v-if="skillSaving" :size="12" class="animate-spin" />
+                        保存
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
             </template>
           </div>
-        </div>
       </div>
     </div>
 
@@ -449,11 +602,11 @@
     </div>
 
     <!-- Style Preset Dialog -->
-    <div v-if="styleDialog" class="overlay" @click.self="styleDialog = false">
+    <div v-if="styleDialog" class="overlay" @click.self="cancelStyleDialog">
       <form class="dialog config-dialog" @submit.prevent="saveStyle">
         <div class="dialog-head">
           <div>
-            <div class="dialog-title">{{ styleEditId ? '编辑风格预设' : '添加风格预设' }}</div>
+            <div class="dialog-title">添加风格预设</div>
             <div class="dialog-sub">提示词片段为英文，会在生成角色图与场景图时自动拼入提示词。</div>
           </div>
           <span class="tag tag-accent ml-auto"><Palette :size="12" /> 风格</span>
@@ -476,7 +629,7 @@
           </label>
           <label class="field">
             <span class="field-label">风格 key <span class="required">*</span></span>
-            <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" :disabled="!!styleEditId" />
+            <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" />
             <span class="field-hint">存入项目的风格标识，创建后不可修改。</span>
           </label>
           <label class="field">
@@ -493,10 +646,33 @@
           </label>
         </div>
         <div class="dialog-foot">
-          <button type="button" class="btn" @click="styleDialog = false">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="button" class="btn" @click="cancelStyleDialog">取消</button>
+          <button type="submit" class="btn btn-primary" :disabled="styleSaving">保存</button>
         </div>
       </form>
+    </div>
+    <!-- 切换风格前：当前风格有未保存修改，让用户选择保存 / 放弃 / 取消 -->
+    <div v-if="stylePromptOpen" class="overlay" @click.self="cancelStylePrompt">
+      <div class="dialog unsaved-dialog">
+        <div class="dialog-head">
+          <div>
+            <div class="dialog-title">有未保存的修改</div>
+            <div class="dialog-sub">「{{ currentStyle?.name || '当前风格' }}」的表单已修改但尚未保存。</div>
+          </div>
+          <span class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2"><TriangleAlert :size="12" /> 未保存</span>
+        </div>
+        <div class="dialog-body">
+          <p class="unsaved-dialog-copy">{{ stylePromptIsNew ? '新建风格会丢弃当前风格的未保存修改。' : '切换风格会丢弃这些修改。' }}「保存并{{ stylePromptIsNew ? '新建' : '切换' }}」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
+        </div>
+        <div class="dialog-foot">
+          <button type="button" class="btn" @click="cancelStylePrompt">取消</button>
+          <button type="button" class="btn btn-ghost" @click="discardStyleEdit">放弃更改</button>
+          <button type="button" class="btn btn-primary" :disabled="styleSaving" @click="keepStyleAndSwitch">
+            <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+            保存并{{ stylePromptIsNew ? '新建' : '切换' }}
+          </button>
+        </div>
+      </div>
     </div>
     <ConfirmDialog
       :open="!!styleToDelete"
@@ -518,7 +694,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
@@ -538,11 +714,144 @@ const navGroups = [
     id: 'advanced',
     label: '高级',
     items: [
-      { id: 'agents', label: 'Agent 配置', icon: Bot },
+      { id: 'agents', label: 'Prompts', icon: Bot },
       { id: 'skills', label: 'Skills', icon: FileText },
     ],
   },
 ]
+
+// ===== 三栏布局：左一级导航 / 中二级目录 / 右正文，分隔条可拖拽调宽 =====
+const SETTINGS_PANE_KEY = 'settings-layout-widths'
+const NAV_DEFAULT = 212
+const NAV_MIN = 168
+const NAV_MAX = 300
+const SUB_DEFAULT = 232
+const SUB_MIN = 168
+const SUB_MAX = 360
+const navWidth = ref(NAV_DEFAULT)
+const subWidth = ref(SUB_DEFAULT)
+const paneRef = ref(null)
+// 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video），
+// styles 用 styleDetailId 记录当前风格；agents 用 agentDetail 记录被选中的 Agent。
+const activeSection = ref('')
+const agentDetail = ref(null)
+let activePaneDrag = null
+
+function clampPaneWidth(v, min, max) { return Math.min(max, Math.max(min, v)) }
+function persistPaneWidths() {
+  try {
+    localStorage.setItem(SETTINGS_PANE_KEY, JSON.stringify({ navWidth: navWidth.value, subWidth: subWidth.value }))
+  } catch { /* 忽略持久化失败 */ }
+}
+function initPaneWidths() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_PANE_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (typeof saved.navWidth === 'number') navWidth.value = clampPaneWidth(saved.navWidth, NAV_MIN, NAV_MAX)
+    if (typeof saved.subWidth === 'number') subWidth.value = clampPaneWidth(saved.subWidth, SUB_MIN, SUB_MAX)
+  } catch { /* 忽略损坏数据 */ }
+}
+const curTabMeta = computed(() => ({
+  ai: { icon: Cpu, title: 'AI 服务', desc: '能力分组与默认模型' },
+  styles: { icon: Palette, title: '风格预设', desc: '视觉风格片段管理' },
+  agents: { icon: Bot, title: 'Prompts', desc: '模型与系统提示词' },
+  skills: { icon: FileText, title: 'Skills 编辑', desc: '按 Agent 组织提示词文件' },
+}[tab.value]))
+// 二级目录：ai 为能力面板；styles 为风格列表；agents 为动态 Agent 列表
+const subItems = computed(() => {
+  if (tab.value === 'ai') {
+    return [
+      { id: 'ai-overview', label: '能力总览' },
+      { id: 'ai-text', label: '文本服务', count: byType('text').length },
+      { id: 'ai-image', label: '图片服务', count: byType('image').length },
+      { id: 'ai-video', label: '视频服务', count: byType('video').length },
+    ]
+  }
+  if (tab.value === 'styles') return stylePresets.value.map(p => ({ id: p.id, label: p.name }))
+  if (tab.value === 'agents') return agentList.value.map(a => ({ id: `agent-${a.type}`, label: a.label, icon: a.icon }))
+  return []
+})
+// 二级目录点击 = 右侧内容切换（不再做长页锚点滚动）
+function isSubActive(it) {
+  if (tab.value === 'agents') return !!agentDetail.value && it.id === `agent-${agentDetail.value}`
+  if (tab.value === 'styles') return styleDetailId.value === it.id
+  return activeSection.value === it.id
+}
+function paneScrollTop() {
+  requestAnimationFrame(() => {
+    if (paneRef.value) paneRef.value.scrollTop = 0
+  })
+}
+function onSubNavClick(it) {
+  if (tab.value === 'agents') {
+    if (it.id.startsWith('agent-')) showAgentDetail(it.id.slice(6))
+    return
+  }
+  if (tab.value === 'styles') {
+    requestStyleSwitch(it.id)
+    return
+  }
+  if (activeSection.value !== it.id) activeSection.value = it.id
+  paneScrollTop()
+}
+// Agent 配置页：切到指定 Agent，并在卡片中展开编辑表单（拉取该 Agent 的 /prompts 详情）
+async function showAgentDetail(type) {
+  agentDetail.value = type
+  if (editingAgent.value !== type) {
+    editingAgent.value = null
+    await toggleAgentEdit(type)
+  }
+  paneScrollTop()
+}
+function startPaneResize(type, e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  const isNav = type === 'nav'
+  activePaneDrag = {
+    type,
+    startX: e.clientX,
+    startWidth: isNav ? navWidth.value : subWidth.value,
+  }
+  const move = (ev) => {
+    if (!activePaneDrag) return
+    const delta = ev.clientX - activePaneDrag.startX
+    const next = clampPaneWidth(activePaneDrag.startWidth + delta, isNav ? NAV_MIN : SUB_MIN, isNav ? NAV_MAX : SUB_MAX)
+    if (isNav) navWidth.value = next
+    else subWidth.value = next
+  }
+  const finish = () => {
+    activePaneDrag = null
+    cleanup()
+    persistPaneWidths()
+  }
+  const cleanup = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', finish)
+    window.removeEventListener('pointercancel', finish)
+    document.body.classList.remove('resizing-panes')
+  }
+  activePaneDrag.cleanup = cleanup
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', finish)
+  window.addEventListener('pointercancel', finish)
+  document.body.classList.add('resizing-panes')
+}
+function adjustPaneWidth(type, delta) {
+  if (type === 'nav') navWidth.value = clampPaneWidth(navWidth.value + delta, NAV_MIN, NAV_MAX)
+  else subWidth.value = clampPaneWidth(subWidth.value + delta, SUB_MIN, SUB_MAX)
+  persistPaneWidths()
+}
+function resetPaneWidth(type) {
+  if (type === 'nav') navWidth.value = NAV_DEFAULT
+  else subWidth.value = SUB_DEFAULT
+  persistPaneWidths()
+}
+function onPaneResizeKey(type, e) {
+  const step = e.shiftKey ? 40 : 10
+  if (e.key === 'ArrowLeft') { adjustPaneWidth(type, -step); e.preventDefault(); return }
+  if (e.key === 'ArrowRight') { adjustPaneWidth(type, step); e.preventDefault(); return }
+  if (e.key === 'Home') { resetPaneWidth(type); e.preventDefault() }
+}
 
 // ===== 列表加载三态（P0-C1/C2）：初始加载显示骨架，失败内联错误 + 重试 =====
 const cfgsLoading = ref(false)
@@ -790,6 +1099,11 @@ async function saveCfg() {
     if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature })
     else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature })
     cfgDialog.value = false; toast.success('已保存'); loadCfgs()
+    // 保存后跳到对应能力面板，让新配置立即可见
+    if (activeSection.value !== `ai-${cfgForm.service_type}`) {
+      activeSection.value = `ai-${cfgForm.service_type}`
+      paneScrollTop()
+    }
   } catch (e) { toast.error(e.message) }
 }
 
@@ -900,8 +1214,10 @@ async function saveAgentCfg(type) {
 // ===== Skills =====
 const selectedAgent = ref('script_rewriter')
 const allSkills = ref([])   // { id, name, description }[]
-const editingSkill = ref(null)
-const skillContent = ref('')
+const skillContents = ref({})  // skill id -> SKILL.md 内容（仅在读取成功后写入）
+const skillLoadError = ref({})  // skill id -> 首次读取失败的报错；有错误时不显示可保存的编辑框
+const skillLoadingIds = reactive(new Set())  // 正在读取 SKILL.md 的 skill id
+const skillOpen = reactive(new Set())  // 已展开的 skill id（进入/切换 Agent 后默认全部展开）
 const skillSaving = ref(false)
 const skillSaved = ref(null)
 const addSkillDialog = ref(false)
@@ -911,10 +1227,15 @@ const selectedAgentType = computed(() => selectedAgent.value)
 const selectedAgentLabel = computed(() => agentList.value.find(a => a.type === selectedAgent.value)?.label || selectedAgent.value)
 const selectedAgentIcon = computed(() => agentList.value.find(a => a.type === selectedAgent.value)?.icon || '🤖')
 
-// 列表来自 /prompts：若当前选中 Agent 不在其中（被移除或列表刚加载），自动回退到第一个
+// 列表来自 /prompts：若当前选中 Agent 不在其中（被移除或列表刚加载），自动回退到第一个。
+// Agent 配置页的详情卡同样默认选中第一个，列表变化后失效则回退。
 watch(agentCfgs, (list) => {
   if (list.length && !list.some(a => a.agent_type === selectedAgent.value)) {
     selectedAgent.value = list[0].agent_type
+  }
+  if (!list.length) return
+  if (!agentDetail.value || !list.some(a => a.agent_type === agentDetail.value)) {
+    agentDetail.value = list[0].agent_type
   }
 })
 
@@ -944,9 +1265,44 @@ async function loadAllSkills(initial = false) {
   }
 }
 
+// 读取单个 SKILL.md：成功写入内容并展开；失败不伪装为空内容——
+// 首次读取失败记录内联错误（显示「重试」，禁止可保存的空编辑框）；已有缓存则保留缓存内容
+async function loadSkillContent(id) {
+  if (skillLoadingIds.has(id)) return
+  skillLoadingIds.add(id)
+  try {
+    const res = await skillsAPI.get(id)
+    delete skillLoadError.value[id]
+    skillContents.value[id] = res.content || ''
+    skillOpen.add(id)
+    return true
+  } catch (e) {
+    if (skillContents.value[id] === undefined) {
+      skillLoadError.value[id] = e.message || '读取失败'
+    } else {
+      toast.error(`「${id}」重新读取失败，已保留已加载内容`)
+    }
+    skillOpen.add(id)
+    return false
+  } finally {
+    skillLoadingIds.delete(id)
+  }
+}
+// 预载并展开某个 Agent 的全部 Skill 内容（默认全部展开，可点击卡头收起）
+function revealSkillsOf(type) {
+  const items = allSkills.value.filter(s => skillBelongsTo(s.id, type))
+  return Promise.all(items.map(s => loadSkillContent(s.id)))
+}
+function ensureSkillsRevealed() {
+  if (!agentCfgs.value.length || !allSkills.value.length) return Promise.resolve()
+  return revealSkillsOf(selectedAgent.value)
+}
+
 async function selectAgent(type) {
   selectedAgent.value = type
-  editingSkill.value = null
+  skillSaved.value = null
+  await revealSkillsOf(type)
+  paneScrollTop()
 }
 
 function startAddSkill() {
@@ -963,6 +1319,7 @@ async function confirmAddSkill() {
     await skillsAPI.create({ id: skillId, name: newSkillForm.name, description: newSkillForm.description })
     addSkillDialog.value = false
     await loadAllSkills()
+    await revealSkillsOf(selectedAgent.value)
     toast.success('Skill 创建成功')
   } catch (e) {
     toast.error(e.message)
@@ -978,7 +1335,11 @@ async function confirmDelSkill() {
   try {
     deletingSkill.value = true
     await skillsAPI.del(id)
-    if (editingSkill.value === id) editingSkill.value = null
+    delete skillContents.value[id]
+    delete skillLoadError.value[id]
+    skillLoadingIds.delete(id)
+    skillOpen.delete(id)
+    if (skillSaved.value === id) skillSaved.value = null
     await loadAllSkills()
     skillToDelete.value = null
     toast.success('已删除')
@@ -989,21 +1350,18 @@ async function confirmDelSkill() {
   }
 }
 
+// 点击 Skill 卡头：展开 / 收起；内容未载入或读取失败时触发加载 / 重试
 async function toggleSkillEdit(id) {
-  if (editingSkill.value === id) { editingSkill.value = null; return }
-  try {
-    const res = await skillsAPI.get(id)
-    skillContent.value = res.content
-    skillSaved.value = null
-    editingSkill.value = id
-  } catch (e) { toast.error(e.message) }
+  if (skillOpen.has(id)) { skillOpen.delete(id); return }
+  if (skillContents.value[id] === undefined || skillLoadError.value[id]) await loadSkillContent(id)
+  else skillOpen.add(id)
 }
 
 async function saveSkill(id) {
   skillSaving.value = true
   skillSaved.value = null
   try {
-    await skillsAPI.update(id, skillContent.value)
+    await skillsAPI.update(id, skillContents.value[id] ?? '')
     await loadAllSkills()
     skillSaved.value = id
     toast.success(`已保存`)
@@ -1020,6 +1378,17 @@ const stylePresets = ref([])
 const styleDialog = ref(false)
 const styleEditId = ref(null)
 const styleForm = reactive({ name: '', value: '', prompt: '', description: '', sort_order: 0 })
+const styleDetailId = ref(null)
+const styleSaving = ref(false)
+// 未保存修改检测：styleSnap 为当前选中风格加载进表单时的原始快照，表单与之不一致即视为未保存
+const styleSnap = ref(null)
+const styleDirty = ref(false)
+// 有未保存修改时切换风格：弹「保存并切换 / 放弃更改 / 取消」三选确认
+const stylePromptOpen = ref(false)
+const stylePromptSwitchId = ref(null)
+// 新建风格同样复用该确认：目标是「添加风格」的标记值（与真实风格 id 不冲突）
+const STYLE_ADD_FLAG = '__add_style__'
+const stylePromptIsNew = computed(() => stylePromptSwitchId.value === STYLE_ADD_FLAG)
 
 async function loadStylePresets(initial = false) {
   if (initial) { styleLoading.value = true; styleError.value = '' }
@@ -1031,6 +1400,82 @@ async function loadStylePresets(initial = false) {
     if (initial) styleLoading.value = false
   }
 }
+
+const currentStyle = computed(() => stylePresets.value.find(p => p.id === styleDetailId.value) || null)
+// 把指定风格载入表单，同时记录原始快照作为“未保存”基准（表单与之不同即 dirty）
+function fillStyleForm(p) {
+  styleEditId.value = p.id
+  styleSnap.value = { name: p.name, value: p.value, prompt: p.prompt, description: p.description ?? '', sort_order: p.sort_order ?? 0 }
+  Object.assign(styleForm, styleSnap.value)
+  styleDirty.value = false
+}
+// 详情卡表单变化检测（新建弹窗不参与：取消时通过 fillStyleForm 恢复）
+watch(
+  () => [styleForm.name, styleForm.value, styleForm.prompt, styleForm.description, styleForm.sort_order],
+  () => {
+    const s = styleSnap.value
+    styleDirty.value = !!s && (
+      styleForm.name !== s.name || styleForm.value !== s.value ||
+      styleForm.prompt !== s.prompt || styleForm.description !== s.description ||
+      styleForm.sort_order !== s.sort_order
+    )
+  }
+)
+// 二级目录 / 列表入口：把对应风格装进右侧详情卡（默认展开可编辑）
+function showStyleDetail(id) {
+  if (styleDetailId.value === id) { paneScrollTop(); return }
+  const p = stylePresets.value.find(x => x.id === id)
+  if (!p) return
+  styleDetailId.value = id
+  fillStyleForm(p)
+  paneScrollTop()
+}
+// 切换风格入口：当前有未保存修改时先弹「保存并切换 / 放弃更改 / 取消」，防止静默丢失
+function requestStyleSwitch(id) {
+  if (styleDetailId.value === id) { paneScrollTop(); return }
+  if (styleDirty.value && styleEditId.value) {
+    stylePromptSwitchId.value = id
+    stylePromptOpen.value = true
+    return
+  }
+  showStyleDetail(id)
+}
+function closeStylePrompt() {
+  stylePromptOpen.value = false
+  stylePromptSwitchId.value = null
+}
+function cancelStylePrompt() {
+  if (styleSaving.value) return
+  closeStylePrompt()
+}
+// 「保存并切换 / 保存并新建」：先保存当前风格修改，成功后再执行目标动作
+async function keepStyleAndSwitch() {
+  const target = stylePromptSwitchId.value
+  const ok = await persistCurrentStyleEdit()
+  if (!ok) return // 保存失败：停留当前页并保留弹窗，由用户重试或放弃
+  closeStylePrompt()
+  if (target === STYLE_ADD_FLAG) openAddStyleDialog()
+  else if (target) showStyleDetail(target)
+}
+// 「放弃更改 / 放弃修改」：恢复当前风格快照；若正处于切换/新建确认中，随后继续执行目标动作
+function discardStyleEdit() {
+  const target = stylePromptSwitchId.value
+  closeStylePrompt()
+  const p = stylePresets.value.find(x => x.id === styleDetailId.value)
+  if (p) fillStyleForm(p)
+  if (target === STYLE_ADD_FLAG) openAddStyleDialog()
+  else if (target && target !== styleDetailId.value) showStyleDetail(target)
+}
+// 列表加载 / 删除后保证有合法选中项，默认选中第一个
+function ensureStyleSelection() {
+  const list = stylePresets.value
+  if (!list.length) return
+  if (!styleDetailId.value || !list.some(p => p.id === styleDetailId.value)) {
+    styleDetailId.value = list[0].id
+    fillStyleForm(list[0])
+  }
+}
+watch(stylePresets, ensureStyleSelection)
 
 async function toggleStyle(p) {
   try {
@@ -1050,7 +1495,14 @@ async function confirmDelStyle() {
     await stylePresetAPI.del(p.id)
     styleToDelete.value = null
     toast.success('已删除')
-    loadStylePresets()
+    await loadStylePresets()
+    // 删除了当前正在编辑的风格：列表 watch 已回退选中第一个；若没有剩余风格则清空编辑态
+    if (!stylePresets.value.length) {
+      styleDetailId.value = null
+      styleEditId.value = null
+      styleSnap.value = null
+      styleDirty.value = false
+    }
   } catch (e) {
     toast.error(e.message)
   } finally {
@@ -1058,8 +1510,20 @@ async function confirmDelStyle() {
   }
 }
 
+// 「添加风格」入口：当前详情卡有未保存修改时同样走「保存并新建 / 放弃新建 / 取消」确认，
+// 防止直接重置 styleSnap/styleForm 使草稿被静默覆盖（owner 复核 P1）
 function startAddStyle() {
+  if (styleDirty.value && styleEditId.value) {
+    stylePromptSwitchId.value = STYLE_ADD_FLAG
+    stylePromptOpen.value = true
+    return
+  }
+  openAddStyleDialog()
+}
+// 新建风格仍走弹窗表单；styleEditId 置空使「风格 key」可填写
+function openAddStyleDialog() {
   styleEditId.value = null
+  styleSnap.value = null // 新建弹窗期间不做未保存检测，取消时会用当前风格快照恢复
   Object.assign(styleForm, {
     name: '', value: '', prompt: '', description: '',
     sort_order: (stylePresets.value.at(-1)?.sort_order ?? 0) + 1,
@@ -1067,16 +1531,16 @@ function startAddStyle() {
   styleDialog.value = true
 }
 
+// 编辑已改为在右侧详情卡内直接进行
 function startEditStyle(p) {
-  styleEditId.value = p.id
-  Object.assign(styleForm, {
-    name: p.name,
-    value: p.value,
-    prompt: p.prompt,
-    description: p.description || '',
-    sort_order: p.sort_order ?? 0,
-  })
-  styleDialog.value = true
+  if (p) showStyleDetail(p.id)
+}
+
+// 取消新建弹窗后，把详情卡的表单恢复为当前选中风格
+function cancelStyleDialog() {
+  styleDialog.value = false
+  const p = stylePresets.value.find(x => x.id === styleDetailId.value)
+  if (p) fillStyleForm(p)
 }
 
 const styleExpanding = ref(false)
@@ -1105,43 +1569,232 @@ async function expandStyle() {
   }
 }
 
+// 保存右侧详情卡当前风格的修改；保存后按最新列表重建快照并复位 dirty。返回是否保存成功。
+async function persistCurrentStyleEdit() {
+  const id = styleEditId.value
+  if (!id) return false
+  if (!styleForm.name?.trim() || !styleForm.prompt?.trim()) {
+    toast.warning('名称与提示词片段必填')
+    return false
+  }
+  styleSaving.value = true
+  try {
+    await stylePresetAPI.update(id, {
+      name: styleForm.name,
+      prompt: styleForm.prompt,
+      description: styleForm.description,
+      sort_order: styleForm.sort_order,
+    })
+    toast.success('已保存')
+    await loadStylePresets()
+    const p = stylePresets.value.find(x => x.id === id)
+    if (p) fillStyleForm(p)
+    return true
+  } catch (e) {
+    toast.error(e.message)
+    return false
+  } finally {
+    styleSaving.value = false
+  }
+}
+
 async function saveStyle() {
-  if (!styleForm.name?.trim() || !styleForm.prompt?.trim() || (!styleEditId.value && !styleForm.value?.trim())) {
+  // 详情卡保存（存在正在编辑的风格）
+  if (styleEditId.value) {
+    const ok = await persistCurrentStyleEdit()
+    if (ok) styleDialog.value = false
+    return
+  }
+  // 新建风格弹窗
+  if (!styleForm.name?.trim() || !styleForm.prompt?.trim() || !styleForm.value?.trim()) {
     toast.warning('名称、key、提示词片段必填')
     return
   }
+  styleSaving.value = true
   try {
-    if (styleEditId.value) {
-      await stylePresetAPI.update(styleEditId.value, {
-        name: styleForm.name,
-        prompt: styleForm.prompt,
-        description: styleForm.description,
-        sort_order: styleForm.sort_order,
-      })
-    } else {
-      await stylePresetAPI.create({ ...styleForm })
-    }
+    const beforeIds = new Set(stylePresets.value.map(p => p.id))
+    await stylePresetAPI.create({ ...styleForm })
     styleDialog.value = false
     toast.success('已保存')
-    loadStylePresets()
-  } catch (e) { toast.error(e.message) }
+    await loadStylePresets()
+    // 新建完成后跳到新风格详情卡，立即可见
+    const added = stylePresets.value.find(p => !beforeIds.has(p.id))
+    if (added) showStyleDetail(added.id)
+    else ensureStyleSelection()
+  } catch (e) { toast.error(e.message) } finally { styleSaving.value = false }
 }
 
-onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadStylePresets(true) })
+// tab 切换：AI 回到能力总览；风格页兜底选中；Skills 页自动展开当前 Agent 的 Skill
+watch(tab, () => {
+  if (tab.value === 'ai') activeSection.value = 'ai-overview'
+  else if (tab.value === 'styles') ensureStyleSelection()
+  else if (tab.value === 'skills') ensureSkillsRevealed()
+})
+// 数据到达后补一次展开（首次进入 Skills 页时 agent / skill 列表可能尚未加载完）
+watch([agentCfgs, allSkills], () => {
+  if (tab.value === 'skills') ensureSkillsRevealed()
+})
+// 刷新 / 关闭页面兜底：风格详情卡有未保存修改时提示浏览器确认，避免误丢
+const guardUnload = (e) => {
+  if (styleDirty.value && styleEditId.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+onBeforeUnmount(() => {
+  if (activePaneDrag?.cleanup) activePaneDrag.cleanup()
+  window.removeEventListener('beforeunload', guardUnload)
+})
+onMounted(() => {
+  initPaneWidths()
+  activeSection.value = 'ai-overview'
+  loadCfgs(true); loadAgents(true); loadAllSkills(true); loadStylePresets(true)
+  window.addEventListener('beforeunload', guardUnload)
+})
 </script>
 
 <style scoped>
 .settings-page { display: flex; flex-direction: column; height: 100%; background: var(--bg-base); }
-.page-title {
-  font-size: 32px; font-weight: 800; letter-spacing: -0.02em;
-  color: var(--text-0); padding: 24px 32px 16px;
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px 32px 0;
 }
+.page-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-0);
+}
+.page-head-sub { font-size: 12px; color: var(--text-3); }
 
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 
 .settings-nav {
-  width: 220px; flex-shrink: 0; padding: 4px 12px 16px; border-right: 1px solid var(--border);
+  flex-shrink: 0; padding: 4px 12px 16px;
   display: flex; flex-direction: column; gap: 14px;
+  overflow: hidden auto;
+  min-width: 0;
+}
+.nav-group-label { flex: none; }
+.nav-item { flex: none; }
+
+/* —— 可拖拽分隔条 —— */
+.pane-resizer {
+  flex: none;
+  width: 7px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  touch-action: none;
+}
+.pane-resizer::before {
+  content: '';
+  width: 1px;
+  height: 100%;
+  background: transparent;
+  transition: width 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+.pane-resizer:hover::before,
+.pane-resizer:active::before,
+.pane-resizer:focus-visible::before {
+  width: 2.5px;
+  background: var(--accent);
+  opacity: 0.75;
+  border-radius: 99px;
+}
+
+/* —— 中间二级目录 —— */
+.settings-subnav {
+  flex-shrink: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-0);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 12px 10px 10px;
+}
+.subnav-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 4px 6px 11px;
+  border-bottom: 1px solid var(--border);
+}
+.subnav-head-icon { margin-top: 1px; color: var(--accent); flex-shrink: 0; }
+.subnav-head-copy { min-width: 0; flex: 1; }
+.subnav-title { font-size: 13px; font-weight: 700; color: var(--text-0); }
+.subnav-desc { font-size: 10.5px; color: var(--text-3); margin-top: 2px; line-height: 1.5; }
+.subnav-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 2px;
+}
+.subnav-group-title {
+  font-size: 10.5px; font-weight: 650; letter-spacing: 0.06em;
+  color: var(--text-3); padding: 2px 8px 5px;
+}
+.subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  font-weight: 550;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: all 0.16s var(--ease-out);
+  text-align: left;
+}
+.subnav-item:hover { background: var(--bg-hover); color: var(--text-0); }
+.subnav-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
+.subnav-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
+.subnav-item-icon {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent-bg); color: var(--accent-text);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+}
+.subnav-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subnav-count {
+  font-size: 10px; font-weight: 700; font-family: var(--font-mono); flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.06); color: var(--text-2);
+  padding: 1px 6px; border-radius: 99px;
+}
+.subnav-item.active .subnav-count { background: var(--accent-bg); color: var(--accent-text); }
+.subnav-foot {
+  flex: none;
+  margin-top: 8px;
+  padding: 8px 6px 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-3);
+  border-top: 1px solid var(--border);
+}
+.subnav-loading { display: flex; flex-direction: column; gap: 8px; padding: 8px 4px; }
+.subnav-skel-row { display: flex; align-items: center; gap: 10px; }
+.subnav-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: var(--text-2);
 }
 .nav-group { display: flex; flex-direction: column; gap: 2px; }
 .nav-group-label {
@@ -1159,44 +1812,90 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .nav-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
 
 .settings-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
-.settings-scroll { height: 100%; overflow-y: auto; padding: 24px 40px 48px; max-width: 840px; margin: 0 auto; animation: fadeUp 0.3s var(--ease-out); }
-.settings-head { margin-bottom: 20px; }
-.settings-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
-.settings-desc { font-size: 13px; color: var(--text-2); margin-top: 6px; }
-
-.setup-title { font-size: 15px; font-weight: 700; color: var(--text-0); }
-.setup-desc { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; }
-
-/* 手动模板 */
-.setup-panel { padding: 18px 20px; margin-bottom: 16px; }
-.setup-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-.setup-panel-head.compact { margin-bottom: 12px; }
-.template-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.template-type-chip {
-  min-height: var(--button-height-sm);
-  padding: 0 14px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--button-bg);
-  color: var(--text-1);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.16s var(--ease-out);
-}
-.template-type-chip:hover { background: var(--button-bg-hover); color: var(--text-0); }
-.template-type-chip:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
+.settings-scroll { height: 100%; overflow-y: auto; padding: 20px 32px 48px; max-width: 1180px; margin: 0 auto; animation: fadeUp 0.3s var(--ease-out); }
+.settings-head { margin-bottom: 16px; }
+.settings-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.settings-desc { font-size: 12px; color: var(--text-2); margin-top: 4px; }
 
 /* 按服务类型分组的配置卡 */
 .sections { display: flex; flex-direction: column; gap: 16px; }
 .svc-group { overflow: hidden; }
+
+/* —— 能力总览条 —— */
+.cap-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+}
+.cap-cell {
+  min-width: 0;
+  padding: 14px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cap-cell + .cap-cell { border-left: 1px solid var(--border); }
+.cap-cell-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.cap-cell-top .btn { margin-left: auto; flex-shrink: 0; }
+.cap-badge {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.cap-badge.t-image { background: linear-gradient(135deg, #8b5cf6, #4f46e5); }
+.cap-badge.t-video { background: linear-gradient(135deg, #f43f5e, #f97316); }
+.cap-cell-title {
+  font-size: 13.5px; font-weight: 700; color: var(--text-0);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cap-cell-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cap-default {
+  display: inline-flex; align-items: center; gap: 4px;
+  max-width: 100%; padding: 2px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-bg, rgba(0, 113, 227, 0.10));
+  color: var(--accent);
+  font-size: 10.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cap-default svg { flex-shrink: 0; fill: currentColor; }
+.cap-none {
+  padding: 2px 9px; border-radius: 999px;
+  background: var(--bg-2); color: var(--text-3);
+  font-size: 10.5px; white-space: nowrap;
+}
+
+/* —— 能力组配置卡（二级目录切换，单列全宽展示） —— */
+.cap-card { overflow: hidden; }
+
+/* 卡内配置行：行内收纳（徽标 + 信息列 + 动作行） */
+.cap-card .config-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 12px;
+  align-items: start;
+  padding: 12px 16px;
+}
+.cap-card .config-row + .config-row { border-top: 1px solid var(--border); }
+.cap-card .config-row .provider-badge { width: 34px; height: 34px; border-radius: 9px; font-size: 13px; }
+.cap-card .config-row .config-main {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.cap-card .config-row .config-actions {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 5px;
+}
+.cap-card .config-actions .config-switch { margin-left: auto; }
 .svc-group-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px 20px;
@@ -1205,6 +1904,22 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .svc-group-heading { min-width: 0; }
 .svc-group-title { font-size: 14px; font-weight: 700; color: var(--text-0); }
 .svc-group-sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+
+/* 风格预设详情卡（二级目录切换展示，默认展开可编辑） */
+.styles-head { display: flex; align-items: flex-start; gap: 12px; }
+.styles-head-copy { min-width: 0; flex: 1; }
+.style-detail-card { overflow: hidden; }
+.style-detail-badge {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #f5a623, #e86b2a);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.style-detail-body { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
+.style-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.style-detail-grid .field-wide { grid-column: 1 / -1; }
+.style-detail-foot { display: flex; align-items: center; gap: 8px; }
 .config-row { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
 .config-row + .config-row { border-top: 1px solid var(--border); }
 .provider-badge {
@@ -1293,36 +2008,7 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .agent-card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); }
 .agent-card-foot { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
 
-/* Skills 布局 */
-.skills-layout { display: flex; height: 100%; overflow: hidden; }
-.skills-agent-list {
-  width: 210px; flex-shrink: 0; border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  overflow-y: auto; padding: 4px 10px 16px;
-}
-.skills-agent-title {
-  font-size: 11px; font-weight: 650; letter-spacing: 0.06em;
-  color: var(--text-3); padding: 8px 10px 4px;
-}
-.skills-agent-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px; font-size: 13px; font-weight: 550; cursor: pointer;
-  border: none; border-radius: var(--radius); background: transparent; color: var(--text-1);
-  transition: all 0.16s var(--ease-out); width: 100%; text-align: left;
-}
-.skills-agent-item:hover { background: var(--bg-hover); color: var(--text-0); }
-.skills-agent-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
-.skills-agent-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
-.skills-agent-item .agent-type-badge { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
-.skills-agent-label { flex: 1; min-width: 0; }
-.skill-count-badge {
-  font-size: 10px; font-weight: 700; font-family: var(--font-mono);
-  background: rgba(0,0,0,0.06); color: var(--text-2);
-  padding: 1px 6px; border-radius: 99px;
-}
-.skills-agent-item.active .skill-count-badge { background: var(--accent-bg); color: var(--accent-text); }
-.skills-main { flex: 1; min-width: 0; }
-.skills-main.settings-scroll { max-width: 900px; }
+/* Skills 页面（中栏 Agent 目录 + 右栏编辑区） */
 .skills-head { display: flex; align-items: flex-start; gap: 12px; }
 .skills-head-badge { width: 32px; height: 32px; font-size: 16px; }
 .skills-head-copy { min-width: 0; }
@@ -1342,6 +2028,14 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .skill-card-head:hover { background: var(--bg-hover); }
 .skill-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); }
 .skill-card-foot { display: flex; align-items: center; gap: 8px; }
+.skill-load-error {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border: 1px solid #f0c0bb; background: #fdf1f0; border-radius: 10px;
+}
+.skill-loading {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 26px 0; color: var(--text-3); font-size: 12.5px;
+}
 
 /* Shared */
 .field { display: flex; flex-direction: column; gap: 5px; }
@@ -1411,5 +2105,31 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
   font-size: 11px;
   color: var(--text-2);
   word-break: break-all;
+}
+
+/* 拖拽分隔条时禁止选中文本 */
+:global(body.resizing-panes) {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* 窄屏：总览条堆叠为单列 */
+@media (max-width: 960px) {
+  .cap-strip { grid-template-columns: 1fr; }
+  .cap-cell + .cap-cell {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* 窄窗口：收起中间二级目录与分隔条，退回左侧导航 + 正文两栏 */
+@media (max-width: 1080px) {
+  .pane-resizer,
+  .settings-subnav {
+    display: none;
+  }
+  .settings-nav {
+    border-right: 1px solid var(--border);
+  }
 }
 </style>
