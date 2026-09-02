@@ -5,7 +5,7 @@
       <p class="page-head-sub">服务、风格预设与 Agent 提示词统一在这里维护，保存即生效</p>
     </div>
     <div class="settings-layout">
-      <aside class="settings-nav">
+      <aside class="settings-nav" :style="{ width: `${navWidth}px` }">
         <div v-for="g in navGroups" :key="g.id" class="nav-group">
           <div class="nav-group-label">{{ g.label }}</div>
           <button
@@ -21,10 +21,101 @@
         </div>
       </aside>
 
+      <div
+        class="pane-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        tabindex="0"
+        :aria-valuenow="navWidth"
+        aria-valuemin="168"
+        aria-valuemax="300"
+        aria-label="调整一级导航宽度"
+        @pointerdown="startPaneResize('nav', $event)"
+        @dblclick="resetPaneWidth('nav')"
+        @keydown="onPaneResizeKey('nav', $event)"
+      />
+
+      <!-- 中间二级目录：当前 tab 下的章节 / Agent 子列表 -->
+      <aside class="settings-subnav" :style="{ width: `${subWidth}px` }" aria-label="二级目录">
+        <div class="subnav-head">
+          <component :is="curTabMeta.icon" :size="15" class="subnav-head-icon" />
+          <div class="subnav-head-copy">
+            <div class="subnav-title">{{ curTabMeta.title }}</div>
+            <div class="subnav-desc">{{ curTabMeta.desc }}</div>
+          </div>
+        </div>
+        <div class="subnav-body">
+          <template v-if="tab !== 'skills'">
+            <div v-if="tab === 'agents' && agentsLoading" class="subnav-loading">
+              <div v-for="i in 3" :key="i" class="subnav-skel-row">
+                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:72%;height:12px"></div>
+              </div>
+            </div>
+            <div v-else-if="tab === 'agents' && agentsError" class="subnav-error">
+              <span>Agent 列表加载失败</span>
+              <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="11" /> 重试</button>
+            </div>
+            <p v-else-if="tab === 'agents' && !agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            <button
+              v-else
+              v-for="it in subItems"
+              :key="it.id"
+              :class="['subnav-item', { active: isSubActive(it) }]"
+              @click="onSubNavClick(it)"
+            >
+              <span v-if="it.icon" class="subnav-item-icon">{{ it.icon }}</span>
+              <span class="subnav-item-label">{{ it.label }}</span>
+              <span v-if="it.count != null" class="subnav-count">{{ it.count }}</span>
+            </button>
+          </template>
+          <template v-else>
+            <div class="subnav-group-title">Agent 列表</div>
+            <div v-if="agentsLoading" class="subnav-loading">
+              <div v-for="i in 3" :key="i" class="subnav-skel-row">
+                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:72%;height:12px"></div>
+              </div>
+            </div>
+            <div v-else-if="agentsError" class="subnav-error">
+              <span>Agent 列表加载失败</span>
+              <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="11" /> 重试</button>
+            </div>
+            <p v-else-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            <button
+              v-else
+              v-for="a in agentList"
+              :key="a.type"
+              :class="['subnav-item', { active: selectedAgent === a.type }]"
+              @click="selectAgent(a.type)"
+            >
+              <span class="subnav-item-icon">{{ a.icon }}</span>
+              <span class="subnav-item-label">{{ a.label }}</span>
+              <span v-if="agentSkillCount(a.type) > 0" class="subnav-count">{{ agentSkillCount(a.type) }}</span>
+            </button>
+          </template>
+        </div>
+        <div class="subnav-foot">拖动两侧分隔条调节面板宽度，双击恢复默认</div>
+      </aside>
+
+      <div
+        class="pane-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        tabindex="0"
+        :aria-valuenow="subWidth"
+        aria-valuemin="168"
+        aria-valuemax="360"
+        aria-label="调整二级目录宽度"
+        @pointerdown="startPaneResize('sub', $event)"
+        @dblclick="resetPaneWidth('sub')"
+        @keydown="onPaneResizeKey('sub', $event)"
+      />
+
       <div class="settings-content">
 
         <!-- ===== AI 服务配置 ===== -->
-        <div v-if="tab === 'ai'" class="settings-scroll">
+        <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll" @scroll="onPaneScroll">
           <div class="settings-head">
             <h2 class="settings-title">AI 服务</h2>
             <p class="settings-desc">文本 / 图片 / 视频三类能力分开维护，启用后即可被工作台自动采用；弹窗内有推荐模板可选。</p>
@@ -49,7 +140,7 @@
           </div>
           <div v-else class="cap-wrap">
             <!-- 能力总览条：全部来自真实计数与默认模型解析，无假数据 -->
-            <section class="card cap-strip" aria-label="能力总览">
+            <section class="card cap-strip" aria-label="能力总览" data-sub="ai-overview">
               <div v-for="st in serviceTypes" :key="st.type" class="cap-cell">
                 <div class="cap-cell-top">
                   <span class="cap-badge" :class="`t-${st.type}`">{{ st.label.slice(0, 1) }}</span>
@@ -70,7 +161,7 @@
 
             <!-- 三列能力组卡：每条配置以行内卡片收纳 -->
             <div class="cap-grid">
-              <section v-for="st in serviceTypes" :key="st.type" class="card svc-group cap-card">
+              <section v-for="st in serviceTypes" :key="st.type" class="card svc-group cap-card" :data-sub="`ai-${st.type}`">
                 <div class="svc-group-head">
                   <div class="svc-group-heading">
                     <span class="svc-group-title">{{ st.label }}服务</span>
@@ -116,7 +207,7 @@
         </div>
 
         <!-- ===== 风格预设 ===== -->
-        <div v-else-if="tab === 'styles'" class="settings-scroll">
+        <div v-else-if="tab === 'styles'" ref="paneRef" class="settings-scroll" @scroll="onPaneScroll">
           <div class="settings-head">
             <h2 class="settings-title">风格预设</h2>
             <p class="settings-desc">创建项目时选择的视觉风格，其英文提示词片段会自动注入角色图与场景图生成。停用的风格不出现在创建选项中。</p>
@@ -137,7 +228,7 @@
             <p class="app-state-desc">{{ styleError }}</p>
             <button class="btn btn-primary btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <section v-else class="card svc-group">
+          <section v-else class="card svc-group" data-sub="styles-all">
             <div class="svc-group-head">
               <div class="svc-group-heading">
                 <span class="svc-group-title">全部风格</span>
@@ -168,7 +259,7 @@
         </div>
 
         <!-- ===== Agent 配置 ===== -->
-        <div v-else-if="tab === 'agents'" class="settings-scroll">
+        <div v-else-if="tab === 'agents'" ref="paneRef" class="settings-scroll" @scroll="onPaneScroll">
           <div class="settings-head">
             <h2 class="settings-title">Agent 配置</h2>
             <p class="settings-desc">高级区只保留 Agent 运行配置。这里可以调整模型、提示词和参数，保存后立即生效。</p>
@@ -191,7 +282,7 @@
             <button class="btn btn-primary btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
           <div v-else class="agent-list">
-            <div v-for="a in agentList" :key="a.type" class="card agent-card">
+            <div v-for="a in agentList" :key="a.type" class="card agent-card" :data-sub="`agent-${a.type}`">
               <div class="agent-card-head" @click="toggleAgentEdit(a.type)">
                 <div class="agent-type-badge">{{ a.icon }}</div>
                 <div class="agent-card-heading">
@@ -228,39 +319,7 @@
         </div>
 
         <!-- ===== Skills 编辑 ===== -->
-        <div v-else-if="tab === 'skills'" class="skills-layout">
-          <!-- Agent 左侧列表 -->
-          <aside class="skills-agent-list">
-            <div class="skills-agent-title">Agent 列表</div>
-            <template v-if="agentsLoading">
-              <div v-for="i in 4" :key="i" style="display:flex;align-items:center;gap:8px;padding:8px 6px">
-                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
-                <div class="app-skeleton-line" style="width:58%;height:12px"></div>
-              </div>
-            </template>
-            <template v-else-if="agentsError">
-              <div class="app-state app-state-error compact-state">
-                <div class="app-state-title">Agent 列表加载失败</div>
-                <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
-              </div>
-            </template>
-            <template v-else>
-              <button
-                v-for="a in agentList"
-                :key="a.type"
-                :class="['skills-agent-item', { active: selectedAgent === a.type }]"
-                @click="selectAgent(a.type)"
-              >
-                <span class="agent-type-badge">{{ a.icon }}</span>
-                <span class="skills-agent-label">{{ a.label }}</span>
-                <span v-if="agentSkillCount(a.type) > 0" class="skill-count-badge">{{ agentSkillCount(a.type) }}</span>
-              </button>
-              <p v-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
-            </template>
-          </aside>
-
-          <!-- Skill 管理右侧主区域 -->
-          <div class="settings-scroll skills-main">
+        <div v-else-if="tab === 'skills'" ref="paneRef" class="settings-scroll skills-pane" @scroll="onPaneScroll">
             <div class="settings-head skills-head">
               <span class="agent-type-badge skills-head-badge">{{ selectedAgentIcon }}</span>
               <div class="skills-head-copy">
@@ -333,7 +392,6 @@
             </div>
             </template>
           </div>
-        </div>
       </div>
     </div>
 
@@ -552,6 +610,127 @@ const navGroups = [
     ],
   },
 ]
+
+// ===== 三栏布局：左一级导航 / 中二级目录 / 右正文，分隔条可拖拽调宽 =====
+const SETTINGS_PANE_KEY = 'settings-layout-widths'
+const NAV_DEFAULT = 212
+const NAV_MIN = 168
+const NAV_MAX = 300
+const SUB_DEFAULT = 232
+const SUB_MIN = 168
+const SUB_MAX = 360
+const navWidth = ref(NAV_DEFAULT)
+const subWidth = ref(SUB_DEFAULT)
+const paneRef = ref(null)
+const activeSection = ref('')
+let activePaneDrag = null
+
+function clampPaneWidth(v, min, max) { return Math.min(max, Math.max(min, v)) }
+function persistPaneWidths() {
+  try {
+    localStorage.setItem(SETTINGS_PANE_KEY, JSON.stringify({ navWidth: navWidth.value, subWidth: subWidth.value }))
+  } catch { /* 忽略持久化失败 */ }
+}
+function initPaneWidths() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_PANE_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (typeof saved.navWidth === 'number') navWidth.value = clampPaneWidth(saved.navWidth, NAV_MIN, NAV_MAX)
+    if (typeof saved.subWidth === 'number') subWidth.value = clampPaneWidth(saved.subWidth, SUB_MIN, SUB_MAX)
+  } catch { /* 忽略损坏数据 */ }
+}
+const curTabMeta = computed(() => ({
+  ai: { icon: Cpu, title: 'AI 服务', desc: '能力分组与默认模型' },
+  styles: { icon: Palette, title: '风格预设', desc: '视觉风格片段管理' },
+  agents: { icon: Bot, title: 'Agent 配置', desc: '模型与提示词' },
+  skills: { icon: FileText, title: 'Skills 编辑', desc: '按 Agent 组织提示词文件' },
+}[tab.value]))
+// 二级目录：ai / styles 为章节锚点，agents 为动态 Agent 列表
+const subItems = computed(() => {
+  if (tab.value === 'ai') {
+    return [
+      { id: 'ai-overview', label: '能力总览' },
+      { id: 'ai-text', label: '文本服务', count: byType('text').length },
+      { id: 'ai-image', label: '图片服务', count: byType('image').length },
+      { id: 'ai-video', label: '视频服务', count: byType('video').length },
+    ]
+  }
+  if (tab.value === 'styles') return [{ id: 'styles-all', label: '全部风格', count: stylePresets.value.length }]
+  if (tab.value === 'agents') return agentList.value.map(a => ({ id: `agent-${a.type}`, label: a.label, icon: a.icon }))
+  return []
+})
+function isSubActive(it) {
+  if (activeSection.value) return activeSection.value === it.id
+  return subItems.value[0]?.id === it.id
+}
+function onSubNavClick(it) {
+  const el = paneRef.value?.querySelector(`[data-sub="${it.id}"]`)
+  if (!el) return
+  activeSection.value = it.id
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+function onPaneScroll() {
+  if (tab.value !== 'ai' && tab.value !== 'styles' && tab.value !== 'agents') return
+  const pane = paneRef.value
+  if (!pane) return
+  const marks = [...pane.querySelectorAll('[data-sub]')]
+  if (!marks.length) return
+  const paneTop = pane.getBoundingClientRect().top
+  let current = marks[0].getAttribute('data-sub')
+  for (const m of marks) {
+    if (m.getBoundingClientRect().top - paneTop <= 160) current = m.getAttribute('data-sub')
+  }
+  activeSection.value = current
+}
+function startPaneResize(type, e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  const isNav = type === 'nav'
+  activePaneDrag = {
+    type,
+    startX: e.clientX,
+    startWidth: isNav ? navWidth.value : subWidth.value,
+  }
+  const move = (ev) => {
+    if (!activePaneDrag) return
+    const delta = ev.clientX - activePaneDrag.startX
+    const next = clampPaneWidth(activePaneDrag.startWidth + delta, isNav ? NAV_MIN : SUB_MIN, isNav ? NAV_MAX : SUB_MAX)
+    if (isNav) navWidth.value = next
+    else subWidth.value = next
+  }
+  const finish = () => {
+    activePaneDrag = null
+    cleanup()
+    persistPaneWidths()
+  }
+  const cleanup = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', finish)
+    window.removeEventListener('pointercancel', finish)
+    document.body.classList.remove('resizing-panes')
+  }
+  activePaneDrag.cleanup = cleanup
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', finish)
+  window.addEventListener('pointercancel', finish)
+  document.body.classList.add('resizing-panes')
+}
+function adjustPaneWidth(type, delta) {
+  if (type === 'nav') navWidth.value = clampPaneWidth(navWidth.value + delta, NAV_MIN, NAV_MAX)
+  else subWidth.value = clampPaneWidth(subWidth.value + delta, SUB_MIN, SUB_MAX)
+  persistPaneWidths()
+}
+function resetPaneWidth(type) {
+  if (type === 'nav') navWidth.value = NAV_DEFAULT
+  else subWidth.value = SUB_DEFAULT
+  persistPaneWidths()
+}
+function onPaneResizeKey(type, e) {
+  const step = e.shiftKey ? 40 : 10
+  if (e.key === 'ArrowLeft') { adjustPaneWidth(type, -step); e.preventDefault(); return }
+  if (e.key === 'ArrowRight') { adjustPaneWidth(type, step); e.preventDefault(); return }
+  if (e.key === 'Home') { resetPaneWidth(type); e.preventDefault() }
+}
 
 // ===== 列表加载三态（P0-C1/C2）：初始加载显示骨架，失败内联错误 + 重试 =====
 const cfgsLoading = ref(false)
@@ -956,6 +1135,8 @@ async function loadAllSkills(initial = false) {
 async function selectAgent(type) {
   selectedAgent.value = type
   editingSkill.value = null
+  await nextTick()
+  if (paneRef.value) paneRef.value.scrollTo({ top: 0 })
 }
 
 function startAddSkill() {
@@ -1136,7 +1317,27 @@ async function saveStyle() {
   } catch (e) { toast.error(e.message) }
 }
 
-onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadStylePresets(true) })
+watch(tab, async () => {
+  activeSection.value = ''
+  await nextTick()
+  if (tab.value !== 'skills') {
+    const first = paneRef.value?.querySelector('[data-sub]')
+    if (first) activeSection.value = first.getAttribute('data-sub')
+  }
+})
+onBeforeUnmount(() => {
+  if (activePaneDrag?.cleanup) activePaneDrag.cleanup()
+})
+onMounted(async () => {
+  initPaneWidths()
+  loadCfgs(true)
+  loadAgents(true)
+  loadAllSkills(true)
+  loadStylePresets(true)
+  await nextTick()
+  const first = paneRef.value?.querySelector('[data-sub]')
+  if (first) activeSection.value = first.getAttribute('data-sub')
+})
 </script>
 
 <style scoped>
@@ -1159,8 +1360,128 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 
 .settings-nav {
-  width: 220px; flex-shrink: 0; padding: 4px 12px 16px; border-right: 1px solid var(--border);
+  flex-shrink: 0; padding: 4px 12px 16px;
   display: flex; flex-direction: column; gap: 14px;
+  overflow: hidden auto;
+  min-width: 0;
+}
+.nav-group-label { flex: none; }
+.nav-item { flex: none; }
+
+/* —— 可拖拽分隔条 —— */
+.pane-resizer {
+  flex: none;
+  width: 7px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  touch-action: none;
+}
+.pane-resizer::before {
+  content: '';
+  width: 1px;
+  height: 100%;
+  background: transparent;
+  transition: width 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+.pane-resizer:hover::before,
+.pane-resizer:active::before,
+.pane-resizer:focus-visible::before {
+  width: 2.5px;
+  background: var(--accent);
+  opacity: 0.75;
+  border-radius: 99px;
+}
+
+/* —— 中间二级目录 —— */
+.settings-subnav {
+  flex-shrink: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-0);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 12px 10px 10px;
+}
+.subnav-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 4px 6px 11px;
+  border-bottom: 1px solid var(--border);
+}
+.subnav-head-icon { margin-top: 1px; color: var(--accent); flex-shrink: 0; }
+.subnav-head-copy { min-width: 0; flex: 1; }
+.subnav-title { font-size: 13px; font-weight: 700; color: var(--text-0); }
+.subnav-desc { font-size: 10.5px; color: var(--text-3); margin-top: 2px; line-height: 1.5; }
+.subnav-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 2px;
+}
+.subnav-group-title {
+  font-size: 10.5px; font-weight: 650; letter-spacing: 0.06em;
+  color: var(--text-3); padding: 2px 8px 5px;
+}
+.subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  font-weight: 550;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: all 0.16s var(--ease-out);
+  text-align: left;
+}
+.subnav-item:hover { background: var(--bg-hover); color: var(--text-0); }
+.subnav-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
+.subnav-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
+.subnav-item-icon {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent-bg); color: var(--accent-text);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+}
+.subnav-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subnav-count {
+  font-size: 10px; font-weight: 700; font-family: var(--font-mono); flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.06); color: var(--text-2);
+  padding: 1px 6px; border-radius: 99px;
+}
+.subnav-item.active .subnav-count { background: var(--accent-bg); color: var(--accent-text); }
+.subnav-foot {
+  flex: none;
+  margin-top: 8px;
+  padding: 8px 6px 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-3);
+  border-top: 1px solid var(--border);
+}
+.subnav-loading { display: flex; flex-direction: column; gap: 8px; padding: 8px 4px; }
+.subnav-skel-row { display: flex; align-items: center; gap: 10px; }
+.subnav-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: var(--text-2);
 }
 .nav-group { display: flex; flex-direction: column; gap: 2px; }
 .nav-group-label {
@@ -1365,36 +1686,7 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .agent-card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); }
 .agent-card-foot { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
 
-/* Skills 布局 */
-.skills-layout { display: flex; height: 100%; overflow: hidden; }
-.skills-agent-list {
-  width: 210px; flex-shrink: 0; border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  overflow-y: auto; padding: 4px 10px 16px;
-}
-.skills-agent-title {
-  font-size: 11px; font-weight: 650; letter-spacing: 0.06em;
-  color: var(--text-3); padding: 8px 10px 4px;
-}
-.skills-agent-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px; font-size: 13px; font-weight: 550; cursor: pointer;
-  border: none; border-radius: var(--radius); background: transparent; color: var(--text-1);
-  transition: all 0.16s var(--ease-out); width: 100%; text-align: left;
-}
-.skills-agent-item:hover { background: var(--bg-hover); color: var(--text-0); }
-.skills-agent-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
-.skills-agent-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
-.skills-agent-item .agent-type-badge { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
-.skills-agent-label { flex: 1; min-width: 0; }
-.skill-count-badge {
-  font-size: 10px; font-weight: 700; font-family: var(--font-mono);
-  background: rgba(0,0,0,0.06); color: var(--text-2);
-  padding: 1px 6px; border-radius: 99px;
-}
-.skills-agent-item.active .skill-count-badge { background: var(--accent-bg); color: var(--accent-text); }
-.skills-main { flex: 1; min-width: 0; }
-.skills-main.settings-scroll { max-width: 900px; }
+/* Skills 页面（中栏 Agent 目录 + 右栏编辑区） */
 .skills-head { display: flex; align-items: flex-start; gap: 12px; }
 .skills-head-badge { width: 32px; height: 32px; font-size: 16px; }
 .skills-head-copy { min-width: 0; }
@@ -1485,6 +1777,12 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
   word-break: break-all;
 }
 
+/* 拖拽分隔条时禁止选中文本 */
+:global(body.resizing-panes) {
+  cursor: col-resize;
+  user-select: none;
+}
+
 /* 窄屏：总览条与能力卡堆叠，行内收纳保持 */
 @media (max-width: 960px) {
   .cap-strip { grid-template-columns: 1fr; }
@@ -1493,5 +1791,16 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
     border-top: 1px solid var(--border);
   }
   .cap-grid { grid-template-columns: 1fr; }
+}
+
+/* 窄窗口：收起中间二级目录与分隔条，退回左侧导航 + 正文两栏 */
+@media (max-width: 1080px) {
+  .pane-resizer,
+  .settings-subnav {
+    display: none;
+  }
+  .settings-nav {
+    border-right: 1px solid var(--border);
+  }
 }
 </style>
