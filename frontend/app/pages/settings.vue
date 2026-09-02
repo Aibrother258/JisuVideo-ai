@@ -441,7 +441,7 @@
                 <div v-if="skillOpen.has(s.id)" class="skill-card-body">
                   <!-- 读取失败：内联错误 + 重试，禁止出现可保存的空编辑框 -->
                   <div v-if="skillLoadError[s.id]" class="skill-load-error">
-                    <CircleAlert :size="14" style="flex-shrink:0;color:#d9534f" />
+                    <CircleAlert :size="14" class="skill-load-error-icon" style="flex-shrink:0" />
                     <div style="flex:1;min-width:0">
                       <div style="font-weight:600;font-size:12.5px">SKILL.md 读取失败</div>
                       <div class="dim" style="font-size:11px">{{ skillLoadError[s.id] }}</div>
@@ -1872,7 +1872,7 @@ onMounted(() => {
   max-width: 100%; padding: 2px 9px;
   border: 1px solid var(--accent);
   border-radius: 999px;
-  background: var(--accent-bg, rgba(0, 113, 227, 0.10));
+  background: var(--accent-bg);
   color: var(--accent);
   font-size: 10.5px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1971,7 +1971,7 @@ onMounted(() => {
 .cfg-model-chip.cfg-model-chip-ro:hover { border-color: var(--border); color: var(--text-2); cursor: default; }
 .cfg-model-chip.is-default {
   border-color: var(--accent);
-  background: var(--accent-bg, rgba(0,113,227,0.10));
+  background: var(--accent-bg);
   color: var(--accent);
   font-weight: 600;
   cursor: default;
@@ -1979,7 +1979,7 @@ onMounted(() => {
 .cfg-model-star { fill: currentColor; }
 .cfg-model-chip.is-selected {
   border-color: var(--accent);
-  background: var(--accent-bg, rgba(0,113,227,0.10));
+  background: var(--accent-bg);
   color: var(--accent);
   font-weight: 600;
 }
@@ -2050,6 +2050,7 @@ onMounted(() => {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px;
   border: 1px solid #f0c0bb; background: #fdf1f0; border-radius: 10px;
 }
+.skill-load-error-icon { color: var(--error); }
 .skill-loading {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 26px 0; color: var(--text-3); font-size: 12.5px;
@@ -2109,8 +2110,8 @@ onMounted(() => {
   border: 1px solid var(--border);
   background: var(--bg-0);
 }
-.test-result.ok { border-color: rgba(52,199,89,0.4); background: var(--success-bg); }
-.test-result.bad { border-color: rgba(255,59,48,0.4); background: var(--error-bg); }
+.test-result.ok { border-color: var(--success-border-strong); background: var(--success-bg); }
+.test-result.bad { border-color: var(--error-border-strong); background: var(--error-bg); }
 .test-result-head {
   display: flex;
   align-items: center;

@@ -44,7 +44,7 @@ test('project entry is redesigned as a poster card grid', () => {
 })
 
 test('global header uses the frosted glass material', () => {
-  assert.match(defaultLayout, /background:\s*rgba\(251,251,253,0\.72\)/)
+  assert.match(defaultLayout, /background:\s*var\(--bar-glass\)/)
   assert.match(defaultLayout, /backdrop-filter:\s*blur\(20px\)\s*saturate\(180%\)/)
   assert.match(defaultLayout, /border-bottom:\s*1px solid var\(--border\)/)
 })
