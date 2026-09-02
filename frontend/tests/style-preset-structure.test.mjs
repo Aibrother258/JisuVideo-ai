@@ -26,7 +26,13 @@ test('project creation starts from source content and offers AI-generated choice
   assert.match(page, /stylePresetAPI/)
   assert.match(page, /stylePresetAPI\.list\(\)/)
   assert.match(page, /styleLabel\(d\.style\)/)
-  assert.match(page, /stylePresets\.length \}\} 种视觉风格/)
+  // 原「N 种视觉风格」统计已随首页双栏改造移除；侧栏「风格灵感」色板直接使用风格预设列表（API 数据），
+  // 点击色板可预选该风格并进入新建流程（风格灵感锁定 → AI 提炼时优先采用）
+  assert.match(page, /风格灵感/)
+  assert.match(page, /stylePresets\.length/)
+  assert.match(page, /stylePresets\.slice\(0, 6\)/)
+  assert.match(page, /openCreateWithStyle\(/)
+  assert.match(page, /inspirationStyle/)
 })
 
 test('useApi exposes style preset endpoints', () => {

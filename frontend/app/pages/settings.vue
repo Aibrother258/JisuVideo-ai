@@ -299,10 +299,14 @@
                 </label>
               </div>
               <div class="style-detail-foot">
-                <span class="dim" style="font-size:11px">修改后点击保存立即生效</span>
-                <button class="btn btn-primary btn-sm ml-auto" :disabled="styleSaving" @click="saveStyle">
+                <span v-if="styleDirty" class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2">
+                  <TriangleAlert :size="11" /> 有未保存的修改
+                </span>
+                <span v-else class="dim" style="font-size:11px">修改后点击保存立即生效</span>
+                <button v-if="styleDirty" type="button" class="btn btn-ghost btn-sm" @click="discardStyleEdit">放弃修改</button>
+                <button type="button" class="btn btn-primary btn-sm ml-auto" :disabled="styleSaving || !styleDirty" @click="saveStyle">
                   <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
-                  保存
+                  {{ styleDirty ? '保存修改' : '已保存' }}
                 </button>
               </div>
             </div>
@@ -430,24 +434,45 @@
                   </button>
                   <ChevronDown :size="14" :style="{ transform: skillOpen.has(s.id) ? 'rotate(180deg)' : '', transition: '0.2s' }" />
                 </div>
-                <div v-if="skillContents[s.id] !== undefined && skillOpen.has(s.id)" class="skill-card-body">
-                  <textarea
-                    v-model="skillContents[s.id]"
-                    class="textarea mono"
-                    rows="20"
-                    style="font-size:12px;line-height:1.6"
-                    placeholder="编写 SKILL.md 内容..."
-                  />
-                  <div class="skill-card-foot">
-                    <span class="dim" style="font-size:11px">skills/{{ s.id }}/SKILL.md</span>
-                    <span v-if="skillSaved === s.id" class="tag tag-success" style="margin-left:8px">
-                      <Check :size="10" /> 已保存
-                    </span>
-                    <button class="btn btn-primary btn-sm ml-auto" :disabled="skillSaving" @click="saveSkill(s.id)">
-                      <Loader2 v-if="skillSaving" :size="12" class="animate-spin" />
-                      保存
+                <div v-if="skillOpen.has(s.id)" class="skill-card-body">
+                  <!-- 读取失败：内联错误 + 重试，禁止出现可保存的空编辑框 -->
+                  <div v-if="skillLoadError[s.id]" class="skill-load-error">
+                    <CircleAlert :size="14" style="flex-shrink:0;color:#d9534f" />
+                    <div style="flex:1;min-width:0">
+                      <div style="font-weight:600;font-size:12.5px">SKILL.md 读取失败</div>
+                      <div class="dim" style="font-size:11px">{{ skillLoadError[s.id] }}</div>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" :disabled="skillLoadingIds.has(s.id)" @click="loadSkillContent(s.id)">
+                      <Loader2 v-if="skillLoadingIds.has(s.id)" :size="11" class="animate-spin" />
+                      <RefreshCw v-else :size="11" />
+                      重试
                     </button>
                   </div>
+                  <!-- 首次加载中 -->
+                  <div v-else-if="skillContents[s.id] === undefined" class="skill-loading">
+                    <Loader2 :size="15" class="animate-spin" style="color:var(--text-3)" />
+                    <span>正在读取 SKILL.md…</span>
+                  </div>
+                  <!-- 内容已加载：可编辑保存 -->
+                  <template v-else>
+                    <textarea
+                      v-model="skillContents[s.id]"
+                      class="textarea mono"
+                      rows="20"
+                      style="font-size:12px;line-height:1.6"
+                      placeholder="编写 SKILL.md 内容..."
+                    />
+                    <div class="skill-card-foot">
+                      <span class="dim" style="font-size:11px">skills/{{ s.id }}/SKILL.md</span>
+                      <span v-if="skillSaved === s.id" class="tag tag-success" style="margin-left:8px">
+                        <Check :size="10" /> 已保存
+                      </span>
+                      <button class="btn btn-primary btn-sm ml-auto" :disabled="skillSaving" @click="saveSkill(s.id)">
+                        <Loader2 v-if="skillSaving" :size="12" class="animate-spin" />
+                        保存
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -626,6 +651,29 @@
         </div>
       </form>
     </div>
+    <!-- 切换风格前：当前风格有未保存修改，让用户选择保存 / 放弃 / 取消 -->
+    <div v-if="stylePromptOpen" class="overlay" @click.self="cancelStylePrompt">
+      <div class="dialog unsaved-dialog">
+        <div class="dialog-head">
+          <div>
+            <div class="dialog-title">有未保存的修改</div>
+            <div class="dialog-sub">「{{ currentStyle?.name || '当前风格' }}」的表单已修改但尚未保存。</div>
+          </div>
+          <span class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2"><TriangleAlert :size="12" /> 未保存</span>
+        </div>
+        <div class="dialog-body">
+          <p class="unsaved-dialog-copy">切换风格会丢弃这些修改。「保存并切换」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
+        </div>
+        <div class="dialog-foot">
+          <button type="button" class="btn" @click="cancelStylePrompt">取消</button>
+          <button type="button" class="btn btn-ghost" @click="discardStyleEdit">放弃更改</button>
+          <button type="button" class="btn btn-primary" :disabled="styleSaving" @click="keepStyleAndSwitch">
+            <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+            保存并切换
+          </button>
+        </div>
+      </div>
+    </div>
     <ConfirmDialog
       :open="!!styleToDelete"
       title="删除风格预设"
@@ -646,7 +694,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
@@ -741,7 +789,7 @@ function onSubNavClick(it) {
     return
   }
   if (tab.value === 'styles') {
-    showStyleDetail(it.id)
+    requestStyleSwitch(it.id)
     return
   }
   if (activeSection.value !== it.id) activeSection.value = it.id
@@ -1166,7 +1214,9 @@ async function saveAgentCfg(type) {
 // ===== Skills =====
 const selectedAgent = ref('script_rewriter')
 const allSkills = ref([])   // { id, name, description }[]
-const skillContents = ref({})  // skill id -> SKILL.md 内容
+const skillContents = ref({})  // skill id -> SKILL.md 内容（仅在读取成功后写入）
+const skillLoadError = ref({})  // skill id -> 首次读取失败的报错；有错误时不显示可保存的编辑框
+const skillLoadingIds = reactive(new Set())  // 正在读取 SKILL.md 的 skill id
 const skillOpen = reactive(new Set())  // 已展开的 skill id（进入/切换 Agent 后默认全部展开）
 const skillSaving = ref(false)
 const skillSaved = ref(null)
@@ -1215,19 +1265,33 @@ async function loadAllSkills(initial = false) {
   }
 }
 
-// 预载并展开某个 Agent 的全部 Skill 内容（默认全部展开，可点击卡头收起）
-async function revealSkillsOf(type) {
-  const items = allSkills.value.filter(s => skillBelongsTo(s.id, type))
-  await Promise.all(items.map(async (s) => {
-    if (skillContents.value[s.id] !== undefined) { skillOpen.add(s.id); return }
-    try {
-      const res = await skillsAPI.get(s.id)
-      skillContents.value[s.id] = res.content || ''
-    } catch (e) {
-      skillContents.value[s.id] = ''
+// 读取单个 SKILL.md：成功写入内容并展开；失败不伪装为空内容——
+// 首次读取失败记录内联错误（显示「重试」，禁止可保存的空编辑框）；已有缓存则保留缓存内容
+async function loadSkillContent(id) {
+  if (skillLoadingIds.has(id)) return
+  skillLoadingIds.add(id)
+  try {
+    const res = await skillsAPI.get(id)
+    delete skillLoadError.value[id]
+    skillContents.value[id] = res.content || ''
+    skillOpen.add(id)
+    return true
+  } catch (e) {
+    if (skillContents.value[id] === undefined) {
+      skillLoadError.value[id] = e.message || '读取失败'
+    } else {
+      toast.error(`「${id}」重新读取失败，已保留已加载内容`)
     }
-    skillOpen.add(s.id)
-  }))
+    skillOpen.add(id)
+    return false
+  } finally {
+    skillLoadingIds.delete(id)
+  }
+}
+// 预载并展开某个 Agent 的全部 Skill 内容（默认全部展开，可点击卡头收起）
+function revealSkillsOf(type) {
+  const items = allSkills.value.filter(s => skillBelongsTo(s.id, type))
+  return Promise.all(items.map(s => loadSkillContent(s.id)))
 }
 function ensureSkillsRevealed() {
   if (!agentCfgs.value.length || !allSkills.value.length) return Promise.resolve()
@@ -1272,6 +1336,8 @@ async function confirmDelSkill() {
     deletingSkill.value = true
     await skillsAPI.del(id)
     delete skillContents.value[id]
+    delete skillLoadError.value[id]
+    skillLoadingIds.delete(id)
     skillOpen.delete(id)
     if (skillSaved.value === id) skillSaved.value = null
     await loadAllSkills()
@@ -1284,10 +1350,10 @@ async function confirmDelSkill() {
   }
 }
 
-// 点击 Skill 卡头：展开 / 收起；若内容尚未载入则先载入再展开
+// 点击 Skill 卡头：展开 / 收起；内容未载入或读取失败时触发加载 / 重试
 async function toggleSkillEdit(id) {
   if (skillOpen.has(id)) { skillOpen.delete(id); return }
-  if (skillContents.value[id] === undefined) await revealSkillsOf(selectedAgent.value)
+  if (skillContents.value[id] === undefined || skillLoadError.value[id]) await loadSkillContent(id)
   else skillOpen.add(id)
 }
 
@@ -1314,6 +1380,12 @@ const styleEditId = ref(null)
 const styleForm = reactive({ name: '', value: '', prompt: '', description: '', sort_order: 0 })
 const styleDetailId = ref(null)
 const styleSaving = ref(false)
+// 未保存修改检测：styleSnap 为当前选中风格加载进表单时的原始快照，表单与之不一致即视为未保存
+const styleSnap = ref(null)
+const styleDirty = ref(false)
+// 有未保存修改时切换风格：弹「保存并切换 / 放弃更改 / 取消」三选确认
+const stylePromptOpen = ref(false)
+const stylePromptSwitchId = ref(null)
 
 async function loadStylePresets(initial = false) {
   if (initial) { styleLoading.value = true; styleError.value = '' }
@@ -1327,16 +1399,25 @@ async function loadStylePresets(initial = false) {
 }
 
 const currentStyle = computed(() => stylePresets.value.find(p => p.id === styleDetailId.value) || null)
+// 把指定风格载入表单，同时记录原始快照作为“未保存”基准（表单与之不同即 dirty）
 function fillStyleForm(p) {
   styleEditId.value = p.id
-  Object.assign(styleForm, {
-    name: p.name,
-    value: p.value,
-    prompt: p.prompt,
-    description: p.description || '',
-    sort_order: p.sort_order ?? 0,
-  })
+  styleSnap.value = { name: p.name, value: p.value, prompt: p.prompt, description: p.description ?? '', sort_order: p.sort_order ?? 0 }
+  Object.assign(styleForm, styleSnap.value)
+  styleDirty.value = false
 }
+// 详情卡表单变化检测（新建弹窗不参与：取消时通过 fillStyleForm 恢复）
+watch(
+  () => [styleForm.name, styleForm.value, styleForm.prompt, styleForm.description, styleForm.sort_order],
+  () => {
+    const s = styleSnap.value
+    styleDirty.value = !!s && (
+      styleForm.name !== s.name || styleForm.value !== s.value ||
+      styleForm.prompt !== s.prompt || styleForm.description !== s.description ||
+      styleForm.sort_order !== s.sort_order
+    )
+  }
+)
 // 二级目录 / 列表入口：把对应风格装进右侧详情卡（默认展开可编辑）
 function showStyleDetail(id) {
   if (styleDetailId.value === id) { paneScrollTop(); return }
@@ -1345,6 +1426,40 @@ function showStyleDetail(id) {
   styleDetailId.value = id
   fillStyleForm(p)
   paneScrollTop()
+}
+// 切换风格入口：当前有未保存修改时先弹「保存并切换 / 放弃更改 / 取消」，防止静默丢失
+function requestStyleSwitch(id) {
+  if (styleDetailId.value === id) { paneScrollTop(); return }
+  if (styleDirty.value && styleEditId.value) {
+    stylePromptSwitchId.value = id
+    stylePromptOpen.value = true
+    return
+  }
+  showStyleDetail(id)
+}
+function closeStylePrompt() {
+  stylePromptOpen.value = false
+  stylePromptSwitchId.value = null
+}
+function cancelStylePrompt() {
+  if (styleSaving.value) return
+  closeStylePrompt()
+}
+// 「保存并切换」：先保存当前风格修改，成功后再跳到目标风格
+async function keepStyleAndSwitch() {
+  const target = stylePromptSwitchId.value
+  const ok = await persistCurrentStyleEdit()
+  if (!ok) return // 保存失败：停留当前页并保留弹窗，由用户重试或放弃
+  closeStylePrompt()
+  if (target) showStyleDetail(target)
+}
+// 「放弃更改 / 放弃修改」：恢复当前风格快照；若正处于切换确认中，随后继续切到目标风格
+function discardStyleEdit() {
+  const target = stylePromptSwitchId.value
+  closeStylePrompt()
+  const p = stylePresets.value.find(x => x.id === styleDetailId.value)
+  if (p) fillStyleForm(p)
+  if (target && target !== styleDetailId.value) showStyleDetail(target)
 }
 // 列表加载 / 删除后保证有合法选中项，默认选中第一个
 function ensureStyleSelection() {
@@ -1375,7 +1490,14 @@ async function confirmDelStyle() {
     await stylePresetAPI.del(p.id)
     styleToDelete.value = null
     toast.success('已删除')
-    loadStylePresets()
+    await loadStylePresets()
+    // 删除了当前正在编辑的风格：列表 watch 已回退选中第一个；若没有剩余风格则清空编辑态
+    if (!stylePresets.value.length) {
+      styleDetailId.value = null
+      styleEditId.value = null
+      styleSnap.value = null
+      styleDirty.value = false
+    }
   } catch (e) {
     toast.error(e.message)
   } finally {
@@ -1386,6 +1508,7 @@ async function confirmDelStyle() {
 // 新建风格仍走弹窗表单；styleEditId 置空使「风格 key」可填写
 function startAddStyle() {
   styleEditId.value = null
+  styleSnap.value = null // 新建弹窗期间不做未保存检测，取消时会用当前风格快照恢复
   Object.assign(styleForm, {
     name: '', value: '', prompt: '', description: '',
     sort_order: (stylePresets.value.at(-1)?.sort_order ?? 0) + 1,
@@ -1431,34 +1554,58 @@ async function expandStyle() {
   }
 }
 
+// 保存右侧详情卡当前风格的修改；保存后按最新列表重建快照并复位 dirty。返回是否保存成功。
+async function persistCurrentStyleEdit() {
+  const id = styleEditId.value
+  if (!id) return false
+  if (!styleForm.name?.trim() || !styleForm.prompt?.trim()) {
+    toast.warning('名称与提示词片段必填')
+    return false
+  }
+  styleSaving.value = true
+  try {
+    await stylePresetAPI.update(id, {
+      name: styleForm.name,
+      prompt: styleForm.prompt,
+      description: styleForm.description,
+      sort_order: styleForm.sort_order,
+    })
+    toast.success('已保存')
+    await loadStylePresets()
+    const p = stylePresets.value.find(x => x.id === id)
+    if (p) fillStyleForm(p)
+    return true
+  } catch (e) {
+    toast.error(e.message)
+    return false
+  } finally {
+    styleSaving.value = false
+  }
+}
+
 async function saveStyle() {
-  if (!styleForm.name?.trim() || !styleForm.prompt?.trim() || (!styleEditId.value && !styleForm.value?.trim())) {
+  // 详情卡保存（存在正在编辑的风格）
+  if (styleEditId.value) {
+    const ok = await persistCurrentStyleEdit()
+    if (ok) styleDialog.value = false
+    return
+  }
+  // 新建风格弹窗
+  if (!styleForm.name?.trim() || !styleForm.prompt?.trim() || !styleForm.value?.trim()) {
     toast.warning('名称、key、提示词片段必填')
     return
   }
   styleSaving.value = true
   try {
-    if (styleEditId.value) {
-      await stylePresetAPI.update(styleEditId.value, {
-        name: styleForm.name,
-        prompt: styleForm.prompt,
-        description: styleForm.description,
-        sort_order: styleForm.sort_order,
-      })
-      styleDialog.value = false
-      toast.success('已保存')
-      await loadStylePresets()
-    } else {
-      const beforeIds = new Set(stylePresets.value.map(p => p.id))
-      await stylePresetAPI.create({ ...styleForm })
-      styleDialog.value = false
-      toast.success('已保存')
-      await loadStylePresets()
-      // 新建完成后跳到新风格详情卡，立即可见
-      const added = stylePresets.value.find(p => !beforeIds.has(p.id))
-      if (added) showStyleDetail(added.id)
-      else ensureStyleSelection()
-    }
+    const beforeIds = new Set(stylePresets.value.map(p => p.id))
+    await stylePresetAPI.create({ ...styleForm })
+    styleDialog.value = false
+    toast.success('已保存')
+    await loadStylePresets()
+    // 新建完成后跳到新风格详情卡，立即可见
+    const added = stylePresets.value.find(p => !beforeIds.has(p.id))
+    if (added) showStyleDetail(added.id)
+    else ensureStyleSelection()
   } catch (e) { toast.error(e.message) } finally { styleSaving.value = false }
 }
 
@@ -1472,13 +1619,22 @@ watch(tab, () => {
 watch([agentCfgs, allSkills], () => {
   if (tab.value === 'skills') ensureSkillsRevealed()
 })
+// 刷新 / 关闭页面兜底：风格详情卡有未保存修改时提示浏览器确认，避免误丢
+const guardUnload = (e) => {
+  if (styleDirty.value && styleEditId.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 onBeforeUnmount(() => {
   if (activePaneDrag?.cleanup) activePaneDrag.cleanup()
+  window.removeEventListener('beforeunload', guardUnload)
 })
 onMounted(() => {
   initPaneWidths()
   activeSection.value = 'ai-overview'
   loadCfgs(true); loadAgents(true); loadAllSkills(true); loadStylePresets(true)
+  window.addEventListener('beforeunload', guardUnload)
 })
 </script>
 
@@ -1857,6 +2013,14 @@ onMounted(() => {
 .skill-card-head:hover { background: var(--bg-hover); }
 .skill-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); }
 .skill-card-foot { display: flex; align-items: center; gap: 8px; }
+.skill-load-error {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border: 1px solid #f0c0bb; background: #fdf1f0; border-radius: 10px;
+}
+.skill-loading {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 26px 0; color: var(--text-3); font-size: 12.5px;
+}
 
 /* Shared */
 .field { display: flex; flex-direction: column; gap: 5px; }
