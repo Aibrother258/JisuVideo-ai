@@ -88,8 +88,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .confirm-actions .btn { flex: 1; }
 .confirm-danger-btn {
   background: var(--action-danger);
-  color: #fff;
+  color: var(--text-invert);
 }
-.confirm-danger-btn:hover { background: #d70015; color: #fff; }
+.confirm-danger-btn:hover { background: #d70015; color: var(--text-invert); }
 .confirm-danger-btn:disabled { opacity: 0.6; }
 </style>

@@ -1840,9 +1840,9 @@ onMounted(() => {
 .cap-badge {
   width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
   display: grid; place-items: center;
-  font-size: 13px; font-weight: 800; color: #fff;
+  font-size: 13px; font-weight: 800; color: var(--text-invert);
   background: var(--accent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-badge);
 }
 .cap-badge.t-image { background: linear-gradient(135deg, #8b5cf6, #4f46e5); }
 .cap-badge.t-video { background: linear-gradient(135deg, #f43f5e, #f97316); }
@@ -1913,8 +1913,8 @@ onMounted(() => {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, #f5a623, #e86b2a);
-  color: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  color: var(--text-invert);
+  box-shadow: var(--shadow-badge);
 }
 .style-detail-body { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
 .style-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
@@ -1925,9 +1925,9 @@ onMounted(() => {
 .provider-badge {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 14px; color: #fff;
+  font-weight: 700; font-size: 14px; color: var(--text-invert);
   background: var(--accent);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  box-shadow: var(--shadow-badge);
 }
 .provider-badge[data-provider="openai"] { background: #10a37f; }
 .provider-badge[data-provider="gemini"] { background: #4285f4; }
@@ -1984,7 +1984,7 @@ onMounted(() => {
   border-color: var(--accent);
   background: var(--accent);
 }
-.cfg-model-check { color: #fff; flex-shrink: 0; }
+.cfg-model-check { color: var(--text-invert); flex-shrink: 0; }
 .model-fetch-actions { display: flex; gap: 8px; margin-top: 6px; }
 .config-empty { font-size: 12px; color: var(--text-3); padding: 14px 20px; }
 .config-switch { display: inline-flex; flex-shrink: 0; cursor: pointer; }
