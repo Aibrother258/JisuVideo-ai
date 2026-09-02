@@ -2077,7 +2077,7 @@ onBeforeUnmount(() => {
   transition: background 0.14s, color 0.14s;
 }
 .ep-status-draft { background: var(--bg-2); color: var(--text-2); }
-.ep-status-active { background: rgba(34,197,94,0.1); color: #16a34a; }
+.ep-status-active { background: var(--success-bg); color: var(--success-strong); }
 .ep-status-completed { background: var(--accent-bg); color: var(--accent-text); }
 
 /* 分辨率标签 */
@@ -2095,7 +2095,7 @@ onBeforeUnmount(() => {
 .status-dot {
   width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
 }
-.dot-active { background: var(--success); box-shadow: 0 0 4px rgba(34,197,94,0.35); }
+.dot-active { background: var(--success); box-shadow: 0 0 4px var(--success-border-strong); }
 .dot-done { background: var(--accent); }
 .dot-pending { background: var(--text-3); }
 
@@ -2205,10 +2205,10 @@ onBeforeUnmount(() => {
 }
 .asset-group-head.is-character { border-left-color: var(--accent); background: var(--accent-bg); color: var(--accent-text); }
 .asset-group-head.is-character .group-icon { color: var(--accent-text); }
-.asset-group-head.is-scene { border-left-color: #16a34a; background: rgba(34,197,94,0.1); color: #15803d; }
-.asset-group-head.is-scene .group-icon { color: #15803d; }
-.asset-group-head.is-prop { border-left-color: #b45309; background: rgba(180,83,9,0.1); color: #b45309; }
-.asset-group-head.is-prop .group-icon { color: #b45309; }
+.asset-group-head.is-scene { border-left-color: var(--kind-scene); background: var(--kind-scene-bg); color: var(--kind-scene-strong); }
+.asset-group-head.is-scene .group-icon { color: var(--kind-scene-strong); }
+.asset-group-head.is-prop { border-left-color: var(--kind-prop); background: var(--kind-prop-bg); color: var(--kind-prop); }
+.asset-group-head.is-prop .group-icon { color: var(--kind-prop); }
 .asset-card {
   display: flex; flex-direction: column; overflow: hidden;
   transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
@@ -2361,10 +2361,10 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  background: var(--surface-glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-float);
   color: var(--text-2);
   font-size: 9.5px;
   font-weight: 700;

@@ -107,6 +107,19 @@
   --success-border: rgba(52,199,89,0.30);
   --success-border-strong: rgba(52,199,89,0.32);
   --warning-border-strong: rgba(255,159,10,0.32);
+  /* A2 批次一：资产类别语义色（detail 素材分组，值不变改引用；character 沿用 accent） */
+  --kind-scene: #16a34a;
+  --kind-scene-strong: #15803d;
+  --kind-scene-bg: rgba(34,197,94,0.10);
+  --kind-prop: #b45309;
+  --kind-prop-bg: rgba(180,83,9,0.10);
+  /* A2 批次一：amber 提示横幅（布局 config banner「AI 服务未配置」警示系，值不变；暗色可整体覆盖） */
+  --notice-bg: #fffbeb;
+  --notice-border: #fde68a;
+  --notice-text: #92400e;
+  --notice-link: #b45309;
+  --notice-link-border: #fcd34d;
+  --notice-link-hover-bg: #fef3c7;
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);
