@@ -57,6 +57,17 @@
               <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="11" /> 重试</button>
             </div>
             <p v-else-if="tab === 'agents' && !agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            <div v-else-if="tab === 'styles' && styleLoading" class="subnav-loading">
+              <div v-for="i in 4" :key="i" class="subnav-skel-row">
+                <div class="app-skeleton-line" style="width:14px;height:14px;border-radius:6px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:70%;height:12px"></div>
+              </div>
+            </div>
+            <div v-else-if="tab === 'styles' && styleError" class="subnav-error">
+              <span>风格预设加载失败</span>
+              <button class="btn btn-ghost btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="11" /> 重试</button>
+            </div>
+            <p v-else-if="tab === 'styles' && !stylePresets.length" class="config-empty">暂无风格预设</p>
             <button
               v-else
               v-for="it in subItems"
@@ -212,9 +223,12 @@
 
         <!-- ===== 风格预设 ===== -->
         <div v-else-if="tab === 'styles'" ref="paneRef" class="settings-scroll">
-          <div class="settings-head">
-            <h2 class="settings-title">风格预设</h2>
-            <p class="settings-desc">创建项目时选择的视觉风格，其英文提示词片段会自动注入角色图与场景图生成。停用的风格不出现在创建选项中。</p>
+          <div class="settings-head styles-head">
+            <div class="styles-head-copy">
+              <h2 class="settings-title">风格预设</h2>
+              <p class="settings-desc">点击左侧二级目录切换风格，右侧展示该风格完整信息并可直接编辑；停用的风格不出现在创建选项中。</p>
+            </div>
+            <button class="btn btn-ghost btn-sm ml-auto" @click="startAddStyle"><Plus :size="13" /> 添加风格</button>
           </div>
           <section v-if="styleLoading" class="card svc-group">
             <div class="svc-group-head">
@@ -232,41 +246,77 @@
             <p class="app-state-desc">{{ styleError }}</p>
             <button class="btn btn-primary btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <section v-else class="card svc-group" data-sub="styles-all">
+          <section v-else-if="currentStyle" class="card svc-group style-detail-card">
             <div class="svc-group-head">
+              <div class="style-detail-badge"><Palette :size="15" /></div>
               <div class="svc-group-heading">
-                <span class="svc-group-title">全部风格</span>
-                <div class="svc-group-sub">{{ stylePresets.filter(p => p.is_active).length }} 个启用 · {{ stylePresets.length }} 个总计</div>
-              </div>
-              <button class="btn btn-ghost btn-sm ml-auto" @click="startAddStyle"><Plus :size="13" /> 添加</button>
-            </div>
-            <div v-for="p in stylePresets" :key="p.id" class="config-row">
-              <div class="provider-badge style-badge"><Palette :size="15" /></div>
-              <div class="config-main">
                 <div class="config-line">
-                  <span class="config-name">{{ p.name }}</span>
-                  <span class="tag mono">{{ p.value }}</span>
-                  <span v-if="!p.is_active" class="tag">已停用</span>
+                  <span class="svc-group-title">{{ currentStyle.name }}</span>
+                  <span class="tag mono">{{ currentStyle.value }}</span>
+                  <span v-if="!currentStyle.is_active" class="tag">已停用</span>
+                  <span v-else class="tag tag-success">启用中</span>
                 </div>
-                <div class="config-sub mono truncate">{{ p.prompt }}</div>
-                <div v-if="p.description" class="config-sub truncate">{{ p.description }}</div>
+                <div class="svc-group-sub">提示词片段为英文，会在生成角色图与场景图时自动拼入提示词</div>
               </div>
-              <label class="config-switch">
-                <input type="checkbox" class="sr-only" :checked="p.is_active" @change="toggleStyle(p)">
-                <span class="switch" :class="{ on: p.is_active }"></span>
+              <label class="config-switch" :title="currentStyle.is_active ? '停用该风格' : '启用该风格'">
+                <input type="checkbox" class="sr-only" :checked="currentStyle.is_active" @change="toggleStyle(currentStyle)">
+                <span class="switch" :class="{ on: currentStyle.is_active }"></span>
               </label>
-              <button class="btn btn-ghost btn-icon btn-sm" @click="startEditStyle(p)"><Pencil :size="13" /></button>
-              <button class="btn btn-danger btn-icon btn-sm" @click="styleToDelete = p"><Trash2 :size="13" /></button>
+              <button class="btn btn-danger btn-icon btn-sm" title="删除风格" @click="styleToDelete = currentStyle"><Trash2 :size="13" /></button>
             </div>
-            <p v-if="!stylePresets.length" class="config-empty">暂无风格预设</p>
+            <div class="svc-group-body style-detail-body">
+              <div class="style-ai-bar">
+                <div class="style-ai-copy">
+                  <span>AI 一键完善</span>
+                  <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
+                  <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
+                  <Sparkles v-else :size="13" />
+                  {{ styleExpanding ? '完善中…' : 'AI 完善' }}
+                </button>
+              </div>
+              <div class="style-detail-grid">
+                <label class="field">
+                  <span class="field-label">风格名称 <span class="required">*</span></span>
+                  <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
+                </label>
+                <label class="field">
+                  <span class="field-label">风格 key <span class="required">*</span> <span class="dim">(创建后不可修改)</span></span>
+                  <input v-model="styleForm.value" class="input mono" :disabled="!!styleEditId" placeholder="如 3d、anime（小写字母/数字/中划线）" />
+                </label>
+                <label class="field field-wide">
+                  <span class="field-label">提示词片段（英文） <span class="required">*</span></span>
+                  <textarea v-model="styleForm.prompt" class="textarea" rows="4" placeholder="如 anime style, cel shading, vibrant colors, clean line art"></textarea>
+                </label>
+                <label class="field">
+                  <span class="field-label">描述</span>
+                  <input v-model="styleForm.description" class="input" placeholder="一句话说明该风格的适用场景" />
+                </label>
+                <label class="field">
+                  <span class="field-label">排序</span>
+                  <input v-model.number="styleForm.sort_order" class="input" type="number" min="0" max="999" />
+                </label>
+              </div>
+              <div class="style-detail-foot">
+                <span class="dim" style="font-size:11px">修改后点击保存立即生效</span>
+                <button class="btn btn-primary btn-sm ml-auto" :disabled="styleSaving" @click="saveStyle">
+                  <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+                  保存
+                </button>
+              </div>
+            </div>
+          </section>
+          <section v-else class="card svc-group">
+            <p class="config-empty">暂无风格预设，点击右上角「添加风格」创建第一个风格</p>
           </section>
         </div>
 
         <!-- ===== Agent 配置 ===== -->
         <div v-else-if="tab === 'agents'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
-            <h2 class="settings-title">Agent 配置</h2>
-            <p class="settings-desc">高级区只保留 Agent 运行配置。这里可以调整模型、提示词和参数，保存后立即生效。</p>
+            <h2 class="settings-title">Prompts</h2>
+            <p class="settings-desc">Prompts 即各 Agent 的系统提示词与运行模型（保存为 workspace/prompts/*.md），点击左侧目录切换 Agent，修改后保存立即生效。</p>
           </div>
           <div v-if="agentsLoading" class="agent-list">
             <div v-for="i in 3" :key="i" class="card agent-card">
@@ -336,7 +386,7 @@
               <div class="skills-head-copy">
                 <h2 class="settings-title">{{ selectedAgentLabel }}</h2>
                 <div class="dim" style="font-size:12px;margin-top:2px">{{ selectedAgentType }} — Skills</div>
-                <p class="settings-desc">Skills 仅作为 Agent 的高级提示词层使用，不影响工作台常规功能入口。</p>
+                <p class="settings-desc">每个 Skill 保存为独立的 SKILL.md。点击左侧 Agent 后其全部 Skill 默认展开，可直接编辑内容。</p>
               </div>
               <button class="btn btn-primary btn-sm ml-auto" @click="startAddSkill">
                 <Plus :size="13" /> 新增 Skill
@@ -378,11 +428,11 @@
                   <button class="btn btn-danger btn-icon btn-sm" style="margin-right:4px" @click.stop="skillToDelete = s.id">
                     <Trash2 :size="13" />
                   </button>
-                  <ChevronDown :size="14" :style="{ transform: editingSkill === s.id ? 'rotate(180deg)' : '', transition: '0.2s' }" />
+                  <ChevronDown :size="14" :style="{ transform: skillOpen.has(s.id) ? 'rotate(180deg)' : '', transition: '0.2s' }" />
                 </div>
-                <div v-if="editingSkill === s.id" class="skill-card-body">
+                <div v-if="skillContents[s.id] !== undefined && skillOpen.has(s.id)" class="skill-card-body">
                   <textarea
-                    v-model="skillContent"
+                    v-model="skillContents[s.id]"
                     class="textarea mono"
                     rows="20"
                     style="font-size:12px;line-height:1.6"
@@ -527,11 +577,11 @@
     </div>
 
     <!-- Style Preset Dialog -->
-    <div v-if="styleDialog" class="overlay" @click.self="styleDialog = false">
+    <div v-if="styleDialog" class="overlay" @click.self="cancelStyleDialog">
       <form class="dialog config-dialog" @submit.prevent="saveStyle">
         <div class="dialog-head">
           <div>
-            <div class="dialog-title">{{ styleEditId ? '编辑风格预设' : '添加风格预设' }}</div>
+            <div class="dialog-title">添加风格预设</div>
             <div class="dialog-sub">提示词片段为英文，会在生成角色图与场景图时自动拼入提示词。</div>
           </div>
           <span class="tag tag-accent ml-auto"><Palette :size="12" /> 风格</span>
@@ -554,7 +604,7 @@
           </label>
           <label class="field">
             <span class="field-label">风格 key <span class="required">*</span></span>
-            <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" :disabled="!!styleEditId" />
+            <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" />
             <span class="field-hint">存入项目的风格标识，创建后不可修改。</span>
           </label>
           <label class="field">
@@ -571,8 +621,8 @@
           </label>
         </div>
         <div class="dialog-foot">
-          <button type="button" class="btn" @click="styleDialog = false">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="button" class="btn" @click="cancelStyleDialog">取消</button>
+          <button type="submit" class="btn btn-primary" :disabled="styleSaving">保存</button>
         </div>
       </form>
     </div>
@@ -616,7 +666,7 @@ const navGroups = [
     id: 'advanced',
     label: '高级',
     items: [
-      { id: 'agents', label: 'Agent 配置', icon: Bot },
+      { id: 'agents', label: 'Prompts', icon: Bot },
       { id: 'skills', label: 'Skills', icon: FileText },
     ],
   },
@@ -634,7 +684,7 @@ const navWidth = ref(NAV_DEFAULT)
 const subWidth = ref(SUB_DEFAULT)
 const paneRef = ref(null)
 // 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video），
-// styles 恒为 styles-all；agents 用 agentDetail 记录被选中的 Agent。
+// styles 用 styleDetailId 记录当前风格；agents 用 agentDetail 记录被选中的 Agent。
 const activeSection = ref('')
 const agentDetail = ref(null)
 let activePaneDrag = null
@@ -657,10 +707,10 @@ function initPaneWidths() {
 const curTabMeta = computed(() => ({
   ai: { icon: Cpu, title: 'AI 服务', desc: '能力分组与默认模型' },
   styles: { icon: Palette, title: '风格预设', desc: '视觉风格片段管理' },
-  agents: { icon: Bot, title: 'Agent 配置', desc: '模型与提示词' },
+  agents: { icon: Bot, title: 'Prompts', desc: '模型与系统提示词' },
   skills: { icon: FileText, title: 'Skills 编辑', desc: '按 Agent 组织提示词文件' },
 }[tab.value]))
-// 二级目录：ai / styles 为章节锚点，agents 为动态 Agent 列表
+// 二级目录：ai 为能力面板；styles 为风格列表；agents 为动态 Agent 列表
 const subItems = computed(() => {
   if (tab.value === 'ai') {
     return [
@@ -670,13 +720,14 @@ const subItems = computed(() => {
       { id: 'ai-video', label: '视频服务', count: byType('video').length },
     ]
   }
-  if (tab.value === 'styles') return [{ id: 'styles-all', label: '全部风格', count: stylePresets.value.length }]
+  if (tab.value === 'styles') return stylePresets.value.map(p => ({ id: p.id, label: p.name }))
   if (tab.value === 'agents') return agentList.value.map(a => ({ id: `agent-${a.type}`, label: a.label, icon: a.icon }))
   return []
 })
 // 二级目录点击 = 右侧内容切换（不再做长页锚点滚动）
 function isSubActive(it) {
   if (tab.value === 'agents') return !!agentDetail.value && it.id === `agent-${agentDetail.value}`
+  if (tab.value === 'styles') return styleDetailId.value === it.id
   return activeSection.value === it.id
 }
 function paneScrollTop() {
@@ -687,6 +738,10 @@ function paneScrollTop() {
 function onSubNavClick(it) {
   if (tab.value === 'agents') {
     if (it.id.startsWith('agent-')) showAgentDetail(it.id.slice(6))
+    return
+  }
+  if (tab.value === 'styles') {
+    showStyleDetail(it.id)
     return
   }
   if (activeSection.value !== it.id) activeSection.value = it.id
@@ -1111,8 +1166,8 @@ async function saveAgentCfg(type) {
 // ===== Skills =====
 const selectedAgent = ref('script_rewriter')
 const allSkills = ref([])   // { id, name, description }[]
-const editingSkill = ref(null)
-const skillContent = ref('')
+const skillContents = ref({})  // skill id -> SKILL.md 内容
+const skillOpen = reactive(new Set())  // 已展开的 skill id（进入/切换 Agent 后默认全部展开）
 const skillSaving = ref(false)
 const skillSaved = ref(null)
 const addSkillDialog = ref(false)
@@ -1160,11 +1215,30 @@ async function loadAllSkills(initial = false) {
   }
 }
 
+// 预载并展开某个 Agent 的全部 Skill 内容（默认全部展开，可点击卡头收起）
+async function revealSkillsOf(type) {
+  const items = allSkills.value.filter(s => skillBelongsTo(s.id, type))
+  await Promise.all(items.map(async (s) => {
+    if (skillContents.value[s.id] !== undefined) { skillOpen.add(s.id); return }
+    try {
+      const res = await skillsAPI.get(s.id)
+      skillContents.value[s.id] = res.content || ''
+    } catch (e) {
+      skillContents.value[s.id] = ''
+    }
+    skillOpen.add(s.id)
+  }))
+}
+function ensureSkillsRevealed() {
+  if (!agentCfgs.value.length || !allSkills.value.length) return Promise.resolve()
+  return revealSkillsOf(selectedAgent.value)
+}
+
 async function selectAgent(type) {
   selectedAgent.value = type
-  editingSkill.value = null
-  await nextTick()
-  if (paneRef.value) paneRef.value.scrollTo({ top: 0 })
+  skillSaved.value = null
+  await revealSkillsOf(type)
+  paneScrollTop()
 }
 
 function startAddSkill() {
@@ -1181,6 +1255,7 @@ async function confirmAddSkill() {
     await skillsAPI.create({ id: skillId, name: newSkillForm.name, description: newSkillForm.description })
     addSkillDialog.value = false
     await loadAllSkills()
+    await revealSkillsOf(selectedAgent.value)
     toast.success('Skill 创建成功')
   } catch (e) {
     toast.error(e.message)
@@ -1196,7 +1271,9 @@ async function confirmDelSkill() {
   try {
     deletingSkill.value = true
     await skillsAPI.del(id)
-    if (editingSkill.value === id) editingSkill.value = null
+    delete skillContents.value[id]
+    skillOpen.delete(id)
+    if (skillSaved.value === id) skillSaved.value = null
     await loadAllSkills()
     skillToDelete.value = null
     toast.success('已删除')
@@ -1207,21 +1284,18 @@ async function confirmDelSkill() {
   }
 }
 
+// 点击 Skill 卡头：展开 / 收起；若内容尚未载入则先载入再展开
 async function toggleSkillEdit(id) {
-  if (editingSkill.value === id) { editingSkill.value = null; return }
-  try {
-    const res = await skillsAPI.get(id)
-    skillContent.value = res.content
-    skillSaved.value = null
-    editingSkill.value = id
-  } catch (e) { toast.error(e.message) }
+  if (skillOpen.has(id)) { skillOpen.delete(id); return }
+  if (skillContents.value[id] === undefined) await revealSkillsOf(selectedAgent.value)
+  else skillOpen.add(id)
 }
 
 async function saveSkill(id) {
   skillSaving.value = true
   skillSaved.value = null
   try {
-    await skillsAPI.update(id, skillContent.value)
+    await skillsAPI.update(id, skillContents.value[id] ?? '')
     await loadAllSkills()
     skillSaved.value = id
     toast.success(`已保存`)
@@ -1238,6 +1312,8 @@ const stylePresets = ref([])
 const styleDialog = ref(false)
 const styleEditId = ref(null)
 const styleForm = reactive({ name: '', value: '', prompt: '', description: '', sort_order: 0 })
+const styleDetailId = ref(null)
+const styleSaving = ref(false)
 
 async function loadStylePresets(initial = false) {
   if (initial) { styleLoading.value = true; styleError.value = '' }
@@ -1249,6 +1325,37 @@ async function loadStylePresets(initial = false) {
     if (initial) styleLoading.value = false
   }
 }
+
+const currentStyle = computed(() => stylePresets.value.find(p => p.id === styleDetailId.value) || null)
+function fillStyleForm(p) {
+  styleEditId.value = p.id
+  Object.assign(styleForm, {
+    name: p.name,
+    value: p.value,
+    prompt: p.prompt,
+    description: p.description || '',
+    sort_order: p.sort_order ?? 0,
+  })
+}
+// 二级目录 / 列表入口：把对应风格装进右侧详情卡（默认展开可编辑）
+function showStyleDetail(id) {
+  if (styleDetailId.value === id) { paneScrollTop(); return }
+  const p = stylePresets.value.find(x => x.id === id)
+  if (!p) return
+  styleDetailId.value = id
+  fillStyleForm(p)
+  paneScrollTop()
+}
+// 列表加载 / 删除后保证有合法选中项，默认选中第一个
+function ensureStyleSelection() {
+  const list = stylePresets.value
+  if (!list.length) return
+  if (!styleDetailId.value || !list.some(p => p.id === styleDetailId.value)) {
+    styleDetailId.value = list[0].id
+    fillStyleForm(list[0])
+  }
+}
+watch(stylePresets, ensureStyleSelection)
 
 async function toggleStyle(p) {
   try {
@@ -1276,6 +1383,7 @@ async function confirmDelStyle() {
   }
 }
 
+// 新建风格仍走弹窗表单；styleEditId 置空使「风格 key」可填写
 function startAddStyle() {
   styleEditId.value = null
   Object.assign(styleForm, {
@@ -1285,16 +1393,16 @@ function startAddStyle() {
   styleDialog.value = true
 }
 
+// 编辑已改为在右侧详情卡内直接进行
 function startEditStyle(p) {
-  styleEditId.value = p.id
-  Object.assign(styleForm, {
-    name: p.name,
-    value: p.value,
-    prompt: p.prompt,
-    description: p.description || '',
-    sort_order: p.sort_order ?? 0,
-  })
-  styleDialog.value = true
+  if (p) showStyleDetail(p.id)
+}
+
+// 取消新建弹窗后，把详情卡的表单恢复为当前选中风格
+function cancelStyleDialog() {
+  styleDialog.value = false
+  const p = stylePresets.value.find(x => x.id === styleDetailId.value)
+  if (p) fillStyleForm(p)
 }
 
 const styleExpanding = ref(false)
@@ -1328,6 +1436,7 @@ async function saveStyle() {
     toast.warning('名称、key、提示词片段必填')
     return
   }
+  styleSaving.value = true
   try {
     if (styleEditId.value) {
       await stylePresetAPI.update(styleEditId.value, {
@@ -1336,19 +1445,32 @@ async function saveStyle() {
         description: styleForm.description,
         sort_order: styleForm.sort_order,
       })
+      styleDialog.value = false
+      toast.success('已保存')
+      await loadStylePresets()
     } else {
+      const beforeIds = new Set(stylePresets.value.map(p => p.id))
       await stylePresetAPI.create({ ...styleForm })
+      styleDialog.value = false
+      toast.success('已保存')
+      await loadStylePresets()
+      // 新建完成后跳到新风格详情卡，立即可见
+      const added = stylePresets.value.find(p => !beforeIds.has(p.id))
+      if (added) showStyleDetail(added.id)
+      else ensureStyleSelection()
     }
-    styleDialog.value = false
-    toast.success('已保存')
-    loadStylePresets()
-  } catch (e) { toast.error(e.message) }
+  } catch (e) { toast.error(e.message) } finally { styleSaving.value = false }
 }
 
-// 切换到 AI / 风格页时回到各自默认二级面板
+// tab 切换：AI 回到能力总览；风格页兜底选中；Skills 页自动展开当前 Agent 的 Skill
 watch(tab, () => {
   if (tab.value === 'ai') activeSection.value = 'ai-overview'
-  else if (tab.value === 'styles') activeSection.value = 'styles-all'
+  else if (tab.value === 'styles') ensureStyleSelection()
+  else if (tab.value === 'skills') ensureSkillsRevealed()
+})
+// 数据到达后补一次展开（首次进入 Skills 页时 agent / skill 列表可能尚未加载完）
+watch([agentCfgs, allSkills], () => {
+  if (tab.value === 'skills') ensureSkillsRevealed()
 })
 onBeforeUnmount(() => {
   if (activePaneDrag?.cleanup) activePaneDrag.cleanup()
@@ -1611,6 +1733,22 @@ onMounted(() => {
 .svc-group-heading { min-width: 0; }
 .svc-group-title { font-size: 14px; font-weight: 700; color: var(--text-0); }
 .svc-group-sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+
+/* 风格预设详情卡（二级目录切换展示，默认展开可编辑） */
+.styles-head { display: flex; align-items: flex-start; gap: 12px; }
+.styles-head-copy { min-width: 0; flex: 1; }
+.style-detail-card { overflow: hidden; }
+.style-detail-badge {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #f5a623, #e86b2a);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.style-detail-body { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
+.style-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.style-detail-grid .field-wide { grid-column: 1 / -1; }
+.style-detail-foot { display: flex; align-items: center; gap: 8px; }
 .config-row { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
 .config-row + .config-row { border-top: 1px solid var(--border); }
 .provider-badge {

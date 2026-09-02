@@ -20,7 +20,7 @@ test('settings nav is a two-tier structure without the advanced toggle', () => {
   assert.match(settings, /id: 'advanced'/)
   assert.match(settings, /\{ id: 'ai', label: 'AI 服务', icon: Cpu \}/)
   assert.match(settings, /\{ id: 'styles', label: '风格预设', icon: Palette \}/)
-  assert.match(settings, /\{ id: 'agents', label: 'Agent 配置', icon: Bot \}/)
+  assert.match(settings, /\{ id: 'agents', label: 'Prompts', icon: Bot \}/)
   assert.match(settings, /\{ id: 'skills', label: 'Skills', icon: FileText \}/)
 
   // 模板以双层 v-for 渲染分组与目录，不再按 base/advanced 分开写死
