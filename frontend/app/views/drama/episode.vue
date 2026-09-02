@@ -4516,7 +4516,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   min-height: 40px;
   padding: 4px 10px;
   border-radius: var(--radius-lg);
-  background: rgba(251,251,253,0.72);
+  background: var(--bar-glass);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(20px) saturate(180%);
@@ -4963,7 +4963,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .stage-subnav-item.active {
   background: var(--surface-raised);
   color: var(--text-0);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  box-shadow: var(--shadow-float);
 }
 .stage-subnav-item.done {
   color: var(--text-1);
@@ -5042,7 +5042,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   display: flex; align-items: center; gap: 12px;
   padding: 6px 8px;
   border-radius: var(--radius-pill);
-  background: rgba(255,255,255,0.8);
+  background: var(--surface-glass);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border);
@@ -5140,13 +5140,13 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .storyboard-shot-card.active {
   background: var(--surface-raised);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,113,227,0.15);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 /* 多选模式：选中的卡片高亮描边 */
 .storyboard-shot-card.is-selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,113,227,0.15);
-  background: var(--accent-soft, #f0f7ff);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  background: var(--accent-soft);
 }
 .storyboard-shot-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .storyboard-shot-chip {
@@ -5343,7 +5343,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: transparent;
   padding: 2px 6px;
   margin-left: -6px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
   color: var(--accent);
@@ -5374,7 +5374,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .storyboard-ref-item:not(.bound) .storyboard-ref-main .storyboard-ref-name { color: var(--text-2); }
 .storyboard-ref-item.bound {
   border-color: var(--accent);
-  background: var(--accent-bg, rgba(0,113,227,0.06));
+  background: var(--accent-bg);
 }
 .storyboard-ref-item.bound:hover { border-color: var(--accent); }
 .storyboard-ref-thumb {
@@ -5648,7 +5648,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   align-items: center;
   justify-content: center;
   border: none;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--media-scrim);
   color: var(--text-invert);
   cursor: pointer;
   opacity: 0;
@@ -5704,7 +5704,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   transition: background 0.15s, color 0.15s;
 }
 .shot-quick-actions .shot-quick-btn:hover {
-  background: var(--accent-soft, #f0f7ff);
+  background: var(--accent-soft);
   color: var(--accent-text);
   text-decoration: none;
 }
@@ -5716,7 +5716,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   gap: 8px;
   padding: 10px;
   border-top: 1px solid var(--border);
-  background: var(--bg-1, #fafafa);
+  background: var(--bg-1);
 }
 .shot-select-info {
   display: flex;
@@ -6034,7 +6034,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .frame-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .frame-re {
   position: absolute; top: 3px; right: 3px; width: 18px; height: 18px;
-  border-radius: 50%; background: rgba(0,0,0,0.5); color: var(--text-invert);
+  border-radius: 50%; background: var(--media-scrim); color: var(--text-invert);
   display: none; align-items: center; justify-content: center;
 }
 .frame-thumb:hover .frame-re { display: flex; }
@@ -6043,7 +6043,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .dot.ok { background: var(--success); }
 .dot.pending {
   background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,113,227,0.14);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 /* Video tasks */
@@ -6157,7 +6157,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 }
 .video-history-item.viewing {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,113,227,0.18);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .video-history-time {
   position: absolute;
@@ -6165,7 +6165,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   bottom: 4px;
   padding: 1px 4px;
   border-radius: 3px;
-  background: rgba(0,0,0,0.6);
+  background: var(--media-scrim-strong);
   color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 9px;
@@ -6192,7 +6192,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   justify-content: center;
   border: 0;
   border-radius: 50%;
-  background: rgba(0,0,0,0.62);
+  background: var(--media-scrim-strong);
   color: var(--text-invert);
   font-size: 11px;
   line-height: 1;
@@ -6247,9 +6247,9 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   gap: 8px;
   padding: 24px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--media-text-dim);
 }
-.video-player-empty-title { color: rgba(255, 255, 255, 0.85); font-size: 13px; font-weight: 700; }
+.video-player-empty-title { color: var(--media-text); font-size: 13px; font-weight: 700; }
 .video-player-empty-desc { font-size: 11px; line-height: 1.5; }
 .video-task-list {
   min-height: 0;
@@ -6297,7 +6297,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 0 8px;
   border: 1px solid var(--surface-outline);
   border-radius: 999px;
-  background: rgba(0,0,0,0.04);
+  background: var(--fill-subtle);
   color: var(--text-2);
   font-size: 11px;
   font-weight: 750;
@@ -6388,7 +6388,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   top: 5px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(0,0,0,0.56);
+  background: var(--media-scrim);
   color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 10px;
@@ -6487,7 +6487,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-inspector-hint { margin-top: 4px; color: var(--text-3); font-size: 10px; }
 .video-inspector-h3-prompt {
   min-height: 230px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -6528,7 +6528,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   left: 0;
   padding: 4px 6px;
   overflow: hidden;
-  background: rgba(0,0,0,0.55);
+  background: var(--media-scrim);
   color: var(--text-invert);
   font-size: 10px;
   text-align: left;
@@ -6545,7 +6545,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-ref-media-chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
   border: 1px solid var(--surface-outline); border-radius: 980px;
-  font-size: 11px; color: var(--text-1); background: var(--surface-2, #f5f5f7);
+  font-size: 11px; color: var(--text-1); background: var(--surface-muted);
 }
 .video-ref-media-remove {
   border: none; background: none; padding: 0; cursor: pointer;
@@ -6564,7 +6564,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: var(--bg-2);
 }
 .video-ref-action-group > span { color: var(--text-2); font-size: 11px; font-weight: 600; }
-.video-ref-media-hint { margin-top: 6px; font-size: 11px; color: var(--warning, #b25000); }
+.video-ref-media-hint { margin-top: 6px; font-size: 11px; color: var(--warning); }
 .video-param-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 12px; }
 .video-param-name { color: var(--text-3); flex-shrink: 0; }
 .video-param-value { color: var(--text-1); text-align: right; font-size: 11px; }
@@ -6594,9 +6594,9 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 }
 .ref-asset-card:hover { border-color: var(--accent); }
 .ref-asset-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-bg); }
-.ref-asset-card.locked { border-color: var(--success, #2d8a55); }
+.ref-asset-card.locked { border-color: var(--success); }
 .ref-asset-card img,
-.ref-asset-card video { width: 100%; height: 112px; display: block; border-radius: calc(var(--radius) - 2px); object-fit: cover; background: #111; }
+.ref-asset-card video { width: 100%; height: 112px; display: block; border-radius: calc(var(--radius) - 2px); object-fit: cover; background: var(--media-stage-bg); }
 .ref-asset-audio-preview { height: 112px; display: grid; place-items: center; border-radius: calc(var(--radius) - 2px); background: linear-gradient(145deg, var(--accent-bg), var(--bg-2)); color: var(--accent); font-size: 36px; }
 .ref-asset-card strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .ref-asset-card small { color: var(--text-3); font-size: 10px; }
@@ -6615,11 +6615,11 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .prod-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
 .prod-cover { position: relative; aspect-ratio: 16/9; background: var(--bg-2); overflow: hidden; }
 .prod-cover img { width: 100%; height: 100%; object-fit: cover; }
-.prod-video { width: 100%; height: 100%; object-fit: cover; background: #000; display: block; }
+.prod-video { width: 100%; height: 100%; object-fit: cover; background: var(--media-stage-bg); display: block; }
 .prod-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .prod-idx {
   position: absolute; top: 5px; left: 5px; font-size: 10px; font-weight: 700;
-  font-family: var(--font-mono); background: rgba(0,0,0,0.5); color: var(--text-invert); padding: 1px 5px; border-radius: 3px;
+  font-family: var(--font-mono); background: var(--media-scrim); color: var(--text-invert); padding: 1px 5px; border-radius: 3px;
 }
 .prod-overlay-badge {
   position: absolute; bottom: 5px; right: 5px; font-size: 10px; font-weight: 600;
@@ -7093,7 +7093,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  background: rgba(0,0,0,0.28);
+  background: var(--media-scrim-soft);
   color: var(--text-invert);
   opacity: 0;
   transition: opacity 0.15s var(--ease-out);
@@ -7112,7 +7112,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   width: 100%;
   max-height: calc(100vh - 220px);
   border-radius: var(--radius);
-  background: #000;
+  background: var(--media-stage-bg);
   display: block;
 }
 .export-merge-empty {
@@ -7135,7 +7135,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .exp-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px; border-radius: var(--radius); background: var(--surface-raised); border: 1px solid var(--border); }
 .exp-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
 .exp-card.playable { cursor: pointer; }
-.exp-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,113,227,0.15); }
+.exp-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
 .exp-check {
   position: absolute;
   right: 6px;
@@ -7146,8 +7146,8 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.9);
-  background: rgba(0,0,0,0.35);
+  border: 1.5px solid var(--media-text);
+  background: var(--media-scrim-soft);
   color: var(--text-invert);
 }
 .exp-check.on { background: var(--accent); border-color: var(--accent); }
@@ -7168,7 +7168,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   top: 5px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(0,0,0,0.56);
+  background: var(--media-scrim);
   color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 10px;
@@ -7180,7 +7180,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   bottom: 5px;
   padding: 1px 4px;
   border-radius: 3px;
-  background: rgba(0,0,0,0.6);
+  background: var(--media-scrim-strong);
   color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 9px;

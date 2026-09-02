@@ -118,3 +118,62 @@ test('A2 batch1: detail asset-kind/status semantic colors and amber notice banne
   assert.doesNotMatch(detail, /rgba\(34,197,94|rgba\(180,83,9/)
   assert.doesNotMatch(layout, /#fffbeb|#fde68a|#fcd34d|#fef3c7|#92400e|#b45309/)
 })
+
+test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error and new-style tokens resolve', () => {
+  const episode = read('../app/views/drama/episode.vue')
+  const settings = read('../app/pages/settings.vue')
+  const index = read('../app/pages/index.vue')
+  const layout = read('../app/layouts/default.vue')
+  const modelSelect = read('../app/components/ModelSelect.vue')
+  // 新增 token 定义
+  assert.match(studioCss, /--accent-soft:\s*#f0f7ff;/)
+  assert.match(studioCss, /--bar-glass:\s*rgba\(251,251,253,0\.72\);/)
+  assert.match(studioCss, /--media-scrim-soft:\s*rgba\(0,0,0,0\.28\);/)
+  assert.match(studioCss, /--media-scrim:\s*rgba\(0,0,0,0\.50\);/)
+  assert.match(studioCss, /--media-scrim-strong:\s*rgba\(0,0,0,0\.60\);/)
+  assert.match(studioCss, /--media-text:\s*rgba\(255,255,255,0\.85\);/)
+  assert.match(studioCss, /--media-text-dim:\s*rgba\(255,255,255,0\.45\);/)
+  assert.match(studioCss, /--error-border-strong:\s*rgba\(255,59,48,0\.40\);/)
+  assert.match(studioCss, /--new-style:\s*#8642a6;/)
+  assert.match(studioCss, /--new-style-soft:\s*rgba\(175,82,222,0\.05\);/)
+  assert.match(studioCss, /--new-style-border:\s*rgba\(175,82,222,0\.22\);/)
+  // episode：on-media 深底收敛到 scrim 档、白字归 media-text、accent ring 归 glow
+  assert.match(episode, /\.asset-del-btn[\s\S]*?background: var\(--media-scrim\)/)
+  assert.match(episode, /\.frame-re[\s\S]*?background: var\(--media-scrim\)/)
+  assert.match(episode, /\.video-task-index[\s\S]*?background: var\(--media-scrim\)/)
+  assert.match(episode, /\.video-history-time[\s\S]*?background: var\(--media-scrim-strong\)/)
+  assert.match(episode, /\.video-history-del[\s\S]*?background: var\(--media-scrim-strong\)/)
+  assert.match(episode, /\.merge-card-play[\s\S]*?background: var\(--media-scrim-soft\)/)
+  assert.match(episode, /\.exp-check[\s\S]*?background: var\(--media-scrim-soft\)/)
+  assert.match(episode, /\.exp-check[\s\S]*?border: 1\.5px solid var\(--media-text\)/)
+  assert.match(episode, /\.video-player-empty[\s\S]*?color: var\(--media-text-dim\)/)
+  assert.match(episode, /\.video-player-empty-title \{ color: var\(--media-text\)/)
+  assert.match(episode, /\.storyboard-shot-card\.active[\s\S]*?box-shadow: 0 0 0 3px var\(--accent-glow\)/)
+  assert.match(episode, /\.ref-asset-card\.locked \{ border-color: var\(--success\); \}/)
+  assert.match(episode, /\.ref-asset-card img,[\s\S]*?background: var\(--media-stage-bg\);/)
+  assert.match(episode, /\.storyboard-shot-card\.is-selected[\s\S]*?background: var\(--accent-soft\);/)
+  assert.match(episode, /\.video-ref-media-chip[\s\S]*?background: var\(--surface-muted\);/)
+  // episode：R5 fallback 清零（未定义的 accent-soft/surface-2 已正式化或改已定义 token）
+  assert.doesNotMatch(episode, /var\(--[\w-]+,\s*(?:#|rgba)/)
+  // 静态非颜色 fallback 也清零（radius-sm/font-mono 已全局定义；运行时动态拖拽宽度 fallback 保留）
+  assert.doesNotMatch(episode, /var\(--radius-sm, 6px\)/)
+  assert.doesNotMatch(episode, /font-family: var\(--font-mono,/)
+  // --sel 局部定义维持（裁决：单页模型选中语义，规范 §5 记录；暗色主题批次再定全局）
+  // default：顶部玻璃条与导航激活段 shadow 收敛
+  assert.match(layout, /background: var\(--bar-glass\);/)
+  assert.match(layout, /\.nav-link\.active[\s\S]*?box-shadow: var\(--shadow-float\);/)
+  // settings：R6 内联图标色转 class + error token；测试结果描边入 border token；R5 fallback 清零
+  assert.doesNotMatch(settings, /color:#d9534f/)
+  assert.match(settings, /\.skill-load-error-icon \{ color: var\(--error\); \}/)
+  assert.match(settings, /\.test-result\.ok \{ border-color: var\(--success-border-strong\);/)
+  assert.match(settings, /\.test-result\.bad \{ border-color: var\(--error-border-strong\);/)
+  assert.doesNotMatch(settings, /var\(--accent-bg,/)
+  assert.doesNotMatch(settings, /var\(--border-strong,/)
+  // index：source-badge 归 success/new-style token
+  assert.match(index, /\.source-badge\.is-existing \{ background: var\(--success-bg\); color: var\(--success-strong\); \}/)
+  assert.match(index, /\.source-badge\.is-new \{ background: var\(--new-style-bg\); color: var\(--new-style\); \}/)
+  assert.match(index, /\.new-style-confirm[\s\S]*?border: 1px solid var\(--new-style-border\)[\s\S]*?background: var\(--new-style-soft\)/)
+  assert.match(index, /\.new-style-copy \{ display: flex; align-items: flex-start; gap: 9px; color: var\(--new-style\); \}/)
+  // ModelSelect：R5 fallback 清零
+  assert.doesNotMatch(modelSelect, /var\(--(?:accent|accent-bg|bg-1|bg-3|ease-out),/)
+})

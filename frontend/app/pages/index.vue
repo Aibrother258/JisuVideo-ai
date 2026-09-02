@@ -1481,7 +1481,7 @@ onMounted(load)
   gap: 6px;
   padding: 4px;
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--fill-subtle);
 }
 .source-method {
   min-height: 34px;
@@ -1498,7 +1498,7 @@ onMounted(load)
   cursor: pointer;
 }
 .source-method:hover { color: var(--text-0); }
-.source-method.on { background: var(--surface-raised); color: var(--text-0); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.09); }
+.source-method.on { background: var(--surface-raised); color: var(--text-0); box-shadow: var(--shadow-float); }
 .source-import-panel {
   min-height: 72px;
   display: flex;
@@ -1596,8 +1596,8 @@ onMounted(load)
 .style-choice { min-height: 100px; flex-direction: column; gap: 6px; padding: 11px 13px; }
 .choice-topline { display: flex; align-items: center; justify-content: space-between; color: var(--accent); }
 .source-badge { padding: 3px 7px; border-radius: var(--radius-pill); font-size: 9.5px; font-weight: 700; }
-.source-badge.is-existing { background: rgba(52, 199, 89, 0.11); color: #238a42; }
-.source-badge.is-new { background: rgba(175, 82, 222, 0.11); color: #8642a6; }
+.source-badge.is-existing { background: var(--success-bg); color: var(--success-strong); }
+.source-badge.is-new { background: var(--new-style-bg); color: var(--new-style); }
 .existing-style-picker {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
@@ -1624,11 +1624,11 @@ onMounted(load)
   flex-direction: column;
   gap: 11px;
   padding: 13px 14px;
-  border: 1px solid rgba(175, 82, 222, 0.22);
+  border: 1px solid var(--new-style-border);
   border-radius: var(--radius);
-  background: rgba(175, 82, 222, 0.05);
+  background: var(--new-style-soft);
 }
-.new-style-copy { display: flex; align-items: flex-start; gap: 9px; color: #8642a6; }
+.new-style-copy { display: flex; align-items: flex-start; gap: 9px; color: var(--new-style); }
 .new-style-copy strong { display: block; color: var(--text-0); font-size: 12px; }
 .new-style-copy p { margin: 3px 0 0; color: var(--text-2); font-size: 10.5px; line-height: 1.5; }
 .confirm-check { display: flex; align-items: center; gap: 8px; color: var(--text-1); font-size: 11.5px; cursor: pointer; }

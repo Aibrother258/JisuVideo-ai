@@ -78,7 +78,7 @@ watch(() => route.path, checkAiConfigs)
   height: 60px; flex-shrink: 0;
   padding: 0 24px;
   gap: 32px;
-  background: rgba(251,251,253,0.72);
+  background: var(--bar-glass);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--border);
@@ -149,7 +149,7 @@ watch(() => route.path, checkAiConfigs)
 .nav-link.active {
   background: var(--surface-raised);
   color: var(--text-0);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-float);
 }
 .nav-link:focus-visible {
   outline: none;

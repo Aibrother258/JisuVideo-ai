@@ -120,6 +120,24 @@
   --notice-link: #b45309;
   --notice-link-border: #fcd34d;
   --notice-link-hover-bg: #fef3c7;
+  /* A2 批次二：accent 浅填充（episode 多选卡选中底 #f0f7ff，原 var(--accent-soft, #f0f7ff) 未定义的 fallback 值升为正式 token） */
+  --accent-soft: #f0f7ff;
+  /* A2 批次二：顶部毛玻璃条（default header / episode studio-topbar 同值 rgba(251,251,253,.72)，值不变） */
+  --bar-glass: rgba(251,251,253,0.72);
+  /* A2 批次二：媒体画布深色遮罩档（episode on-media 深底圆钮/索引/时间/播放大遮罩 13 处收敛，R3 归一见规范 v2 §6） */
+  --media-scrim-soft: rgba(0,0,0,0.28);
+  --media-scrim: rgba(0,0,0,0.50);
+  --media-scrim-strong: rgba(0,0,0,0.60);
+  /* A2 批次二：媒体台面白字层级（video-player-empty 提示 0.45/0.85、勾选钮白边 0.9 归 0.85，R3 记录） */
+  --media-text: rgba(255,255,255,0.85);
+  --media-text-dim: rgba(255,255,255,0.45);
+  /* A2 批次二：error 家族深档描边（settings test-result.bad 0.40 值不变，对称 success-border-strong 深档） */
+  --error-border-strong: rgba(255,59,48,0.40);
+  /* A2 批次二：新风格高亮紫（index source-badge.new / new-style-confirm 待入库卡 5 处，暗色可整体覆盖） */
+  --new-style: #8642a6;
+  --new-style-bg: rgba(175,82,222,0.11);
+  --new-style-soft: rgba(175,82,222,0.05);
+  --new-style-border: rgba(175,82,222,0.22);
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);
