@@ -92,6 +92,13 @@
   --unsaved-border: #e0b15a;
   --unsaved-text: #a06a0e;
   --unsaved-bg: #fbf3e2;
+  /* A1 第三批：封面占位体系 + 反色白字/毛玻璃浮层（首页封面；值不变，为暗色主题可覆盖） */
+  --cover-fallback: linear-gradient(135deg, #eef1f6, #dce4f0);
+  --cover-fallback-fg: #6a7ba0;
+  --cover-text: rgba(255,255,255,0.95);
+  --text-invert: #ffffff;
+  --surface-glass: rgba(255,255,255,0.85);
+  --shadow-float: 0 1px 4px rgba(0,0,0,0.08);
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);

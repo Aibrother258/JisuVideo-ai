@@ -109,3 +109,27 @@ test('A1 token batch2: common fills and unsaved-warning colors reference tokens'
   assert.match(index, /\.sort-select:focus \{ background: var\(--surface-raised\); \}/)
   assert.doesNotMatch(index, /background: rgba\(0, 0, 0, 0\.05\)/)
 })
+
+test('A1 token batch3: index cover placeholders and on-dark/glass overlays reference tokens', () => {
+  const index = read('app/pages/index.vue')
+  const css = read('app/assets/studio.css')
+  // 语义 token 定义（值不变，供暗色主题覆盖）
+  assert.match(css, /--cover-fallback: linear-gradient\(135deg, #eef1f6, #dce4f0\);/)
+  assert.match(css, /--cover-fallback-fg: #6a7ba0;/)
+  assert.match(css, /--cover-text: rgba\(255,255,255,0\.95\);/)
+  assert.match(css, /--text-invert: #ffffff;/)
+  assert.match(css, /--surface-glass: rgba\(255,255,255,0\.85\);/)
+  assert.match(css, /--shadow-float: 0 1px 4px rgba\(0,0,0,0\.08\);/)
+  // index：占位封面（渐变底/静默元素）、封面大字形、反色白字、毛玻璃浮层全部收敛为引用
+  assert.match(index, /background: var\(--cover-fallback\);/)
+  assert.match(index, /color: var\(--cover-fallback-fg\);/)
+  assert.match(index, /color: var\(--cover-text\);/)
+  assert.match(index, /color: var\(--text-invert\);/)
+  assert.match(index, /background: var\(--surface-glass\);/)
+  assert.match(index, /box-shadow: var\(--shadow-float\);/)
+  // 批次内字面量不再残留（style 与内联均清零）
+  assert.doesNotMatch(index, /#eef1f6/)
+  assert.doesNotMatch(index, /#6a7ba0/)
+  assert.doesNotMatch(index, /#fff|#ffffff/)
+  assert.doesNotMatch(index, /rgba\(255, 255, 255, 0\.(85|95)\)/)
+})
