@@ -35,7 +35,9 @@ test('MiniMax video provider is supported while image and TTS adapters stay remo
   assert.doesNotMatch(registry, /AliImageAdapter|AliVideoAdapter|ViduVideoAdapter/)
   assert.doesNotMatch(ai, /'vidu'/)
   assert.doesNotMatch(ai, /'ali'/)
-  assert.doesNotMatch(ai, /audio:\s*\[/)
+  // 音频服务配置仅允许 AutoDL（IndexTTS2 等工作流），不借道 MiniMax 引入 TTS
+  assert.match(ai, /audio:\s*\[\s*'autodl'\s*\]/)
+  assert.doesNotMatch(ai, /audio:\s*\[\s*[^\]]*minimax/)
 })
 
 test('startup schema migration keeps MiniMax H3 metadata columns idempotent', () => {

@@ -68,5 +68,8 @@ test('provider presets are separated by service capability', () => {
   assert.match(providerPresetBlock('image'), /gemini[\s\S]*openai/)
   assert.match(providerPresetBlock('video'), /volcengine/)
   assert.match(providerPresetBlock('video'), /minimax[\s\S]*autodl/)
-  assert.doesNotMatch(settingsPage, /audio:\s*\{/)
+  // 音频板块：AutoDL IndexTTS2 语音合成工作流，与视频 H3 工作流互相独立
+  assert.match(providerPresetBlock('audio'), /autodl[\s\S]*indextts2-v1/)
+  assert.doesNotMatch(providerPresetBlock('video'), /indextts/)
+  assert.doesNotMatch(providerPresetBlock('audio'), /minimax_h3|doubao-seedance|MiniMax-H3/)
 })

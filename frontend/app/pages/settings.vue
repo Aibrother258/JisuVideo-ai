@@ -731,7 +731,7 @@ const SUB_MAX = 360
 const navWidth = ref(NAV_DEFAULT)
 const subWidth = ref(SUB_DEFAULT)
 const paneRef = ref(null)
-// 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video），
+// 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video / ai-audio），
 // styles 用 styleDetailId 记录当前风格；agents 用 agentDetail 记录被选中的 Agent。
 const activeSection = ref('')
 const agentDetail = ref(null)
@@ -766,6 +766,7 @@ const subItems = computed(() => {
       { id: 'ai-text', label: '文本服务', count: byType('text').length },
       { id: 'ai-image', label: '图片服务', count: byType('image').length },
       { id: 'ai-video', label: '视频服务', count: byType('video').length },
+      { id: 'ai-audio', label: '音频服务', count: byType('audio').length },
     ]
   }
   if (tab.value === 'styles') return stylePresets.value.map(p => ({ id: p.id, label: p.name }))
@@ -873,13 +874,14 @@ const cfgFetchingModels = ref(false)
 const fetchedModels = ref([])
 const selectedFetchedModels = ref(new Set())
 const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', modelStr: '', service_type: 'text', priority: 0, temperature: '' })
-const serviceTypes = [{ type: 'text', label: '文本' }, { type: 'image', label: '图片' }, { type: 'video', label: '视频' }]
+const serviceTypes = [{ type: 'text', label: '文本' }, { type: 'image', label: '图片' }, { type: 'video', label: '视频' }, { type: 'audio', label: '音频' }]
 const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'autodl']
 const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
 const serviceMeta = {
   text: { label: '文本', desc: '剧本改写、角色场景提取、分镜拆解等 Agent 文本能力' },
   image: { label: '图片', desc: '角色图、场景图与镜头图等静态图像生成' },
   video: { label: '视频', desc: '镜头视频直出生成，支持 Seedance、MiniMax 与 AutoDL H3 工作流' },
+  audio: { label: '音频', desc: '语音合成与音色克隆，支持 AutoDL IndexTTS2 工作流' },
 }
 const providerPresets = {
   text: {
@@ -894,6 +896,9 @@ const providerPresets = {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128', 'doubao-seedance-2-0-mini-260615'] },
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
     autodl: { label: 'AutoDL H3 工作流', baseUrl: 'https://autodl.art', models: ['minimax_h3_image_audio_to_video_v2_15s', 'minimax_h3_lightx2v_v5_15s', 'minimax_h3_image_audio_to_video_v2', 'minimax_h3_image_audio_to_video', 'minimax_h3_lightx2v_v5', 'minimax_h3_lightx2v_no_pic', 'minimax_h3_lightx2v'] },
+  },
+  audio: {
+    autodl: { label: 'AutoDL IndexTTS2', baseUrl: 'https://autodl.art', models: ['indextts2-v1'] },
   },
 }
 
@@ -1846,6 +1851,7 @@ onMounted(() => {
 }
 .cap-badge.t-image { background: linear-gradient(135deg, #8b5cf6, #4f46e5); }
 .cap-badge.t-video { background: linear-gradient(135deg, #f43f5e, #f97316); }
+.cap-badge.t-audio { background: linear-gradient(135deg, #06b6d4, #10b981); }
 .cap-cell-title {
   font-size: 13.5px; font-weight: 700; color: var(--text-0);
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

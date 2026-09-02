@@ -173,7 +173,7 @@ app.post('/models', async (c) => {
 
   const provider = body.provider.toLowerCase()
   if (provider === 'autodl') {
-    return success(c, { ok: true, models: [], source: 'fixed', message: 'AutoDL 为固定 H3 工作流模型，无需拉取' })
+    return success(c, { ok: true, models: [], source: 'fixed', message: 'AutoDL 为固定 ComfyUI 工作流模型，无需拉取' })
   }
 
   const probes = buildModelProbes(provider, body.base_url, body.api_key)

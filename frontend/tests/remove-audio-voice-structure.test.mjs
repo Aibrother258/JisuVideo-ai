@@ -34,14 +34,17 @@ test('episode workbench removes all role voice assignment controls', () => {
   assert.doesNotMatch(episodePage, /voicesAPI/)
 })
 
-test('project and settings pages remove audio service configuration', () => {
+test('project pages remove audio config consumption while settings exposes an audio service board', () => {
+  // 工作台项目/成片页不消费音频配置（角色音色分配结构保持移除）
   assert.doesNotMatch(dramaPage, /audio_config_id/)
   assert.doesNotMatch(dramaPage, /audioConfigs/)
   assert.doesNotMatch(dramaPage, /音频/)
+  // 设置页不再有旧的角色音色分配结构
   assert.doesNotMatch(settingsPage, /voice_assigner/)
   assert.doesNotMatch(settingsPage, /音色分配/)
-  const serviceTypeLine = settingsPage.match(/const serviceTypes = \[[^\n]+/)?.[0] || ''
-  assert.doesNotMatch(serviceTypeLine, /audio/)
-  assert.doesNotMatch(settingsPage, /音频/)
   assert.doesNotMatch(settingsPage, /speech-2\.8-hd/)
+  // 但新增了「音频」服务配置板块（AutoDL IndexTTS2），供后续配音/旁白合成使用
+  const serviceTypeLine = settingsPage.match(/const serviceTypes = \[[^\n]+/)?.[0] || ''
+  assert.match(serviceTypeLine, /\{ type: 'audio', label: '音频' \}/)
+  assert.match(settingsPage, /audio:\s*\{[\s\S]*autodl[\s\S]*indextts2-v1/)
 })
