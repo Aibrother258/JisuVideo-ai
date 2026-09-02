@@ -15,21 +15,14 @@
 
 ---
 
-## 1. 工作区状态（重要）
+## 1. 本次变更范围（归档）
 
-```text
-分支：feat/ui-c1-c2-three-states
-未提交改动：
-  M frontend/app/assets/studio.css        （+63 行：全局三态样式原语）
-  M frontend/app/pages/index.vue          （+14 行：项目列表错误态）
-  M frontend/app/pages/settings.vue       （+164 行：四列表三态）
-  M frontend/app/views/drama/detail.vue   （+64 行：顶层三态 + 冲突框重载错误）
-  M frontend/app/views/drama/episode.vue  （+189 行：顶层/导出面板/任务抽屉/素材选择器/模型配置/历史视频三态）
-?? frontend/tests/three-state-structure.test.mjs  （新增，70 断言的一部分）
-?? data/                                   （运行时数据目录，【禁止】提交）
-```
+三态改造内容均已提交并随对应 PR 评审合入（结构测试基线全绿）。涉及主要文件：
 
-注意：`docs/ui-optimization-plan.md`（v1.2）已随 PR #13 合入 master，**本分支无需再提交该文档**。
+- `frontend/app/assets/studio.css`：全局三态样式原语（骨架 / 错误面板 / 加载态）
+- `frontend/app/pages/index.vue`、`frontend/app/pages/settings.vue`、`frontend/app/views/drama/detail.vue`、`frontend/app/views/drama/episode.vue`：顶层与列表 / 面板的「加载 / 空 / 错误」三态落地
+- `frontend/tests/three-state-structure.test.mjs`：结构测试基线
+- `data/` 为运行时数据目录，【禁止】提交
 
 ---
 
@@ -95,8 +88,8 @@
 ## 4. 验证基线（PR 前 Codex 必须复跑）
 
 ```powershell
-# 工作目录 frontend/
-cd f:/JisuVideo/JisuVideo-ai/frontend
+# 工作目录：仓库根下的 frontend/
+cd frontend
 # 1) 结构测试（19 个测试文件，当前 70/70 全绿）
 node --test tests/*.test.mjs
 # 2) 构建
