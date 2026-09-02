@@ -1,3 +1,7 @@
+# PR 评审回复存档：PR #3（`fix/pipeline-stability-hardening`）
+
+> **⚠️ 历史归档，非当前操作规范**：本文为 PR #3 评审反馈的回复存档（对应提交 `7e7cf53`），结论已被该 PR 合并版本采纳；现行行为以合并后代码与迭代日志 `docs/iteration-logs/2026-09-01-pipeline-batch1-stability.md` 为准。
+
 已按反馈修复全部 6 项，提交 `7e7cf53`，`tsc --noEmit` 通过、容器重启后恢复流程验证正常（`[Recovery] DONE interrupted-tasks | claimed=0 failed=0`）。
 
 **1. 严重 - 生成请求重试重复扣费**
