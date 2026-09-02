@@ -26,6 +26,8 @@
 |---|---|---|---|
 | HB-20260902-01 | AI 服务配置「拉取模型」：按 provider 探测模型列表、SSRF 防护与快捷预填 | 代码、类型检查、新增回归测试与容器内接口验证完成；真实厂商 Key 成功拉取待用户实测 | [查看日志](./2026-09-02-ai-config-fetch-models.md) |
 | HB-20260902-02 | UI 工作线状态排查（线 A 方案稿 vs 线 B UI 治理混淆） | 已归档排查记录与术语索引；P1 token 收敛在 `feat/ui-p1-token-spec` 推进中 | [查看记录](./2026-09-02-ui-communication-audit.md) |
+| HB-20260902-03 | UI P1 Token 收敛 A1 首批 + episode 资产子资源三态补漏（R1） | 完成（PR #15，merge `12121d9`）；结构测试 72/72 通过 | [查看归档](../pr-records/2026-09-02-ui-p1-token-spec-r1-assets.md) |
+| HB-20260902-04 | 首页双栏工作台 + 设置页「目录—详情」三层布局改造 | 完成（PR #16，merge `e9ca6ce`）；经两轮评审，测试 74/74 通过 | [查看归档](../pr-records/2026-09-02-ui-home-workspace-settings-three-tier.md) |
 
 ## 记录规范
 
