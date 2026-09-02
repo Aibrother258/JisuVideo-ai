@@ -44,6 +44,9 @@ services:
       # CORS_ORIGIN: "http://localhost:3013,http://localhost:5679"
       # 存储清理测试：仅报告不删除
       # STORAGE_CLEANUP_DRY_RUN: "true"
+      # 出站 AI Endpoint 安全策略：默认拒绝私网/本机地址（SSRF 防护）；
+      # 确需连接局域网/本机 AI 网关（如 one-api）时设 true 显式放行
+      # ALLOW_PRIVATE_AI_ENDPOINTS: "true"
       # ffmpeg-static postinstall 从 GitHub 下载二进制常超时，改用 npmmirror 镜像
       FFMPEG_BINARIES_URL: https://cdn.npmmirror.com/binaries/ffmpeg-static
       CHOKIDAR_USEPOLLING: "true"

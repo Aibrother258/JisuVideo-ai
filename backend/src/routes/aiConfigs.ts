@@ -6,8 +6,12 @@ import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
 import { invalidateAIConfigCache, isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
+import { UnsafeEndpointError, safeFetch } from '../utils/endpoint-guard.js'
 
 const app = new Hono()
+
+/** 单次拉取最多返回的模型数（防超大列表拖垮设置页渲染） */
+const MAX_MODELS = 200
 
 /** 归一化 temperature 入参：null=未设置；合法值 0~2；非法抛错 */
 function normalizeTemperature(v: any): number | null {
@@ -113,6 +117,115 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
   }
 }
 
+/** 模型拉取候选端点序列：按 provider 优先官方格式，中转站(openai 兼容)格式兜底 */
+function buildModelProbes(provider: string, baseUrl: string, apiKey?: string) {
+  const p = provider.toLowerCase()
+  const probes: Array<{ method: string; url: string; headers: Record<string, string> }> = []
+  const push = (requiredPrefix: string, path: string, headers: Record<string, string>) => {
+    probes.push({ method: 'GET', url: joinProviderUrl(baseUrl, requiredPrefix, path), headers })
+  }
+
+  if (p === 'gemini') {
+    // 官方：v1beta/models?key=；new-api 中转：/v1/models Bearer 兜底
+    const url = new URL(joinProviderUrl(baseUrl, '/v1beta', '/models'))
+    if (apiKey) url.searchParams.set('key', apiKey)
+    probes.push({ method: 'GET', url: url.toString(), headers: {} })
+    push('/v1', '/models', bearerHeaders(apiKey))
+  } else if (p === 'volcengine') {
+    // ark 官方：/api/v3/models；中转站：/v1/models 兜底
+    push('/api/v3', '/models', bearerHeaders(apiKey))
+    push('/v1', '/models', bearerHeaders(apiKey))
+  } else if (p === 'minimax') {
+    // MiniMax 官方：/v2/models；兜底 /v1/models
+    push('/v2', '/models', bearerHeaders(apiKey))
+    push('/v1', '/models', bearerHeaders(apiKey))
+  } else {
+    // openai 系（官方与 openai 兼容中转站）
+    push('/v1', '/models', bearerHeaders(apiKey))
+  }
+  return probes
+}
+
+/** 兼容 openai(data[].id) 与 gemini(models[].name) 两种列表格式，name 去掉 models/ 前缀 */
+function parseModelIds(text: string): string[] | null {
+  try {
+    const json = JSON.parse(text)
+    const arr = Array.isArray(json.data) ? json.data : Array.isArray(json.models) ? json.models : null
+    if (!arr) return null
+    const ids = arr
+      .map((item: any) => String(item?.id ?? item?.name ?? '').replace(/^models\//, ''))
+      .filter(Boolean)
+    return ids.length ? ids : null
+  } catch {
+    return null
+  }
+}
+
+// POST /ai-configs/models — 拉取该 Base URL 下可用的模型列表
+app.post('/models', async (c) => {
+  const body = await c.req.json()
+  if (!body.service_type || !body.provider || !body.base_url) {
+    return badRequest(c, 'service_type, provider and base_url are required')
+  }
+  if (!isOfficialProvider(body.service_type, body.provider)) {
+    return badRequest(c, 'Unsupported service_type/provider')
+  }
+
+  const provider = body.provider.toLowerCase()
+  if (provider === 'autodl') {
+    return success(c, { ok: true, models: [], source: 'fixed', message: 'AutoDL 为固定 H3 工作流模型，无需拉取' })
+  }
+
+  const probes = buildModelProbes(provider, body.base_url, body.api_key)
+  let lastError: string | null = null
+  for (const probe of probes) {
+    const probeUrl = redactUrl(probe.url)
+    logTaskProgress('AIConfig', 'models-fetch-start', { provider, url: probeUrl })
+    try {
+      const { resp, body: text } = await safeFetch(probe.url, {
+        method: probe.method,
+        headers: probe.headers,
+        signal: AbortSignal.timeout(10000),
+      })
+      if (resp.status === 401 || resp.status === 403) {
+        logTaskError('AIConfig', 'models-fetch-unauthorized', { provider, status: resp.status, url: probeUrl })
+        return success(c, { ok: false, models: [], source: probeUrl, message: 'API Key 无效或未填写' })
+      }
+      if (!resp.ok) {
+        lastError = `HTTP ${resp.status}`
+        continue
+      }
+      const parsed = parseModelIds(text)
+      if (!parsed) {
+        lastError = 'response format unexpected'
+        continue
+      }
+      // 去重 + 数量上限
+      const models = [...new Set(parsed)].slice(0, MAX_MODELS)
+      if (!models.length) {
+        lastError = 'empty model list'
+        continue
+      }
+      logTaskSuccess('AIConfig', 'models-fetch-done', { provider, count: models.length, url: probeUrl })
+      return success(c, { ok: true, models, source: probeUrl })
+    } catch (error: any) {
+      if (error instanceof UnsafeEndpointError) {
+        logTaskError('AIConfig', 'models-fetch-blocked', { provider, url: probeUrl, reason: error.message })
+        return success(c, { ok: false, models: [], source: probeUrl, message: '该地址被安全策略拒绝（不支持私网/本机地址）；如确需本地 AI 网关，请在后端设置 ALLOW_PRIVATE_AI_ENDPOINTS=true' })
+      }
+      lastError = error.message
+      logTaskError('AIConfig', 'models-fetch-failed', { provider, url: probeUrl, error: error.message })
+    }
+  }
+  logTaskError('AIConfig', 'models-fetch-none', { provider, error: lastError })
+  return success(c, {
+    ok: false,
+    models: [],
+    source: '',
+    message: `无法从该 Base URL 拉取模型：${lastError || '未知错误'}`,
+  })
+})
+
 // GET /ai-configs?service_type=text
 app.get('/', async (c) => {
   const serviceType = c.req.query('service_type')
@@ -188,12 +301,11 @@ app.post('/test', async (c) => {
   })
 
   try {
-    const resp = await fetch(probe.url, {
+    const { resp, body: text } = await safeFetch(probe.url, {
       method: probe.method,
       headers: probe.headers,
       body: probe.body ? JSON.stringify(probe.body) : undefined,
     })
-    const text = await resp.text()
     const isAutoDL = body.provider.toLowerCase() === 'autodl'
     const reachable = [200, 204, 400, 401, 403, 404].includes(resp.status)
     const authenticated = !isAutoDL || ![401, 403].includes(resp.status)
@@ -227,6 +339,9 @@ app.post('/test', async (c) => {
     }
     return success(c, payload)
   } catch (error: any) {
+    const message = error instanceof UnsafeEndpointError
+      ? '该地址被安全策略拒绝（不支持私网/本机地址）；如确需本地 AI 网关，请在后端设置 ALLOW_PRIVATE_AI_ENDPOINTS=true'
+      : (error.message || '请求失败')
     logTaskError('AIConfig', 'probe-failed', {
       provider: body.provider,
       url: probeUrl,
@@ -237,7 +352,7 @@ app.post('/test', async (c) => {
       reachable: false,
       method: probe.method,
       url: probeUrl,
-      message: error.message || '请求失败',
+      message,
       response_preview: '',
     })
   }
