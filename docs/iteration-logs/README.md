@@ -36,6 +36,7 @@
 |---|---|---|---|
 | HB-20260903-01 | UI P1 Token 收敛 A1 第三批——封面占位/反色白字/毛玻璃浮层语义 token | 完成（PR #19，merge `d58e570`）；结构测试 76/76 通过 | [查看归档](../pr-records/2026-09-03-ui-token-a1-batch3.md) |
 | HB-20260903-02 | UI P1 Token 收敛 A1 第四批——白字白底语义化与徽标投影 token | 完成（PR #20，merge `e2f6f42`）；结构测试 77/77 通过 | [查看归档](../pr-records/2026-09-03-ui-token-a1-batch4.md) |
+| HB-20260903-03 | UI P1 Token 收敛 A1 第五批——episode 播放器深色与状态色 token | 完成（PR #22，merge `cf3a301`）；结构测试 78/78 通过 | [查看归档](../pr-records/2026-09-03-ui-token-a1-batch5.md) |
 
 ## 记录规范
 
