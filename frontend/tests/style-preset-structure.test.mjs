@@ -53,9 +53,10 @@ test('settings page manages style presets in a base tab', () => {
   assert.match(settings, /styleToDelete/)
   assert.match(settings, /<ConfirmDialog/)
   assert.match(settings, /loadStylePresets/)
-  // 关闭高级开关时只重置高级 tab，不影响基础 tab
-  assert.match(settings, /advancedTabs\.some/)
-  assert.doesNotMatch(settings, /if \(!v && tab\.value !== 'ai'\)/)
+  // 设置页为常驻两级目录（原「Agent 高级配置」开关已移除），风格预设始终可达
+  assert.doesNotMatch(settings, /advancedTabs\.some/)
+  assert.doesNotMatch(settings, /showAdvanced/)
+  assert.doesNotMatch(settings, /advanced-toggle/)
   // 风格 key 编辑时不可修改
   assert.match(settings, /:disabled="!!styleEditId"/)
   // image_prompt_generator 默认提示词副本同步更新
