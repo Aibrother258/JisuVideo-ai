@@ -9,6 +9,7 @@
             v-for="t in g.items"
             :key="t.id"
             :class="['nav-item', { active: tab === t.id }]"
+            :aria-current="tab === t.id ? 'page' : undefined"
             @click="tab = t.id"
           >
             <component :is="t.icon" :size="14" />

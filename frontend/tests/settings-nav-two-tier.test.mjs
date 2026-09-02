@@ -29,6 +29,9 @@ test('settings nav is a two-tier structure without the advanced toggle', () => {
   assert.doesNotMatch(settings, /v-for="t in baseTabs"/)
   assert.doesNotMatch(settings, /v-for="t in advancedTabs"/)
 
+  // 当前目录按钮带 aria-current（评审补充：导航可访问性基线）
+  assert.match(settings, /:aria-current="tab === t\.id \? 'page' : undefined"/)
+
   // 默认目录仍是 AI 服务，且不再有 showAdvanced 关闭时的回退 watch
   assert.match(settings, /const tab = ref\('ai'\)/)
   assert.doesNotMatch(settings, /watch\(showAdvanced/)
