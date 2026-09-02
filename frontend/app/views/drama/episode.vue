@@ -5343,7 +5343,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: transparent;
   padding: 2px 6px;
   margin-left: -6px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
   color: var(--accent);
@@ -6487,7 +6487,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-inspector-hint { margin-top: 4px; color: var(--text-3); font-size: 10px; }
 .video-inspector-h3-prompt {
   min-height: 230px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.55;
 }

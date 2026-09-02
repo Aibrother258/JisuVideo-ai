@@ -155,6 +155,9 @@ test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error an
   assert.match(episode, /\.video-ref-media-chip[\s\S]*?background: var\(--surface-muted\);/)
   // episode：R5 fallback 清零（未定义的 accent-soft/surface-2 已正式化或改已定义 token）
   assert.doesNotMatch(episode, /var\(--[\w-]+,\s*(?:#|rgba)/)
+  // 静态非颜色 fallback 也清零（radius-sm/font-mono 已全局定义；运行时动态拖拽宽度 fallback 保留）
+  assert.doesNotMatch(episode, /var\(--radius-sm, 6px\)/)
+  assert.doesNotMatch(episode, /font-family: var\(--font-mono,/)
   // --sel 局部定义维持（裁决：单页模型选中语义，规范 §5 记录；暗色主题批次再定全局）
   // default：顶部玻璃条与导航激活段 shadow 收敛
   assert.match(layout, /background: var\(--bar-glass\);/)
