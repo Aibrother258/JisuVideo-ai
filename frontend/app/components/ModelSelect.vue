@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
 }
-.model-select-trigger:hover { border-color: rgba(0,0,0,0.22); }
+.model-select-trigger:hover { border-color: var(--border-hover); }
 .model-select-trigger.open,
 .model-select-trigger:focus-visible {
   border-color: var(--border-focus);

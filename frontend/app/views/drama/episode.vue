@@ -304,6 +304,13 @@
               <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
               <div class="loading-text">正在提取{{ extractingLabels }}...</div>
             </div>
+            <!-- R1：角色/场景/道具子资源加载失败且无任何资产时，显示加载失败而非误导性「开始提取资产」空态 -->
+            <div v-else-if="assetsLoadError && !chars.length && !scenes.length && !propItems.length" class="app-state app-state-error compact-state">
+              <div class="app-state-icon"><CircleAlert :size="20" /></div>
+              <div class="app-state-title">资产加载失败</div>
+              <p class="app-state-desc">{{ assetsLoadError }}</p>
+              <button class="btn btn-primary btn-sm" @click="loadEpisodeAssets(episode)"><RefreshCw :size="12" /> 重试</button>
+            </div>
             <div v-else-if="!chars.length && !scenes.length && !propItems.length" class="step-empty asset-empty-state">
               <div class="empty-visual">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -317,6 +324,12 @@
               </button>
             </div>
             <template v-else>
+            <!-- R1：有旧数据时刷新失败：非破坏性错误条，保留已加载资产 -->
+            <div v-if="assetsLoadError" class="video-history-error-row">
+              <span class="tag tag-error">资产刷新失败</span>
+              <span class="dim" style="font-size:11px">{{ assetsLoadError }}</span>
+              <button class="btn btn-sm ml-auto" @click="loadEpisodeAssets(episode)"><RefreshCw :size="11" /> 重试</button>
+            </div>
             <div class="asset-section-title">
               角色
               <button class="asset-add-btn" @click="openAssetCreate('character')"><Plus :size="11" /> 新增</button>
@@ -1881,6 +1894,8 @@ const dramaId = Number(route.params.id)
 const episodeNumber = Number(route.params.episodeNumber)
 
 const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]), propItems = ref([]), sbs = ref([]), mergeData = ref(null)
+// 角色/场景/道具子资源加载错误（R1：失败保留旧值并内联呈现，禁止静默置空回落「开始提取资产」空态）
+const assetsLoadError = ref('')
 const pageLoading = ref(false)
 const pageLoadError = ref('')
 // 工作台面板位置记忆（按剧集隔离）：仅页面刷新(reload)时恢复到上次所在步骤；
@@ -3331,6 +3346,15 @@ function sceneShotCount(sceneId) {
 watch(rawContent, v => { localRaw.value = v }, { immediate: true })
 watch(scriptContent, v => { localScript.value = v }, { immediate: true })
 
+// 角色/场景/道具子资源加载（R1）：任一失败保留上次数据并汇总错误，供资产区内联呈现 + 重试
+async function loadEpisodeAssets(ep) {
+  const errors = []
+  try { chars.value = await episodeAPI.characters(ep.id) } catch (e) { errors.push(`角色：${e.message || '加载失败'}`) }
+  try { scenes.value = await episodeAPI.scenes(ep.id) } catch (e) { errors.push(`场景：${e.message || '加载失败'}`) }
+  try { propItems.value = await episodeAPI.props(ep.id) } catch (e) { errors.push(`道具：${e.message || '加载失败'}`) }
+  assetsLoadError.value = errors.join('；')
+}
+
 async function refresh(initial = false) {
   if (initial) { pageLoading.value = true; pageLoadError.value = '' }
   try {
@@ -3338,9 +3362,7 @@ async function refresh(initial = false) {
     const ep = drama.value.episodes?.find(e => (e.episode_number || e.episodeNumber) === episodeNumber)
     if (ep) {
       episode.value = ep
-      try { chars.value = await episodeAPI.characters(ep.id) } catch { chars.value = [] }
-      try { scenes.value = await episodeAPI.scenes(ep.id) } catch { scenes.value = [] }
-      try { propItems.value = await episodeAPI.props(ep.id) } catch { propItems.value = [] }
+      await loadEpisodeAssets(ep)
       sbs.value = await episodeAPI.storyboards(ep.id)
       selectedSbIds.value = selectedSbIds.value.filter(id => sbs.value.some(sb => sb.id === id))
       if (sbs.value.length) {
@@ -4715,7 +4737,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   gap: 6px;
   padding: 0 12px;
   border: none; border-radius: var(--radius-pill);
-  background: rgba(0,0,0,0.05); color: var(--text-1);
+  background: var(--fill-subtle); color: var(--text-1);
   cursor: pointer; transition: all 0.18s var(--ease-out);
   font-size: 12px;
   font-weight: 650;
@@ -5926,7 +5948,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 }
 .asset-cover-badge.is-ready {
   background: var(--success-bg);
-  color: #248a3d;
+  color: var(--success-strong);
 }
 .asset-cover-badge.is-pending {
   background: var(--accent-bg);
@@ -6100,7 +6122,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-player-history-count {
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.05);
+  background: var(--fill-subtle);
   color: var(--text-3);
   font-size: 10px;
   font-weight: 750;
@@ -6704,7 +6726,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   align-items: center;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.05);
+  background: var(--fill-subtle);
   color: var(--text-3);
   font-size: 10px;
   font-weight: 760;
@@ -7285,7 +7307,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   z-index: 118;
   display: flex;
   justify-content: flex-end;
-  background: rgba(0,0,0,0.32);
+  background: var(--overlay-mask);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: fadeIn 0.18s var(--ease-out);

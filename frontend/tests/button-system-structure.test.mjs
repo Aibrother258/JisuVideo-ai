@@ -32,8 +32,8 @@ test('button-like controls share focus-visible and active hooks', () => {
 })
 
 test('custom return buttons use the unified quiet circular surface', () => {
-  assert.match(dramaDetail, /\.back-btn\s*\{[\s\S]*?background:\s*rgba\(0,0,0,0\.05\)/)
+  assert.match(dramaDetail, /\.back-btn\s*\{[\s\S]*?background:\s*var\(--fill-subtle\)/)
   assert.match(dramaDetail, /\.back-btn:focus-visible\s*\{/)
-  assert.match(episodeWorkbench, /\.back-btn\s*\{[\s\S]*?background:\s*rgba\(0,0,0,0\.05\)/)
+  assert.match(episodeWorkbench, /\.back-btn\s*\{[\s\S]*?background:\s*var\(--fill-subtle\)/)
   assert.match(episodeWorkbench, /\.back-btn:focus-visible\s*\{/)
 })
