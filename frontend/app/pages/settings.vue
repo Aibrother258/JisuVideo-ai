@@ -115,10 +115,10 @@
       <div class="settings-content">
 
         <!-- ===== AI 服务配置 ===== -->
-        <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll" @scroll="onPaneScroll">
+        <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">AI 服务</h2>
-            <p class="settings-desc">文本 / 图片 / 视频三类能力分开维护，启用后即可被工作台自动采用；弹窗内有推荐模板可选。</p>
+            <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；启用后即可被工作台自动采用，弹窗内有推荐模板可选。</p>
           </div>
           <div v-if="cfgsLoading" class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
@@ -138,9 +138,9 @@
             <p class="app-state-desc">{{ cfgsError }}</p>
             <button class="btn btn-primary btn-sm" @click="loadCfgs(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <div v-else class="cap-wrap">
-            <!-- 能力总览条：全部来自真实计数与默认模型解析，无假数据 -->
-            <section class="card cap-strip" aria-label="能力总览" data-sub="ai-overview">
+          <template v-else>
+            <!-- 能力总览：全部来自真实计数与默认模型解析，无假数据 -->
+            <section v-show="activeSection === 'ai-overview'" class="card cap-strip" data-sub="ai-overview">
               <div v-for="st in serviceTypes" :key="st.type" class="cap-cell">
                 <div class="cap-cell-top">
                   <span class="cap-badge" :class="`t-${st.type}`">{{ st.label.slice(0, 1) }}</span>
@@ -159,9 +159,14 @@
               </div>
             </section>
 
-            <!-- 三列能力组卡：每条配置以行内卡片收纳 -->
-            <div class="cap-grid">
-              <section v-for="st in serviceTypes" :key="st.type" class="card svc-group cap-card" :data-sub="`ai-${st.type}`">
+            <!-- 能力组配置卡：点击二级目录在右侧切换展示 -->
+            <section
+              v-for="st in serviceTypes"
+              :key="st.type"
+              v-show="activeSection === `ai-${st.type}`"
+              class="card svc-group cap-card"
+              :data-sub="`ai-${st.type}`"
+            >
                 <div class="svc-group-head">
                   <div class="svc-group-heading">
                     <span class="svc-group-title">{{ st.label }}服务</span>
@@ -202,12 +207,11 @@
                 </div>
                 <p v-if="!byType(st.type).length" class="config-empty">暂无配置</p>
               </section>
-            </div>
-          </div>
+          </template>
         </div>
 
         <!-- ===== 风格预设 ===== -->
-        <div v-else-if="tab === 'styles'" ref="paneRef" class="settings-scroll" @scroll="onPaneScroll">
+        <div v-else-if="tab === 'styles'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">风格预设</h2>
             <p class="settings-desc">创建项目时选择的视觉风格，其英文提示词片段会自动注入角色图与场景图生成。停用的风格不出现在创建选项中。</p>
@@ -259,7 +263,7 @@
         </div>
 
         <!-- ===== Agent 配置 ===== -->
-        <div v-else-if="tab === 'agents'" ref="paneRef" class="settings-scroll" @scroll="onPaneScroll">
+        <div v-else-if="tab === 'agents'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">Agent 配置</h2>
             <p class="settings-desc">高级区只保留 Agent 运行配置。这里可以调整模型、提示词和参数，保存后立即生效。</p>
@@ -282,7 +286,14 @@
             <button class="btn btn-primary btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
           <div v-else class="agent-list">
-            <div v-for="a in agentList" :key="a.type" class="card agent-card" :data-sub="`agent-${a.type}`">
+            <!-- 点击二级目录切换展示：列表仅渲染当前选中的 Agent 配置卡 -->
+            <div
+              v-for="a in agentList"
+              :key="a.type"
+              v-show="agentDetail === a.type"
+              class="card agent-card"
+              :data-sub="`agent-${a.type}`"
+            >
               <div class="agent-card-head" @click="toggleAgentEdit(a.type)">
                 <div class="agent-type-badge">{{ a.icon }}</div>
                 <div class="agent-card-heading">
@@ -319,7 +330,7 @@
         </div>
 
         <!-- ===== Skills 编辑 ===== -->
-        <div v-else-if="tab === 'skills'" ref="paneRef" class="settings-scroll skills-pane" @scroll="onPaneScroll">
+        <div v-else-if="tab === 'skills'" ref="paneRef" class="settings-scroll skills-pane">
             <div class="settings-head skills-head">
               <span class="agent-type-badge skills-head-badge">{{ selectedAgentIcon }}</span>
               <div class="skills-head-copy">
@@ -622,7 +633,10 @@ const SUB_MAX = 360
 const navWidth = ref(NAV_DEFAULT)
 const subWidth = ref(SUB_DEFAULT)
 const paneRef = ref(null)
+// 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video），
+// styles 恒为 styles-all；agents 用 agentDetail 记录被选中的 Agent。
 const activeSection = ref('')
+const agentDetail = ref(null)
 let activePaneDrag = null
 
 function clampPaneWidth(v, min, max) { return Math.min(max, Math.max(min, v)) }
@@ -660,28 +674,32 @@ const subItems = computed(() => {
   if (tab.value === 'agents') return agentList.value.map(a => ({ id: `agent-${a.type}`, label: a.label, icon: a.icon }))
   return []
 })
+// 二级目录点击 = 右侧内容切换（不再做长页锚点滚动）
 function isSubActive(it) {
-  if (activeSection.value) return activeSection.value === it.id
-  return subItems.value[0]?.id === it.id
+  if (tab.value === 'agents') return !!agentDetail.value && it.id === `agent-${agentDetail.value}`
+  return activeSection.value === it.id
+}
+function paneScrollTop() {
+  requestAnimationFrame(() => {
+    if (paneRef.value) paneRef.value.scrollTop = 0
+  })
 }
 function onSubNavClick(it) {
-  const el = paneRef.value?.querySelector(`[data-sub="${it.id}"]`)
-  if (!el) return
-  activeSection.value = it.id
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-function onPaneScroll() {
-  if (tab.value !== 'ai' && tab.value !== 'styles' && tab.value !== 'agents') return
-  const pane = paneRef.value
-  if (!pane) return
-  const marks = [...pane.querySelectorAll('[data-sub]')]
-  if (!marks.length) return
-  const paneTop = pane.getBoundingClientRect().top
-  let current = marks[0].getAttribute('data-sub')
-  for (const m of marks) {
-    if (m.getBoundingClientRect().top - paneTop <= 160) current = m.getAttribute('data-sub')
+  if (tab.value === 'agents') {
+    if (it.id.startsWith('agent-')) showAgentDetail(it.id.slice(6))
+    return
   }
-  activeSection.value = current
+  if (activeSection.value !== it.id) activeSection.value = it.id
+  paneScrollTop()
+}
+// Agent 配置页：切到指定 Agent，并在卡片中展开编辑表单（拉取该 Agent 的 /prompts 详情）
+async function showAgentDetail(type) {
+  agentDetail.value = type
+  if (editingAgent.value !== type) {
+    editingAgent.value = null
+    await toggleAgentEdit(type)
+  }
+  paneScrollTop()
 }
 function startPaneResize(type, e) {
   if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -978,6 +996,11 @@ async function saveCfg() {
     if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature })
     else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature })
     cfgDialog.value = false; toast.success('已保存'); loadCfgs()
+    // 保存后跳到对应能力面板，让新配置立即可见
+    if (activeSection.value !== `ai-${cfgForm.service_type}`) {
+      activeSection.value = `ai-${cfgForm.service_type}`
+      paneScrollTop()
+    }
   } catch (e) { toast.error(e.message) }
 }
 
@@ -1099,10 +1122,15 @@ const selectedAgentType = computed(() => selectedAgent.value)
 const selectedAgentLabel = computed(() => agentList.value.find(a => a.type === selectedAgent.value)?.label || selectedAgent.value)
 const selectedAgentIcon = computed(() => agentList.value.find(a => a.type === selectedAgent.value)?.icon || '🤖')
 
-// 列表来自 /prompts：若当前选中 Agent 不在其中（被移除或列表刚加载），自动回退到第一个
+// 列表来自 /prompts：若当前选中 Agent 不在其中（被移除或列表刚加载），自动回退到第一个。
+// Agent 配置页的详情卡同样默认选中第一个，列表变化后失效则回退。
 watch(agentCfgs, (list) => {
   if (list.length && !list.some(a => a.agent_type === selectedAgent.value)) {
     selectedAgent.value = list[0].agent_type
+  }
+  if (!list.length) return
+  if (!agentDetail.value || !list.some(a => a.agent_type === agentDetail.value)) {
+    agentDetail.value = list[0].agent_type
   }
 })
 
@@ -1317,26 +1345,18 @@ async function saveStyle() {
   } catch (e) { toast.error(e.message) }
 }
 
-watch(tab, async () => {
-  activeSection.value = ''
-  await nextTick()
-  if (tab.value !== 'skills') {
-    const first = paneRef.value?.querySelector('[data-sub]')
-    if (first) activeSection.value = first.getAttribute('data-sub')
-  }
+// 切换到 AI / 风格页时回到各自默认二级面板
+watch(tab, () => {
+  if (tab.value === 'ai') activeSection.value = 'ai-overview'
+  else if (tab.value === 'styles') activeSection.value = 'styles-all'
 })
 onBeforeUnmount(() => {
   if (activePaneDrag?.cleanup) activePaneDrag.cleanup()
 })
-onMounted(async () => {
+onMounted(() => {
   initPaneWidths()
-  loadCfgs(true)
-  loadAgents(true)
-  loadAllSkills(true)
-  loadStylePresets(true)
-  await nextTick()
-  const first = paneRef.value?.querySelector('[data-sub]')
-  if (first) activeSection.value = first.getAttribute('data-sub')
+  activeSection.value = 'ai-overview'
+  loadCfgs(true); loadAgents(true); loadAllSkills(true); loadStylePresets(true)
 })
 </script>
 
@@ -1509,7 +1529,6 @@ onMounted(async () => {
 .svc-group { overflow: hidden; }
 
 /* —— 能力总览条 —— */
-.cap-wrap { display: flex; flex-direction: column; gap: 16px; }
 .cap-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1556,13 +1575,7 @@ onMounted(async () => {
   font-size: 10.5px; white-space: nowrap;
 }
 
-/* —— 三列能力组卡 —— */
-.cap-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
-  align-items: start;
-}
+/* —— 能力组配置卡（二级目录切换，单列全宽展示） —— */
 .cap-card { overflow: hidden; }
 
 /* 卡内配置行：行内收纳（徽标 + 信息列 + 动作行） */
@@ -1783,14 +1796,13 @@ onMounted(async () => {
   user-select: none;
 }
 
-/* 窄屏：总览条与能力卡堆叠，行内收纳保持 */
+/* 窄屏：总览条堆叠为单列 */
 @media (max-width: 960px) {
   .cap-strip { grid-template-columns: 1fr; }
   .cap-cell + .cap-cell {
     border-left: none;
     border-top: 1px solid var(--border);
   }
-  .cap-grid { grid-template-columns: 1fr; }
 }
 
 /* 窄窗口：收起中间二级目录与分隔条，退回左侧导航 + 正文两栏 */
