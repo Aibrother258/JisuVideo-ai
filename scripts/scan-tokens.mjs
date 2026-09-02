@@ -1,7 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const root = 'f:/JisuVideo/JisuVideo-ai/frontend/app'
+// 仓库根目录 = 本文件所在 scripts/ 的上一级。从脚本自身路径推导，勿写死机器路径，保证任意检出位置可运行
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const root = path.join(repoRoot, 'frontend', 'app')
 const files = []
 function walk(dir) {
   for (const name of fs.readdirSync(dir)) {

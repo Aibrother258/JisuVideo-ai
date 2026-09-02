@@ -1,8 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
+// 仓库根目录 = 本文件所在 scripts/ 的上一级。从脚本自身路径推导，勿写死机器路径，保证任意检出位置可运行
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const roots = ['frontend/app', 'frontend/layouts', 'frontend/components', 'frontend/pages']
-const root = 'f:/JisuVideo/JisuVideo-ai'
 const files = []
 function walk(dir) {
   for (const name of fs.readdirSync(dir)) {
@@ -12,7 +14,7 @@ function walk(dir) {
     } else if (/\.(vue|css)$/.test(name)) files.push(p)
   }
 }
-walk(root + '/' + roots[0])
+walk(path.join(repoRoot, roots[0]))
 
 const colorRe = /rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}\b/g
 const fontRe = /font(?:-size)?\s*:\s*[\d.]+px/g
@@ -20,7 +22,7 @@ const pxRe = /\b\d+(?:\.\d+)?px\b/g
 
 const stats = files.map(f => {
   const src = fs.readFileSync(f, 'utf8')
-  const rel = path.relative(root, f)
+  const rel = path.relative(repoRoot, f)
   const colors = src.match(colorRe) || []
   const fonts = src.match(fontRe) || []
   // 排除 var() 与 token 定义
