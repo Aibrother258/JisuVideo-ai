@@ -129,7 +129,7 @@
         <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">AI 服务</h2>
-            <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；启用后即可被工作台自动采用，弹窗内有推荐模板可选。</p>
+            <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；已接入工作流的能力启用后即被工作台自动采用，仅配置/测试阶段的接入中能力暂不生效，弹窗内有推荐模板可选。</p>
           </div>
           <div v-if="cfgsLoading" class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
@@ -876,12 +876,17 @@ const selectedFetchedModels = ref(new Set())
 const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', modelStr: '', service_type: 'text', priority: 0, temperature: '' })
 const serviceTypes = [{ type: 'text', label: '文本' }, { type: 'image', label: '图片' }, { type: 'video', label: '视频' }, { type: 'audio', label: '音频' }]
 const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'autodl']
-const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
+// 音频服务后端白名单仅有 AutoDL，服务商下拉按类型收窄（其余类型保持通用列表）
+const providerWhitelistByType = { audio: ['autodl'] }
+const providerSelectOptions = computed(() => {
+  const list = providerWhitelistByType[cfgForm.service_type] || providers
+  return list.map(p => ({ label: p, value: p }))
+})
 const serviceMeta = {
   text: { label: '文本', desc: '剧本改写、角色场景提取、分镜拆解等 Agent 文本能力' },
   image: { label: '图片', desc: '角色图、场景图与镜头图等静态图像生成' },
   video: { label: '视频', desc: '镜头视频直出生成，支持 Seedance、MiniMax 与 AutoDL H3 工作流' },
-  audio: { label: '音频', desc: '语音合成与音色克隆，支持 AutoDL IndexTTS2 工作流' },
+  audio: { label: '音频', desc: '当前仅保存与测试 AutoDL IndexTTS2 配置；语音生成与工作台接入将在后续工作流完成后开放' },
 }
 const providerPresets = {
   text: {
