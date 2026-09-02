@@ -1776,7 +1776,7 @@ onBeforeUnmount(() => {
   width: 36px; height: 36px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%;
-  background: rgba(0,0,0,0.05); color: var(--text-1);
+  background: var(--fill-subtle); color: var(--text-1);
   cursor: pointer;
   transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
 }
@@ -2371,7 +2371,7 @@ onBeforeUnmount(() => {
 }
 .asset-cover-badge.is-ready {
   background: var(--success-bg);
-  color: #248a3d;
+  color: var(--success-strong);
 }
 .asset-cover-badge.is-pending {
   background: var(--accent-bg);
@@ -2533,7 +2533,7 @@ onBeforeUnmount(() => {
 .mat-detail-state {
   min-height: 20px; display: inline-flex; align-items: center;
   padding: 0 7px; border-radius: 999px;
-  background: rgba(0,0,0,0.05); color: var(--text-3);
+  background: var(--fill-subtle); color: var(--text-3);
   font-size: 10px; font-weight: 760; white-space: nowrap;
 }
 .mat-detail-state.is-ready { color: var(--success); background: var(--success-bg); }

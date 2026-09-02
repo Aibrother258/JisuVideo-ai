@@ -127,3 +127,37 @@ test('detail plan reload surfaces failure inline instead of uncaught rejection',
   assert.match(detail, /v-if="episodePlanReloadError" class="episode-plan-reload-error"/)
   assert.match(detail, /:disabled="reloadPlanLoading"/)
 })
+
+test('episode assets (chars/scenes/props) load failure is inline + retry, not silent empty', () => {
+  const ep = read('app/views/drama/episode.vue')
+  // 统一入口 loadEpisodeAssets：分别捕获，任一失败汇总错误，保留旧数据不清空
+  assert.match(ep, /const assetsLoadError = ref\(''\)/)
+  assert.match(ep, /async function loadEpisodeAssets\(ep\) \{/)
+  assert.match(ep, /assetsLoadError\.value = errors\.join\('；'\)/)
+  // 失败且无任何资产时：显示「资产加载失败」错误态（不回落「开始提取资产」误导空态）
+  assert.match(ep, /v-else-if="assetsLoadError && !chars\.length && !scenes\.length && !propItems\.length" class="app-state app-state-error compact-state"/)
+  assert.match(ep, /@click="loadEpisodeAssets\(episode\)"/)
+  // 有旧数据时刷新失败：非破坏性错误条 + 重试，保留已加载资产
+  assert.match(ep, /v-if="assetsLoadError" class="video-history-error-row"/)
+  // 旧的静默置空（catch 内 chars/scenes/props = []）已移除
+  assert.doesNotMatch(ep, /catch \{\s*chars\.value = \[\]\s*\}/)
+  assert.doesNotMatch(ep, /catch \{\s*scenes\.value = \[\]\s*\}/)
+  assert.doesNotMatch(ep, /catch \{\s*propItems\.value = \[\]\s*\}/)
+})
+
+test('P1 token convergence: new semantic tokens exist and pages stop duplicating literals', () => {
+  const css = read('app/assets/studio.css')
+  const views = ['app/views/drama/episode.vue', 'app/views/drama/detail.vue', 'app/layouts/default.vue']
+  for (const v of ['--success-strong', '--info-strong', '--warning-strong', '--fill-subtle', '--border-hover', '--error-outline', '--action-danger-hover-bg', '--overlay-mask', '--switch-track', '--scrollbar-thumb', '--scrollbar-thumb-hover']) {
+    assert.match(css, new RegExp(`${v}:`))
+  }
+  // 页面引用 token，不再出现同值字面量（tag 强色 / 通用浅填充 / 遮罩）
+  for (const f of views) {
+    const src = read(f)
+    assert.doesNotMatch(src, /#248a3d|#0b6b94|#c93400/)
+    assert.doesNotMatch(src, /rgba\(0,0,0,0\.05\)|rgba\(0,0,0,0\.32\)/)
+    assert.match(src, /var\(--fill-subtle\)|var\(--success-strong\)|var\(--overlay-mask\)/)
+  }
+  assert.match(read('app/components/MentionTextarea.vue'), /var\(--success-strong\)/)
+  assert.match(read('app/components/ModelSelect.vue'), /var\(--border-hover\)/)
+})

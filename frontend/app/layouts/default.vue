@@ -133,7 +133,7 @@ watch(() => route.path, checkAiConfigs)
   display: flex; gap: 2px;
   padding: 3px;
   border-radius: var(--radius-pill);
-  background: rgba(0,0,0,0.05);
+  background: var(--fill-subtle);
 }
 .nav-link {
   display: flex; align-items: center; gap: 6px;

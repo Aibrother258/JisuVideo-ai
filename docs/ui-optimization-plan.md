@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v1.2
+> 版本：v1.3
 > 日期：2026-09-02
-> 状态：**P0-F（设置页两级导航重构）已实施**，随 PR #13 合入 master 后收口；其余迭代方向（P1–P4）仍待排期
+> 状态：**P0（F 设置页两级导航重构 + C1/C2 骨架屏与三态统一）已实施并随 PR #13/#14 合入 master 收口；P1（A1 Token 收敛）在 `feat/ui-p1-token-spec` 分支推进中；P2–P4 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -14,6 +14,7 @@
 | v1.0 | 2026-09-02 | 初稿。基于 `frontend/app/**` 代码逐文件核实的 UI 体检结论；新增专项「设置页两级导航重构」（一级分组选 A：基础 / 高级）并冻结为 P0 优先项 |
 | v1.1 | 2026-09-02 | 提交 PR 前自检修订：① 关键断言逐项核验（episode.vue 296KB/7315 行、detail.vue 124KB/2590 行、settings.vue 58KB/1319 行、index.vue 47KB/1241 行，与代码一致）；② 新增「第 8 章 与其他在途方案的边界」「第 10 章 待 Codex 评审决策点」；③ C 方向补 C6 表单字段级校验、D 方向补 D6 媒体加载占位；④ 第 9 章拆分度量由“单文件 ≤60KB”放宽为“面板文件 ≤1200 行 + 跨页重复样式归零”的可执行口径 |
 | v1.2 | 2026-09-02 | PR #13 评审收口：① 头部版本/状态对齐事实（P0-F 已实施、随 PR #13 待合入，P1–P4 仍待排期）；② 第 8 章同步「PR #11（Agent/Skills 数据源）已合入 master」；③ 4.3 表 URL 深链明确为已延期独立增强项（第 10 章新增 D7）；④ 4.3 表补导航按钮 `aria-current` 可访问性条目；⑤ 方案文档合入路径收敛：由 PR #13 携带进入 master，PR #12 关闭避免双份合并 |
+| v1.3 | 2026-09-02 | P1 推进记录：在 `feat/ui-p1-token-spec` 分支完成 A1 首批 Token 收敛（studio.css 新增 `--success-strong/--info-strong/--warning-strong/--fill-subtle/--border-hover/--error-outline/--action-danger-hover-bg/--overlay-mask/--switch-track/--scrollbar-thumb/--scrollbar-thumb-hover` 并替换全局原语引用），随后将 `episode.vue/detail.vue/default.vue/MentionTextarea.vue/ModelSelect.vue` 内同值字面量改为 Token 引用（值不变改引用）；R1 加载类失败残留清零（角色/场景/道具子资源加载失败不再静默置空，改内联呈现 + 重试）；同步新增「多线工作流状态排查记录」`docs/iteration-logs/2026-09-02-ui-communication-audit.md`，作为回答 UI/进度类问题的术语索引 |
 
 ---
 
