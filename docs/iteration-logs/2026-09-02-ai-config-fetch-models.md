@@ -88,22 +88,23 @@
   （IPv4：0/8、10/8、127/8、100.64/10、169.254/16、172.16/12、192.168/16、198.18/15、224+；
   IPv6：`::1`、`fc00::/7`、`fe80::/10`、组播）；IP 字面量直接判断不查 DNS
 - **受控开关**：`ALLOW_PRIVATE_AI_ENDPOINTS=true` 显式放行本地/私网 AI 网关（默认拒绝），dev compose 已加注释说明
-- **逐跳重定向校验**：手动跟随（`redirect:'manual'`），每一跳重新校验目标地址；
-  **跨 origin 跳转丢弃 Authorization / x-goog-api-key 与请求体**，防 Key 随跳转泄漏
+- **地址固定与逐跳重定向校验**：DNS 解析时检查全部地址；请求仅连接本次校验后的 IP，
+  每一跳重新校验目标地址，避免 DNS rebinding；跨 origin 跳转丢弃 Authorization /
+  x-goog-api-key 与请求体，防 Key 随跳转泄漏
+- **IPv4-mapped IPv6 拒绝**：`::ffff:127.0.0.1`、`::ffff:7f00:1` 与 IPv4-compatible
+  IPv6 会归一化为 IPv4 后复用私网规则，不能绕过回环/私网拦截
 - **受限读取**：响应体上限 2MiB（`readBodyLimited`），防异常服务拖垮内存
 - 被拒时前端/接口返回明确提示：`该地址被安全策略拒绝（不支持私网/本机地址）…`
 
-## 评审意见 2：响应加固与 mock fetch 回归测试 ✅
+## 评审意见 2：响应加固与回归测试 ✅
 
 - 模型 ID **去重**（`new Set`）+ **数量上限**（`MAX_MODELS = 200`）
-- 新增 `backend/tests/ai-config-models.test.mjs`（mock fetch + 可注入 DNS）：
-  1. 官方格式成功（openai `data[].id`）✅
-  2. 候选端点回退（首候选 404 → 下一候选成功，对应 gemini v1beta→v1 兜底）✅
-  3. 401/403 响应透出（供路由短路判定）✅
-  4. 超大响应拒绝（`readBodyLimited` 超限抛错）✅
-  5. SSRF：15 类私网/保留 IP 识别、域名解析到私网拒绝、IP 字面量拒绝、非 http(s) 协议拒绝、重定向到私网拒绝 ✅
-  6. 跨 origin 重定向丢弃鉴权头与请求体 ✅
-  7. 路由接线静态断言（safeFetch / 去重 / 上限 / 私网提示）✅
+- 新增 `backend/tests/ai-config-models.test.mjs`，实际包含 5 条可执行回归：
+  1. IPv4、IPv4-mapped IPv6 与 IPv4-compatible IPv6 的私网/回环拒绝 ✅
+  2. 公网 IPv4 / IPv6 不误判 ✅
+  3. DNS 多地址中任一私网地址时整体拒绝 ✅
+  4. DNS 解析结果作为受校验、固定连接的目标地址 ✅
+  5. 非 HTTP(S) 协议与空/非法 DNS 结果拒绝 ✅
 
 ## 产品交互补充 ✅
 
@@ -119,7 +120,7 @@
 ## 验证
 
 - `tsc --noEmit` 通过
-- 新增 `backend/tests/ai-config-models.test.mjs` 共 12 条回归测试全部通过（容器内，文件级 suite pass）
+- `backend/tests/ai-config-models.test.mjs` 5 条回归测试全部通过（容器内，文件级 suite pass）
 - 接口实测（容器内 node 请求）：
   - `autodl` + video → `ok:true, source:"fixed"` 固定提示 ✅
   - `openai` + 无效 key → `API Key 无效或未填写`（401 短路）✅
