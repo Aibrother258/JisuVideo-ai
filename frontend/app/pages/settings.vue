@@ -3,24 +3,15 @@
     <h1 class="page-title">设置中心</h1>
     <div class="settings-layout">
       <aside class="settings-nav">
-        <div class="nav-group">
-          <div class="nav-group-label">基础</div>
-          <button v-for="t in baseTabs" :key="t.id" :class="['nav-item', { active: tab === t.id }]" @click="tab = t.id">
-            <component :is="t.icon" :size="14" />
-            {{ t.label }}
-          </button>
-        </div>
-        <div class="nav-advanced">
-          <label class="advanced-toggle">
-            <span>Agent 高级配置</span>
-            <input type="checkbox" v-model="showAdvanced" class="sr-only" />
-            <span class="switch" :class="{ on: showAdvanced }"></span>
-          </label>
-          <p class="advanced-note">仅展开 Agent 配置与 Skills。工作台功能和分镜字段保持默认可见。</p>
-        </div>
-        <div v-if="showAdvanced" class="nav-group">
-          <div class="nav-group-label">高级</div>
-          <button v-for="t in advancedTabs" :key="t.id" :class="['nav-item', { active: tab === t.id }]" @click="tab = t.id">
+        <div v-for="g in navGroups" :key="g.id" class="nav-group">
+          <div class="nav-group-label">{{ g.label }}</div>
+          <button
+            v-for="t in g.items"
+            :key="t.id"
+            :class="['nav-item', { active: tab === t.id }]"
+            :aria-current="tab === t.id ? 'page' : undefined"
+            @click="tab = t.id"
+          >
             <component :is="t.icon" :size="14" />
             {{ t.label }}
           </button>
@@ -453,18 +444,25 @@ import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
 
 const tab = ref('ai')
-const showAdvanced = ref(false)
-const baseTabs = [
-  { id: 'ai', label: 'AI 服务', icon: Cpu },
-  { id: 'styles', label: '风格预设', icon: Palette },
+// 两级导航：一级分组 + 二级目录。Agent 配置 / Skills 常驻可见（原「Agent 高级配置」开关已移除）
+const navGroups = [
+  {
+    id: 'basic',
+    label: '基础',
+    items: [
+      { id: 'ai', label: 'AI 服务', icon: Cpu },
+      { id: 'styles', label: '风格预设', icon: Palette },
+    ],
+  },
+  {
+    id: 'advanced',
+    label: '高级',
+    items: [
+      { id: 'agents', label: 'Agent 配置', icon: Bot },
+      { id: 'skills', label: 'Skills', icon: FileText },
+    ],
+  },
 ]
-const advancedTabs = [
-  { id: 'agents', label: 'Agent 配置', icon: Bot },
-  { id: 'skills', label: 'Skills', icon: FileText },
-]
-watch(showAdvanced, (v) => {
-  if (!v && advancedTabs.some(t => t.id === tab.value)) tab.value = 'ai'
-})
 
 // ===== AI Service Configs =====
 const cfgs = ref([])
@@ -1041,26 +1039,6 @@ onMounted(() => { loadCfgs(); loadAgents(); loadAllSkills(); loadStylePresets() 
 .nav-item:hover { background: var(--bg-hover); color: var(--text-0); }
 .nav-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
 .nav-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
-
-.nav-advanced {
-  padding: 12px 4px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.advanced-toggle {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 0 8px; font-size: 12.5px; font-weight: 550; color: var(--text-1); cursor: pointer;
-}
-.advanced-toggle .switch { width: 38px; height: 23px; }
-.advanced-toggle .switch::after { width: 19px; height: 19px; }
-.advanced-toggle .switch.on::after { transform: translateX(15px); }
-.advanced-toggle input:focus-visible + .switch { box-shadow: 0 0 0 3.5px var(--button-focus); }
-.advanced-note {
-  margin: 8px 8px 0;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--text-3);
-}
 
 .settings-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .settings-scroll { height: 100%; overflow-y: auto; padding: 24px 40px 48px; max-width: 840px; margin: 0 auto; animation: fadeUp 0.3s var(--ease-out); }
