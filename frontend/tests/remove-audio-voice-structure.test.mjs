@@ -48,3 +48,15 @@ test('project pages remove audio config consumption while settings exposes an au
   assert.match(serviceTypeLine, /\{ type: 'audio', label: '音频' \}/)
   assert.match(settingsPage, /audio:\s*\{[\s\S]*autodl[\s\S]*indextts2-v1/)
 })
+
+test('audio config UI stops claiming default adoption before the adapter lands', () => {
+  // 1) 弹窗优先级提示：audio 分支改为"仅保存配置、待接入后生效"，其余类型保留自动采用说明
+  assert.match(settingsPage, /cfgForm\.service_type === 'audio'[\s\S]{0,160}仅保存配置；优先级与自动采用待音频工作流接入后生效/)
+  assert.match(settingsPage, /v-else class="field-hint"[\s\S]{0,160}数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置/)
+  // 2) 配置卡模型 chip：audio 只读展示（cfg-model-chip-ro span），不再出现"当前默认/设为默认"点击语义；其余类型保留
+  assert.match(settingsPage, /<template v-for="m in c\.model" :key="m">\s*<span v-if="st\.type === 'audio'" class="cfg-model-chip mono cfg-model-chip-ro"/)
+  assert.match(settingsPage, /'设为该类型默认模型'/)
+  // 3) 能力总览：audio 显示"待接入后生效"，默认模型徽标仅面向已接入能力
+  assert.match(settingsPage, /v-if="st\.type === 'audio'"[\s\S]{0,120}待接入后生效/)
+  assert.match(settingsPage, /v-else-if="defaultModelOf\(st\.type\)\?\.model" class="cap-default mono"/)
+})

@@ -162,7 +162,8 @@
                 </div>
                 <div class="cap-cell-meta">
                   <span :class="['tag', countActive(st.type) ? 'tag-success' : '']">{{ countActive(st.type) }}/{{ byType(st.type).length }} 启用</span>
-                  <span v-if="defaultModelOf(st.type)?.model" class="cap-default mono" :title="`当前默认${st.label}模型（该类型优先级最高的启用配置首位）`">
+                  <span v-if="st.type === 'audio'" class="cap-none" title="音频工作流接入后，该类型启用配置将按优先级被自动采用">待接入后生效</span>
+                  <span v-else-if="defaultModelOf(st.type)?.model" class="cap-default mono" :title="`当前默认${st.label}模型（该类型优先级最高的启用配置首位）`">
                     <Star :size="10" class="cfg-model-star" /> {{ defaultModelOf(st.type).model }}
                   </span>
                   <span v-else class="cap-none">未设默认</span>
@@ -194,15 +195,18 @@
                       <span v-if="!c.is_active" class="tag">已停用</span>
                     </div>
                     <div class="config-models">
-                      <button
-                        v-for="m in c.model" :key="m" type="button"
-                        :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
-                        :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
-                        @click="setDefaultModel(st.type, c, m)"
-                      >
-                        <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
-                        {{ m }}
-                      </button>
+                      <template v-for="m in c.model" :key="m">
+                        <span v-if="st.type === 'audio'" class="cfg-model-chip mono cfg-model-chip-ro" :title="m">{{ m }}</span>
+                        <button
+                          v-else type="button"
+                          :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
+                          :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
+                          @click="setDefaultModel(st.type, c, m)"
+                        >
+                          <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
+                          {{ m }}
+                        </button>
+                      </template>
                     </div>
                     <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
                     <div class="config-actions">
@@ -513,7 +517,8 @@
           <label class="field">
             <span class="field-label">优先级</span>
             <input v-model.number="cfgForm.priority" class="input" type="number" min="0" max="999" />
-            <span class="field-hint">数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。</span>
+            <span v-if="cfgForm.service_type === 'audio'" class="field-hint">仅保存配置；优先级与自动采用待音频工作流接入后生效。</span>
+            <span v-else class="field-hint">数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。</span>
           </label>
           <label class="field"><span class="field-label">API Key</span><input v-model="cfgForm.api_key" class="input" type="password" placeholder="sk-..." /></label>
           <label class="field"><span class="field-label">Base URL</span><input v-model="cfgForm.base_url" class="input" placeholder="https://..." /></label>
@@ -1962,6 +1967,8 @@ onMounted(() => {
   transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
 .cfg-model-chip:hover { border-color: var(--accent); color: var(--accent); }
+.cfg-model-chip.cfg-model-chip-ro,
+.cfg-model-chip.cfg-model-chip-ro:hover { border-color: var(--border); color: var(--text-2); cursor: default; }
 .cfg-model-chip.is-default {
   border-color: var(--accent);
   background: var(--accent-bg, rgba(0,113,227,0.10));
