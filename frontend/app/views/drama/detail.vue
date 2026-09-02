@@ -1957,7 +1957,7 @@ onBeforeUnmount(() => {
 .episode-plan-actions { display: flex; align-items: center; gap: 8px; }
 
 /* 页内分集 Tab 审阅：二次编辑、批注、原文核对与确认 */
-.episode-inline-review { scroll-margin-top: 14px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.episode-inline-review { scroll-margin-top: 14px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-raised); }
 .episode-inline-review-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px 13px; }
 .episode-inline-review-head h3 { margin: 2px 0 3px; color: var(--text-0); font-size: 15px; }
 .episode-inline-review-head p { margin: 0; color: var(--text-3); font-size: 10.5px; }
@@ -1965,7 +1965,7 @@ onBeforeUnmount(() => {
 .episode-detail-tab { position: relative; min-width: 0; padding: 11px 5px 10px; border: none; border-right: 1px solid var(--border); border-bottom: 2px solid transparent; background: none; color: var(--text-3); font-family: var(--font-mono); font-size: 9.5px; font-weight: 750; cursor: pointer; transition: color 0.16s, border-color 0.16s, background 0.16s; }
 .episode-detail-tab:last-child { border-right: none; }
 .episode-detail-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.7); }
-.episode-detail-tab.on { border-bottom-color: var(--accent); background: #fff; color: var(--accent); }
+.episode-detail-tab.on { border-bottom-color: var(--accent); background: var(--surface-raised); color: var(--accent); }
 .episode-detail-tab i { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); }
 .episode-detail-tab.reviewed i { background: var(--success); }
 .episode-inline-review-panel { display: grid; grid-template-columns: minmax(270px, 0.75fr) minmax(0, 1.45fr); gap: 18px; padding: 18px; }

@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v1.4
+> 版本：v1.5
 > 日期：2026-09-03
-> 状态：**P0 收口：F 随 PR #13/#16 落地（设置页「左导航/中二级目录/右正文」三栏 + 首页双栏工作台），C1/C2 随 PR #13/#14 落地；P1（A1 Token 收敛）首批随 PR #15、第二批随 PR #18 合入 master，第三批（封面占位 `--cover-*`/反色白字 `--text-invert`/毛玻璃 `--surface-glass`，`feat/ui-token-batch3`）提交待评审；P2–P4 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）已合入，批次四（白字白底语义化 + 徽标投影 `--shadow-badge`，`feat/ui-token-batch4`）提交待评审；批次五（episode 播放器深色与状态色）与 A2（语义色板规范，裁决 detail 资产类型 scene/prop/amber 系）待做；P2–P4 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -16,6 +16,7 @@
 | v1.2 | 2026-09-02 | PR #13 评审收口：① 头部版本/状态对齐事实（P0-F 已实施、随 PR #13 待合入，P1–P4 仍待排期）；② 第 8 章同步「PR #11（Agent/Skills 数据源）已合入 master」；③ 4.3 表 URL 深链明确为已延期独立增强项（第 10 章新增 D7）；④ 4.3 表补导航按钮 `aria-current` 可访问性条目；⑤ 方案文档合入路径收敛：由 PR #13 携带进入 master，PR #12 关闭避免双份合并 |
 | v1.3 | 2026-09-02 | P1 推进记录：在 `feat/ui-p1-token-spec` 分支完成 A1 首批 Token 收敛（studio.css 新增 `--success-strong/--info-strong/--warning-strong/--fill-subtle/--border-hover/--error-outline/--action-danger-hover-bg/--overlay-mask/--switch-track/--scrollbar-thumb/--scrollbar-thumb-hover` 并替换全局原语引用），随后将 `episode.vue/detail.vue/default.vue/MentionTextarea.vue/ModelSelect.vue` 内同值字面量改为 Token 引用（值不变改引用）；R1 加载类失败残留清零（角色/场景/道具子资源加载失败不再静默置空，改内联呈现 + 重试）；同步新增「多线工作流状态排查记录」`docs/iteration-logs/2026-09-02-ui-communication-audit.md`，作为回答 UI/进度类问题的术语索引 |
 | v1.4 | 2026-09-03 | P1 推进记录（续，归档体系化）：PR #15 合入 `12121d9`、PR #16 合入 `e9ca6ce`（首页双栏工作台 + 设置页三栏「目录—详情」，P0-F 按此演进收口，归档与索引见 `docs/pr-records/`）；PR #17 合入（新增 `docs/pr-records/README.md` 归档规范，含 Windows PowerShell 下 gh 中文乱码根因与规避——含中文的 gh 输入一律走文件/`gh api --input`，杜绝内联参数乱码）；PR #18 合入 `b14e950`（A1 第二批：通用填充/警示色收敛为 `--fill-hover` / `--unsaved-*`）；A1 第三批（封面占位 `--cover-fallback(-fg)` / `--cover-text`、反色白字 `--text-invert`、毛玻璃浮层 `--surface-glass` / `--shadow-float`）在 `feat/ui-token-batch3` 分支提交待评审 |
+| v1.5 | 2026-09-03 | P1 推进记录（续）：PR #19 合入 `d58e570`（A1 第三批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch3.md`，索引 HB-20260903-01）；A1 第四批在 `feat/ui-token-batch4` 提交待评审（settings/ConfirmDialog/default/detail 白字白底收敛为 `--text-invert`/`--surface-raised`，徽标方形投影新增 `--shadow-badge`；episode 播放器深色体系与 detail 资产类型色 scene/prop/amber 归入 A2 语义色板批次） |
 
 ---
 

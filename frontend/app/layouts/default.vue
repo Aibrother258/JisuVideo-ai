@@ -113,7 +113,7 @@ watch(() => route.path, checkAiConfigs)
 .brand-fallback {
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-invert);
   line-height: 1;
 }
 .brand-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
@@ -147,7 +147,7 @@ watch(() => route.path, checkAiConfigs)
 }
 .nav-link:hover { color: var(--text-0); }
 .nav-link.active {
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--text-0);
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }

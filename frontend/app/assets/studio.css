@@ -99,6 +99,8 @@
   --text-invert: #ffffff;
   --surface-glass: rgba(255,255,255,0.85);
   --shadow-float: 0 1px 4px rgba(0,0,0,0.08);
+  /* A1 第四批：彩色徽标/头像方形投影（settings cap-badge/style-detail-badge/provider-badge 三处同值） */
+  --shadow-badge: 0 1px 4px rgba(0,0,0,0.12);
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);
