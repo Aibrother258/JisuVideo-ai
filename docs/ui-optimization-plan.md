@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v1.6
+> 版本：v1.7
 > 日期：2026-09-03
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）、批次四 #20（白字白底语义化 + 徽标投影）已合入；批次五（episode 播放器深色与状态色，`feat/ui-token-batch5`）提交待评审；A2（语义色板规范，裁决 detail 资产类型 scene/prop/amber 系）待做；P2–P4 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）、批次四 #20（白字白底语义化 + 徽标投影）、批次五 #22（episode 播放器深色与状态色）已合入，A1 全部收口；A2（语义色板规范，裁决 detail 资产类型 scene/prop/amber 系与单次低价值字面量）待做；P2–P4 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -18,6 +18,7 @@
 | v1.4 | 2026-09-03 | P1 推进记录（续，归档体系化）：PR #15 合入 `12121d9`、PR #16 合入 `e9ca6ce`（首页双栏工作台 + 设置页三栏「目录—详情」，P0-F 按此演进收口，归档与索引见 `docs/pr-records/`）；PR #17 合入（新增 `docs/pr-records/README.md` 归档规范，含 Windows PowerShell 下 gh 中文乱码根因与规避——含中文的 gh 输入一律走文件/`gh api --input`，杜绝内联参数乱码）；PR #18 合入 `b14e950`（A1 第二批：通用填充/警示色收敛为 `--fill-hover` / `--unsaved-*`）；A1 第三批（封面占位 `--cover-fallback(-fg)` / `--cover-text`、反色白字 `--text-invert`、毛玻璃浮层 `--surface-glass` / `--shadow-float`）在 `feat/ui-token-batch3` 分支提交待评审 |
 | v1.5 | 2026-09-03 | P1 推进记录（续）：PR #19 合入 `d58e570`（A1 第三批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch3.md`，索引 HB-20260903-01）；A1 第四批在 `feat/ui-token-batch4` 提交待评审（settings/ConfirmDialog/default/detail 白字白底收敛为 `--text-invert`/`--surface-raised`，徽标方形投影新增 `--shadow-badge`；episode 播放器深色体系与 detail 资产类型色 scene/prop/amber 归入 A2 语义色板批次） |
 | v1.6 | 2026-09-03 | P1 推进记录（续）：PR #20 合入 `e2f6f42`（A1 第四批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch4.md`，索引 HB-20260903-02）；A1 第五批在 `feat/ui-token-batch5` 提交待评审（episode 播放器深色体系新增 `--media-stage-bg`，成功/警告状态描边新增 `--success-border(-strong)`/`--warning-border-strong`，白字白底随 `--text-invert`/`--surface-raised`/`--surface-glass`/`--shadow-float` 清零；detail 资产类型色仍归 A2） |
+| v1.7 | 2026-09-03 | P1 推进记录（续，**A1 收口**）：PR #22 合入 `cf3a301`（A1 第五批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch5.md`，索引 HB-20260903-03）；A1（首批 + 二/三/四/五批）全部合入 master；A2 语义色板规范待做（裁决 detail 资产类型 scene/prop/amber 系与 episode/detail 内 `#000`/`#111`/半透明白等单次字面量）；PR #21（设置页音频服务配置板块）独立于 token 线仍在评审 |
 
 ---
 
