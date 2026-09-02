@@ -1,5 +1,23 @@
 <template>
-  <div class="page" v-if="drama">
+  <!-- 页面加载 / 失败态（P0-C1/C2）：初始加载显示骨架，失败内联错误 + 重试 -->
+  <div v-if="pageLoading" class="app-page-loading">
+    <div class="app-state">
+      <div class="app-state-icon"><div class="app-skeleton-line" style="width:24px;height:24px;border-radius:8px"></div></div>
+      <div class="app-skeleton-line" style="width:170px"></div>
+      <div class="app-skeleton-line" style="width:280px;height:11px"></div>
+    </div>
+  </div>
+  <div v-else-if="pageLoadError" class="app-page-loading">
+    <div class="app-state app-state-error">
+      <div class="app-state-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="app-state-title">项目加载失败</div>
+      <p class="app-state-desc">{{ pageLoadError }}</p>
+      <button class="btn btn-primary btn-sm" @click="load(true)">重试</button>
+    </div>
+  </div>
+  <div class="page" v-else-if="drama">
     <!-- Header -->
     <div class="page-head card">
       <button class="back-btn" title="返回" @click="navigateTo('/')">
@@ -200,7 +218,13 @@
               <strong>服务器草稿已有新版本</strong>
               <span>可能是另一个浏览器窗口刚刚保存了修改。当前页面不会覆盖它，请重新加载服务器版本后继续。</span>
             </div>
-            <button type="button" class="btn btn-sm" @click="reloadServerEpisodePlan">重新加载服务器版本</button>
+            <button type="button" class="btn btn-sm" :disabled="reloadPlanLoading" @click="reloadServerEpisodePlan">
+              {{ reloadPlanLoading ? '正在加载…' : '重新加载服务器版本' }}
+            </button>
+            <div v-if="episodePlanReloadError" class="episode-plan-reload-error">
+              <span class="tag tag-error">重新加载失败</span>
+              <span>{{ episodePlanReloadError }}</span>
+            </div>
           </div>
 
           <div class="episode-review-toolbar">
@@ -846,6 +870,8 @@ import { isServerPlanGenerated } from '~/utils/episode-plan-state.mjs'
 const route = useRoute()
 const drama = ref(null)
 const dramaId = Number(route.params.id)
+const pageLoading = ref(false)
+const pageLoadError = ref('')
 const addDialog = ref(false)
 const creatingEpisode = ref(false)
 const newEpisodeTitle = ref('')
@@ -872,6 +898,9 @@ const episodePlanRevisionCount = ref(0)
 const episodePlanSaving = ref(false)
 const episodePlanDirty = ref(false)
 const episodePlanConflict = ref(false)
+// 重新加载服务器版本的三态：失败内联提示（原为未捕获 rejection）
+const reloadPlanLoading = ref(false)
+const episodePlanReloadError = ref('')
 const selectedEpisodeNumber = ref(null)
 const episodeReviewSection = ref(null)
 const committingEpisodes = ref(false)
@@ -1275,12 +1304,21 @@ function restoreEpisodePlanLocalBackup() {
 }
 
 async function reloadServerEpisodePlan() {
-  const saved = await dramaAPI.getEpisodePlan(dramaId)
-  if (saved) applyServerEpisodePlan(saved)
-  else {
-    episodePlanConflict.value = false
-    restoreEpisodePlanLocalBackup()
-    if (episodePlan.value) await saveEpisodePlanDraftNow()
+  reloadPlanLoading.value = true
+  episodePlanReloadError.value = ''
+  try {
+    const saved = await dramaAPI.getEpisodePlan(dramaId)
+    if (saved) applyServerEpisodePlan(saved)
+    else {
+      episodePlanConflict.value = false
+      restoreEpisodePlanLocalBackup()
+      if (episodePlan.value) await saveEpisodePlanDraftNow()
+    }
+  } catch (error) {
+    // 失败内联呈现于冲突框（原为未捕获 rejection），可点击按钮重试
+    episodePlanReloadError.value = error.message || '重新加载服务器版本失败'
+  } finally {
+    reloadPlanLoading.value = false
   }
 }
 
@@ -1413,7 +1451,8 @@ async function commitEpisodePlan() {
   }
 }
 
-async function load() {
+async function load(initial = false) {
+  if (initial) { pageLoading.value = true; pageLoadError.value = '' }
   try {
     const [result, presets] = await Promise.all([dramaAPI.get(dramaId), stylePresetAPI.list()])
     drama.value = result
@@ -1428,7 +1467,10 @@ async function load() {
     })
     await reloadServerEpisodePlan()
   } catch (e) {
+    if (initial) { pageLoadError.value = e.message || '加载失败'; return }
     toast.error(e.message)
+  } finally {
+    if (initial) pageLoading.value = false
   }
 }
 
@@ -1703,7 +1745,7 @@ watch(() => projectDraft.resolution, (next, previous) => {
   if (episodePlan.value && next !== previous && !applyingServerPlan) scheduleEpisodePlanSave(true)
 })
 
-onMounted(load)
+onMounted(() => load(true))
 onBeforeUnmount(() => {
   if (episodePlanSaveTimer) clearTimeout(episodePlanSaveTimer)
 })
@@ -1883,6 +1925,8 @@ onBeforeUnmount(() => {
 .episode-plan-conflict div { display: flex; flex-direction: column; gap: 3px; }
 .episode-plan-conflict strong { color: var(--danger); font-size: 11px; }
 .episode-plan-conflict span { color: var(--text-2); font-size: 10.5px; line-height: 1.5; }
+.episode-plan-reload-error { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.episode-plan-reload-error .tag { margin: 0; flex-shrink: 0; }
 .episode-review-toolbar { display: grid; grid-template-columns: auto minmax(120px, 1fr) auto; align-items: center; gap: 12px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-1); }
 .review-progress-copy { display: flex; flex-direction: column; gap: 2px; }
 .review-progress-copy span { color: var(--text-3); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }

@@ -358,3 +358,66 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
 .stagger-3 { animation-delay: 0.12s; }
 .stagger-4 { animation-delay: 0.16s; }
 .stagger-5 { animation-delay: 0.2s; }
+
+/* === UI 三态基础（P0-C1/C2）：骨架屏 / 空态 / 错误态 === */
+@keyframes app-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.app-skeleton-line {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  animation: app-pulse 1.6s ease-in-out infinite;
+}
+.app-skeleton-line.round { border-radius: var(--radius-pill); }
+
+/* 状态面板：空态/错误态统一容器；图标方块 + 标题 + 描述 + 动作 */
+.app-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.app-state-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.app-state-title { font-size: 14px; font-weight: 650; color: var(--text-0); }
+.app-state-desc { font-size: 12px; color: var(--text-3); line-height: 1.6; max-width: 460px; word-break: break-all; }
+.app-state .btn { margin-top: 6px; }
+.app-state-error .app-state-icon { background: var(--error-bg); color: var(--error); }
+.app-state-error .app-state-title { color: var(--error); }
+/* 侧栏等窄容器内的错误态：收紧留白 */
+.app-state.compact-state { padding: 16px 8px; }
+
+/* 整页加载/失败容器（detail/episode 顶层初始加载） */
+.app-page-loading {
+  height: 100%;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 内联错误横幅（拼接失败等模块级错误）：面板顶部横排，图标 + 文案 + 右侧动作 */
+.app-state-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255,59,48,0.18);
+  border-radius: var(--radius);
+  background: var(--error-bg);
+}
+.app-state-inline .app-state-icon { width: 38px; height: 38px; border-radius: 12px; }
+.app-state-inline .app-state-title { font-size: 13px; }
+.app-state-inline .app-state-desc { margin-top: 2px; font-size: 12px; }
+.app-state-inline-body { flex: 1; min-width: 0; }
+.app-state-inline-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
