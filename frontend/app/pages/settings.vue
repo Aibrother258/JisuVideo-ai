@@ -1,6 +1,9 @@
 <template>
   <div class="settings-page">
-    <h1 class="page-title">设置中心</h1>
+    <div class="page-head">
+      <h1 class="page-title">设置中心</h1>
+      <p class="page-head-sub">服务、风格预设与 Agent 提示词统一在这里维护，保存即生效</p>
+    </div>
     <div class="settings-layout">
       <aside class="settings-nav">
         <div v-for="g in navGroups" :key="g.id" class="nav-group">
@@ -23,27 +26,9 @@
         <!-- ===== AI 服务配置 ===== -->
         <div v-if="tab === 'ai'" class="settings-scroll">
           <div class="settings-head">
-            <h2 class="settings-title">AI 服务配置</h2>
-            <p class="settings-desc">先用推荐模板快速落配置，再按服务类型微调。工作台创建集时会锁定所选图片和视频能力。</p>
+            <h2 class="settings-title">AI 服务</h2>
+            <p class="settings-desc">文本 / 图片 / 视频三类能力分开维护，启用后即可被工作台自动采用；弹窗内有推荐模板可选。</p>
           </div>
-          <section class="card setup-panel">
-            <div class="setup-panel-head compact">
-              <div>
-                <div class="setup-title">手动模板</div>
-                <div class="setup-desc">选择服务类型后，直接用模板填充推荐的 `provider / base URL / model`。</div>
-              </div>
-            </div>
-            <div class="template-row">
-              <button
-                v-for="st in serviceTypes"
-                :key="st.type"
-                class="template-type-chip"
-                @click="startAddCfg(st.type)"
-              >
-                {{ st.label }}
-              </button>
-            </div>
-          </section>
           <div v-if="cfgsLoading" class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
               <div class="svc-group-head">
@@ -62,47 +47,71 @@
             <p class="app-state-desc">{{ cfgsError }}</p>
             <button class="btn btn-primary btn-sm" @click="loadCfgs(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <div v-else class="sections">
-            <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
-              <div class="svc-group-head">
-                <div class="svc-group-heading">
-                  <span class="svc-group-title">{{ st.label }}</span>
-                  <div class="svc-group-sub">{{ serviceMeta[st.type].desc }}</div>
+          <div v-else class="cap-wrap">
+            <!-- 能力总览条：全部来自真实计数与默认模型解析，无假数据 -->
+            <section class="card cap-strip" aria-label="能力总览">
+              <div v-for="st in serviceTypes" :key="st.type" class="cap-cell">
+                <div class="cap-cell-top">
+                  <span class="cap-badge" :class="`t-${st.type}`">{{ st.label.slice(0, 1) }}</span>
+                  <span class="cap-cell-title">{{ st.label }}服务</span>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="`添加${st.label}服务`" @click="startAddCfg(st.type)">
+                    <Plus :size="13" />
+                  </button>
                 </div>
-                <span v-if="countActive(st.type)" class="tag tag-accent">{{ countActive(st.type) }} 已启用</span>
-                <button class="btn btn-ghost btn-sm ml-auto" @click="startAddCfg(st.type)"><Plus :size="13" /> 添加</button>
-              </div>
-              <div v-for="c in byType(st.type)" :key="c.id" class="config-row">
-                <div class="provider-badge" :data-provider="c.provider">{{ c.provider.slice(0, 1).toUpperCase() }}</div>
-                <div class="config-main">
-                  <div class="config-line">
-                    <span class="config-name">{{ c.name || `${c.provider}-${c.service_type}` }}</span>
-                    <span :class="['tag', c.api_key ? 'tag-success' : 'tag-error']">{{ c.api_key ? '已配置' : '无密钥' }}</span>
-                    <span v-if="!c.is_active" class="tag">已停用</span>
-                  </div>
-                  <div class="config-models">
-                    <button
-                      v-for="m in c.model" :key="m" type="button"
-                      :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
-                      :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
-                      @click="setDefaultModel(st.type, c, m)"
-                    >
-                      <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
-                      {{ m }}
-                    </button>
-                  </div>
-                  <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
+                <div class="cap-cell-meta">
+                  <span :class="['tag', countActive(st.type) ? 'tag-success' : '']">{{ countActive(st.type) }}/{{ byType(st.type).length }} 启用</span>
+                  <span v-if="defaultModelOf(st.type)?.model" class="cap-default mono" :title="`当前默认${st.label}模型（该类型优先级最高的启用配置首位）`">
+                    <Star :size="10" class="cfg-model-star" /> {{ defaultModelOf(st.type).model }}
+                  </span>
+                  <span v-else class="cap-none">未设默认</span>
                 </div>
-                <button class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">测试</button>
-                <label class="config-switch">
-                  <input type="checkbox" class="sr-only" :checked="c.is_active" @change="toggleCfg(c)">
-                  <span class="switch" :class="{ on: c.is_active }"></span>
-                </label>
-                <button class="btn btn-ghost btn-icon btn-sm" @click="startEditCfg(c)"><Pencil :size="13" /></button>
-                <button class="btn btn-danger btn-icon btn-sm" @click="delCfg(c.id)"><Trash2 :size="13" /></button>
               </div>
-              <p v-if="!byType(st.type).length" class="config-empty">暂无配置</p>
             </section>
+
+            <!-- 三列能力组卡：每条配置以行内卡片收纳 -->
+            <div class="cap-grid">
+              <section v-for="st in serviceTypes" :key="st.type" class="card svc-group cap-card">
+                <div class="svc-group-head">
+                  <div class="svc-group-heading">
+                    <span class="svc-group-title">{{ st.label }}服务</span>
+                    <div class="svc-group-sub">{{ serviceMeta[st.type].desc }}</div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm ml-auto" @click="startAddCfg(st.type)"><Plus :size="13" /> 添加</button>
+                </div>
+                <div v-for="c in byType(st.type)" :key="c.id" class="config-row">
+                  <div class="provider-badge" :data-provider="c.provider">{{ c.provider.slice(0, 1).toUpperCase() }}</div>
+                  <div class="config-main">
+                    <div class="config-line">
+                      <span class="config-name">{{ c.name || `${c.provider}-${c.service_type}` }}</span>
+                      <span :class="['tag', c.api_key ? 'tag-success' : 'tag-error']">{{ c.api_key ? '已配置' : '无密钥' }}</span>
+                      <span v-if="!c.is_active" class="tag">已停用</span>
+                    </div>
+                    <div class="config-models">
+                      <button
+                        v-for="m in c.model" :key="m" type="button"
+                        :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
+                        :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
+                        @click="setDefaultModel(st.type, c, m)"
+                      >
+                        <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
+                        {{ m }}
+                      </button>
+                    </div>
+                    <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
+                    <div class="config-actions">
+                      <button class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">测试</button>
+                      <label class="config-switch">
+                        <input type="checkbox" class="sr-only" :checked="c.is_active" @change="toggleCfg(c)">
+                        <span class="switch" :class="{ on: c.is_active }"></span>
+                      </label>
+                      <button class="btn btn-ghost btn-icon btn-sm" @click="startEditCfg(c)"><Pencil :size="13" /></button>
+                      <button class="btn btn-danger btn-icon btn-sm" @click="delCfg(c.id)"><Trash2 :size="13" /></button>
+                    </div>
+                  </div>
+                </div>
+                <p v-if="!byType(st.type).length" class="config-empty">暂无配置</p>
+              </section>
+            </div>
           </div>
         </div>
 
@@ -1132,10 +1141,20 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 
 <style scoped>
 .settings-page { display: flex; flex-direction: column; height: 100%; background: var(--bg-base); }
-.page-title {
-  font-size: 32px; font-weight: 800; letter-spacing: -0.02em;
-  color: var(--text-0); padding: 24px 32px 16px;
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px 32px 0;
 }
+.page-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-0);
+}
+.page-head-sub { font-size: 12px; color: var(--text-3); }
 
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 
@@ -1159,44 +1178,97 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
 .nav-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
 
 .settings-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
-.settings-scroll { height: 100%; overflow-y: auto; padding: 24px 40px 48px; max-width: 840px; margin: 0 auto; animation: fadeUp 0.3s var(--ease-out); }
-.settings-head { margin-bottom: 20px; }
-.settings-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
-.settings-desc { font-size: 13px; color: var(--text-2); margin-top: 6px; }
-
-.setup-title { font-size: 15px; font-weight: 700; color: var(--text-0); }
-.setup-desc { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; }
-
-/* 手动模板 */
-.setup-panel { padding: 18px 20px; margin-bottom: 16px; }
-.setup-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-.setup-panel-head.compact { margin-bottom: 12px; }
-.template-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.template-type-chip {
-  min-height: var(--button-height-sm);
-  padding: 0 14px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--button-bg);
-  color: var(--text-1);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.16s var(--ease-out);
-}
-.template-type-chip:hover { background: var(--button-bg-hover); color: var(--text-0); }
-.template-type-chip:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
+.settings-scroll { height: 100%; overflow-y: auto; padding: 20px 32px 48px; max-width: 1180px; margin: 0 auto; animation: fadeUp 0.3s var(--ease-out); }
+.settings-head { margin-bottom: 16px; }
+.settings-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.settings-desc { font-size: 12px; color: var(--text-2); margin-top: 4px; }
 
 /* 按服务类型分组的配置卡 */
 .sections { display: flex; flex-direction: column; gap: 16px; }
 .svc-group { overflow: hidden; }
+
+/* —— 能力总览条 —— */
+.cap-wrap { display: flex; flex-direction: column; gap: 16px; }
+.cap-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+}
+.cap-cell {
+  min-width: 0;
+  padding: 14px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cap-cell + .cap-cell { border-left: 1px solid var(--border); }
+.cap-cell-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.cap-cell-top .btn { margin-left: auto; flex-shrink: 0; }
+.cap-badge {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.cap-badge.t-image { background: linear-gradient(135deg, #8b5cf6, #4f46e5); }
+.cap-badge.t-video { background: linear-gradient(135deg, #f43f5e, #f97316); }
+.cap-cell-title {
+  font-size: 13.5px; font-weight: 700; color: var(--text-0);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cap-cell-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cap-default {
+  display: inline-flex; align-items: center; gap: 4px;
+  max-width: 100%; padding: 2px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-bg, rgba(0, 113, 227, 0.10));
+  color: var(--accent);
+  font-size: 10.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cap-default svg { flex-shrink: 0; fill: currentColor; }
+.cap-none {
+  padding: 2px 9px; border-radius: 999px;
+  background: var(--bg-2); color: var(--text-3);
+  font-size: 10.5px; white-space: nowrap;
+}
+
+/* —— 三列能力组卡 —— */
+.cap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.cap-card { overflow: hidden; }
+
+/* 卡内配置行：行内收纳（徽标 + 信息列 + 动作行） */
+.cap-card .config-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 12px;
+  align-items: start;
+  padding: 12px 16px;
+}
+.cap-card .config-row + .config-row { border-top: 1px solid var(--border); }
+.cap-card .config-row .provider-badge { width: 34px; height: 34px; border-radius: 9px; font-size: 13px; }
+.cap-card .config-row .config-main {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.cap-card .config-row .config-actions {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 5px;
+}
+.cap-card .config-actions .config-switch { margin-left: auto; }
 .svc-group-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px 20px;
@@ -1411,5 +1483,15 @@ onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadSty
   font-size: 11px;
   color: var(--text-2);
   word-break: break-all;
+}
+
+/* 窄屏：总览条与能力卡堆叠，行内收纳保持 */
+@media (max-width: 960px) {
+  .cap-strip { grid-template-columns: 1fr; }
+  .cap-cell + .cap-cell {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .cap-grid { grid-template-columns: 1fr; }
 }
 </style>
