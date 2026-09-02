@@ -140,7 +140,7 @@
             <p class="settings-desc">高级区只保留 Agent 运行配置。这里可以调整模型、提示词和参数，保存后立即生效。</p>
           </div>
           <div class="agent-list">
-            <div v-for="a in agentDefs" :key="a.type" class="card agent-card">
+            <div v-for="a in agentList" :key="a.type" class="card agent-card">
               <div class="agent-card-head" @click="toggleAgentEdit(a.type)">
                 <div class="agent-type-badge">{{ a.icon }}</div>
                 <div class="agent-card-heading">
@@ -172,6 +172,7 @@
                 </div>
               </div>
             </div>
+            <p v-if="!agentList.length" class="config-empty">Agent 列表为空（接口返回无 Agent），请检查后端服务</p>
           </div>
         </div>
 
@@ -181,7 +182,7 @@
           <aside class="skills-agent-list">
             <div class="skills-agent-title">Agent 列表</div>
             <button
-              v-for="a in agentDefs"
+              v-for="a in agentList"
               :key="a.type"
               :class="['skills-agent-item', { active: selectedAgent === a.type }]"
               @click="selectAgent(a.type)"
@@ -190,6 +191,7 @@
               <span class="skills-agent-label">{{ a.label }}</span>
               <span v-if="agentSkillCount(a.type) > 0" class="skill-count-badge">{{ agentSkillCount(a.type) }}</span>
             </button>
+            <p v-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
           </aside>
 
           <!-- Skill 管理右侧主区域 -->
@@ -701,13 +703,28 @@ const agentSaving = ref(false)
 const agentSaved = ref(null)
 const agentForm = reactive({ model: '', system_prompt: '' })
 
-const agentDefs = [
-  { type: 'script_rewriter', label: '剧本改写', icon: '📝' },
-  { type: 'extractor', label: '角色场景提取', icon: '🔍' },
-  { type: 'storyboard_breaker', label: '分镜拆解', icon: '🎬' },
-  { type: 'prompt_generator', label: '提示词', icon: '🖼' },
-  { type: 'minimax_h3_prompt_generator', label: 'MiniMax H3 提示词', icon: '🎞️' },
-]
+// 仅维护「图标」元信息；Agent 列表与展示名一律以 /prompts 接口返回为准，
+// 后端新增 Agent（如 project_analyzer/episode_planner/style_enhancer）会自动出现，无需改前端。
+const AGENT_ICONS = {
+  script_rewriter: '📝',
+  extractor: '🔍',
+  storyboard_breaker: '🎬',
+  prompt_generator: '🖼',
+  minimax_h3_prompt_generator: '🎞️',
+  project_analyzer: '💡',
+  episode_planner: '📚',
+  style_enhancer: '🎨',
+}
+const agentIconOf = (type) => AGENT_ICONS[type] || '🤖'
+
+// Agent 配置 / Skills 左侧共用列表：由 /prompts（agentCfgs）驱动，只叠加图标
+const agentList = computed(() =>
+  agentCfgs.value.map(c => ({
+    type: c.agent_type,
+    label: c.name || c.agent_type,
+    icon: agentIconOf(c.agent_type),
+  }))
+)
 
 function getAgentCfg(type) {
   return agentCfgs.value.find(a => a.agent_type === type)
@@ -762,13 +779,13 @@ async function saveAgentCfg(type) {
   agentSaved.value = null
   try {
     await promptAPI.update(type, {
-      name: agentDefs.find(a => a.type === type)?.label || type,
+      name: agentList.value.find(a => a.type === type)?.label || type,
       model: agentForm.model,
       system_prompt: agentForm.system_prompt,
     })
     await loadAgents()
     agentSaved.value = type
-    toast.success(`${agentDefs.find(a => a.type === type)?.label} 配置已保存`)
+    toast.success(`${agentList.value.find(a => a.type === type)?.label} 配置已保存`)
     setTimeout(() => { if (agentSaved.value === type) agentSaved.value = null }, 3000)
   } catch (e) {
     toast.error(e.message)
@@ -788,8 +805,15 @@ const addSkillDialog = ref(false)
 const newSkillForm = reactive({ id: '', name: '', description: '' })
 
 const selectedAgentType = computed(() => selectedAgent.value)
-const selectedAgentLabel = computed(() => agentDefs.find(a => a.type === selectedAgent.value)?.label || '')
-const selectedAgentIcon = computed(() => agentDefs.find(a => a.type === selectedAgent.value)?.icon || '')
+const selectedAgentLabel = computed(() => agentList.value.find(a => a.type === selectedAgent.value)?.label || selectedAgent.value)
+const selectedAgentIcon = computed(() => agentList.value.find(a => a.type === selectedAgent.value)?.icon || '🤖')
+
+// 列表来自 /prompts：若当前选中 Agent 不在其中（被移除或列表刚加载），自动回退到第一个
+watch(agentCfgs, (list) => {
+  if (list.length && !list.some(a => a.agent_type === selectedAgent.value)) {
+    selectedAgent.value = list[0].agent_type
+  }
+})
 
 // agent type 用下划线（script_rewriter），skill 目录按 Mastra 规范用连字符（script-rewriter）
 const skillDirOf = (type) => type.replace(/_/g, '-')
