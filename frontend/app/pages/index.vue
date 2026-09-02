@@ -1025,14 +1025,14 @@ onMounted(load)
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--cover-text);
   font-size: 19px;
   font-weight: 800;
   overflow: hidden;
-  background: linear-gradient(135deg, #eef1f6, #dce4f0);
+  background: var(--cover-fallback);
   box-shadow: var(--shadow-xs);
 }
-.resume-thumb svg { color: #6a7ba0; opacity: 0.85; }
+.resume-thumb svg { color: var(--cover-fallback-fg); opacity: 0.85; }
 .resume-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .resume-title {
   font-size: 13px;
@@ -1105,7 +1105,7 @@ onMounted(load)
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
-  color: #fff;
+  color: var(--text-invert);
   box-shadow: var(--shadow-xs);
   transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
 }
@@ -1122,7 +1122,7 @@ onMounted(load)
   font-size: 10px;
   font-weight: 650;
   line-height: 1.25;
-  color: #fff;
+  color: var(--text-invert);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1171,7 +1171,7 @@ onMounted(load)
   outline: none;
   box-shadow: 0 0 0 3.5px var(--button-focus);
 }
-.filter-chip.on { background: var(--text-0); color: #fff; }
+.filter-chip.on { background: var(--text-0); color: var(--text-invert); }
 .sort-select {
   margin-left: auto;
   width: auto;
@@ -1208,15 +1208,15 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #eef1f6, #dce4f0);
-  color: #6a7ba0;
+  background: var(--cover-fallback);
+  color: var(--cover-fallback-fg);
 }
 .cover-film { opacity: 0.75; }
 .cover-glyph {
   font-size: 38px;
   font-weight: 800;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--cover-text);
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
   user-select: none;
 }
@@ -1230,7 +1230,7 @@ onMounted(load)
   background: rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #fff;
+  color: var(--text-invert);
   font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
@@ -1242,10 +1242,10 @@ onMounted(load)
   top: 10px;
   left: 10px;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--surface-glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-float);
   color: var(--text-1);
 }
 .status-dot {
@@ -1276,11 +1276,11 @@ onMounted(load)
   min-width: 30px;
   height: 30px;
   min-height: 30px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--surface-glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   color: var(--text-1);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-float);
   opacity: 0;
   transition: opacity 0.15s var(--ease-out), background 0.15s var(--ease-out);
 }
@@ -1448,7 +1448,7 @@ onMounted(load)
   font-size: 11px;
   font-weight: 700;
 }
-.step-indicator span.on { background: var(--text-0); color: #fff; }
+.step-indicator span.on { background: var(--text-0); color: var(--text-invert); }
 .step-indicator i { width: 24px; height: 1px; background: var(--border-strong); }
 .dialog-form {
   display: flex;
