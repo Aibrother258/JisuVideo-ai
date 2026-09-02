@@ -85,3 +85,27 @@ test('adding a style reuses the unsaved-draft guard instead of dropping current 
   assert.match(settings, /stylePromptIsNew/)
   assert.match(settings, /stylePromptIsNew \? '新建风格会丢弃当前风格的未保存修改。'/)
 })
+
+test('A1 token batch2: common fills and unsaved-warning colors reference tokens', () => {
+  const settings = read('app/pages/settings.vue')
+  const index = read('app/pages/index.vue')
+
+  // studio.css 新增语义 token 定义（值不变、为暗色可覆盖）
+  const css = read('app/assets/studio.css')
+  assert.match(css, /--fill-hover: rgba\(0,0,0,0\.08\);/)
+  assert.match(css, /--unsaved-border: #e0b15a;/)
+  assert.match(css, /--unsaved-text: #a06a0e;/)
+  assert.match(css, /--unsaved-bg: #fbf3e2;/)
+  // settings：subnav 计数胶囊 hover 填充与「未保存修改」警示 tag 收敛为 token 引用
+  assert.match(settings, /background: var\(--bg-active\); color: var\(--text-2\);/)
+  assert.match(settings, /var\(--unsaved-border\)/)
+  assert.doesNotMatch(settings, /#e0b15a/)
+  assert.doesNotMatch(settings, /#a06a0e/)
+  assert.doesNotMatch(settings, /#fbf3e2/)
+  // index：搜索框 / 排序 / 筛选 chip / cover-more 的填充层级收敛为 token 引用
+  assert.match(index, /background: var\(--bg-hover\);/)
+  assert.match(index, /background: var\(--fill-subtle\);/)
+  assert.match(index, /background: var\(--fill-hover\);/)
+  assert.match(index, /\.sort-select:focus \{ background: var\(--surface-raised\); \}/)
+  assert.doesNotMatch(index, /background: rgba\(0, 0, 0, 0\.05\)/)
+})

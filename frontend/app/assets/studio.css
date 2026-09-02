@@ -86,6 +86,12 @@
   --switch-track: #e9e9ea;
   --scrollbar-thumb: rgba(0,0,0,0.16);
   --scrollbar-thumb-hover: rgba(0,0,0,0.28);
+  /* A1 第二批：次级 hover 填充（chip 等）；与 --border 同值但语义为填充层，暗色主题可单独覆盖 */
+  --fill-hover: rgba(0,0,0,0.08);
+  /* A1 第二批：未保存修改警示 tag（内联 style 收敛，settings 两处同值） */
+  --unsaved-border: #e0b15a;
+  --unsaved-text: #a06a0e;
+  --unsaved-bg: #fbf3e2;
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);
