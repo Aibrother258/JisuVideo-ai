@@ -662,14 +662,14 @@
           <span class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2"><TriangleAlert :size="12" /> 未保存</span>
         </div>
         <div class="dialog-body">
-          <p class="unsaved-dialog-copy">切换风格会丢弃这些修改。「保存并切换」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
+          <p class="unsaved-dialog-copy">{{ stylePromptIsNew ? '新建风格会丢弃当前风格的未保存修改。' : '切换风格会丢弃这些修改。' }}「保存并{{ stylePromptIsNew ? '新建' : '切换' }}」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
         </div>
         <div class="dialog-foot">
           <button type="button" class="btn" @click="cancelStylePrompt">取消</button>
           <button type="button" class="btn btn-ghost" @click="discardStyleEdit">放弃更改</button>
           <button type="button" class="btn btn-primary" :disabled="styleSaving" @click="keepStyleAndSwitch">
             <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
-            保存并切换
+            保存并{{ stylePromptIsNew ? '新建' : '切换' }}
           </button>
         </div>
       </div>
@@ -1386,6 +1386,9 @@ const styleDirty = ref(false)
 // 有未保存修改时切换风格：弹「保存并切换 / 放弃更改 / 取消」三选确认
 const stylePromptOpen = ref(false)
 const stylePromptSwitchId = ref(null)
+// 新建风格同样复用该确认：目标是「添加风格」的标记值（与真实风格 id 不冲突）
+const STYLE_ADD_FLAG = '__add_style__'
+const stylePromptIsNew = computed(() => stylePromptSwitchId.value === STYLE_ADD_FLAG)
 
 async function loadStylePresets(initial = false) {
   if (initial) { styleLoading.value = true; styleError.value = '' }
@@ -1445,21 +1448,23 @@ function cancelStylePrompt() {
   if (styleSaving.value) return
   closeStylePrompt()
 }
-// 「保存并切换」：先保存当前风格修改，成功后再跳到目标风格
+// 「保存并切换 / 保存并新建」：先保存当前风格修改，成功后再执行目标动作
 async function keepStyleAndSwitch() {
   const target = stylePromptSwitchId.value
   const ok = await persistCurrentStyleEdit()
   if (!ok) return // 保存失败：停留当前页并保留弹窗，由用户重试或放弃
   closeStylePrompt()
-  if (target) showStyleDetail(target)
+  if (target === STYLE_ADD_FLAG) openAddStyleDialog()
+  else if (target) showStyleDetail(target)
 }
-// 「放弃更改 / 放弃修改」：恢复当前风格快照；若正处于切换确认中，随后继续切到目标风格
+// 「放弃更改 / 放弃修改」：恢复当前风格快照；若正处于切换/新建确认中，随后继续执行目标动作
 function discardStyleEdit() {
   const target = stylePromptSwitchId.value
   closeStylePrompt()
   const p = stylePresets.value.find(x => x.id === styleDetailId.value)
   if (p) fillStyleForm(p)
-  if (target && target !== styleDetailId.value) showStyleDetail(target)
+  if (target === STYLE_ADD_FLAG) openAddStyleDialog()
+  else if (target && target !== styleDetailId.value) showStyleDetail(target)
 }
 // 列表加载 / 删除后保证有合法选中项，默认选中第一个
 function ensureStyleSelection() {
@@ -1505,8 +1510,18 @@ async function confirmDelStyle() {
   }
 }
 
-// 新建风格仍走弹窗表单；styleEditId 置空使「风格 key」可填写
+// 「添加风格」入口：当前详情卡有未保存修改时同样走「保存并新建 / 放弃新建 / 取消」确认，
+// 防止直接重置 styleSnap/styleForm 使草稿被静默覆盖（owner 复核 P1）
 function startAddStyle() {
+  if (styleDirty.value && styleEditId.value) {
+    stylePromptSwitchId.value = STYLE_ADD_FLAG
+    stylePromptOpen.value = true
+    return
+  }
+  openAddStyleDialog()
+}
+// 新建风格仍走弹窗表单；styleEditId 置空使「风格 key」可填写
+function openAddStyleDialog() {
   styleEditId.value = null
   styleSnap.value = null // 新建弹窗期间不做未保存检测，取消时会用当前风格快照恢复
   Object.assign(styleForm, {

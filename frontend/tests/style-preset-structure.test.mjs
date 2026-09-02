@@ -68,3 +68,20 @@ test('settings page manages style presets in a base tab', () => {
   // image_prompt_generator 默认提示词副本同步更新
   assert.doesNotMatch(settings, /必须包含 "consistent art style"/)
 })
+
+test('adding a style reuses the unsaved-draft guard instead of dropping current edits', () => {
+  const settings = read('app/pages/settings.vue')
+
+  // 「添加风格」入口与「切换风格」一致：详情卡存在未保存修改时先弹三选确认，不直接重置草稿
+  assert.match(settings, /function startAddStyle\(\) {/)
+  assert.match(settings, /if \(styleDirty\.value && styleEditId\.value\) {/)
+  assert.match(settings, /stylePromptSwitchId\.value = STYLE_ADD_FLAG/)
+  assert.match(settings, /stylePromptOpen\.value = true/)
+  // 新建目标标记与真正的弹窗新建流程
+  assert.match(settings, /STYLE_ADD_FLAG = '__add_style__'/)
+  assert.match(settings, /function openAddStyleDialog\(\) {/)
+  // 「保存并新建 / 放弃新建」确认后都进入 openAddStyleDialog；取消则停留原地
+  assert.match(settings, /if \(target === STYLE_ADD_FLAG\) openAddStyleDialog\(\)/)
+  assert.match(settings, /stylePromptIsNew/)
+  assert.match(settings, /stylePromptIsNew \? '新建风格会丢弃当前风格的未保存修改。'/)
+})
