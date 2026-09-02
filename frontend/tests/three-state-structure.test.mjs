@@ -82,6 +82,8 @@ test('export panel shows inline merge error with retry and list load states', ()
   assert.match(ep, /v-if="exportListError" class="app-state app-state-error compact-state"/)
   assert.match(ep, /v-else-if="exportListLoading && !exportMerges\.length"/)
   assert.match(ep, /@click="loadExportMerges\(true\)"/)
+  // 段头“刷新”按钮是用户显式动作，必须走 initial=true（失败显示内联错误而非静默保留）
+  assert.match(ep, /class="btn btn-sm ml-auto" @click="loadExportMerges\(true\)"/)
   // 页面初始刷新时成片列表同步走 initial 三态
   assert.match(ep, /loadExportMerges\(initial\)/)
 })
@@ -110,6 +112,11 @@ test('residual silent loads get inline error + retry (drawer/picker/models/histo
   assert.match(ep, /const sbVideoHistoryError = ref\(''\)/)
   assert.match(ep, /sbVideoHistoryError\.value = e\.message \|\| '历史记录加载失败'/)
   assert.match(ep, /v-else-if="sbVideoHistoryError" class="video-player-history video-history-error"/)
+  // 刷新失败保留上一份成功数据：catch 内不再清空历史（仅无分镜分支置空）
+  assert.doesNotMatch(ep, /sbVideoHistory\.value = \[\][\s\S]{0,100}sbVideoHistoryError\.value = e\.message/)
+  // 有数据的历史列表内也展示非破坏性错误/重试行
+  assert.match(ep, /v-if="sbVideoHistory\.length" class="video-player-history"[\s\S]{0,600}v-if="sbVideoHistoryError" class="video-history-error-row"/)
+  assert.match(ep, /历史记录刷新失败/)
 })
 
 test('detail plan reload surfaces failure inline instead of uncaught rejection', () => {

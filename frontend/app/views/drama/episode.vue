@@ -1002,6 +1002,12 @@
                   <span>历史视频</span>
                   <span class="video-player-history-count">{{ sbVideoHistory.length }}</span>
                 </div>
+                <!-- 有数据时刷新失败：非破坏性错误条，保留旧列表 -->
+                <div v-if="sbVideoHistoryError" class="video-history-error-row">
+                  <span class="tag tag-error">历史记录刷新失败</span>
+                  <span class="dim" style="font-size:11px">{{ sbVideoHistoryError }}</span>
+                  <button class="btn btn-sm ml-auto" @click="loadSbVideoHistory"><RefreshCw :size="11" /> 重试</button>
+                </div>
                 <div class="video-player-history-list">
                   <div
                     v-for="t in sbVideoHistory"
@@ -1234,7 +1240,7 @@
               <div class="export-section-head">
                 <span class="export-section-title">成片列表</span>
                 <span class="dim" style="font-size:11px">{{ exportMerges.length }} 个</span>
-                <button class="btn btn-sm ml-auto" @click="loadExportMerges">
+                <button class="btn btn-sm ml-auto" @click="loadExportMerges(true)">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                   刷新
                 </button>
@@ -3804,8 +3810,7 @@ async function loadSbVideoHistory() {
       .sort((a, b) => taskCreatedAt(b).localeCompare(taskCreatedAt(a)))
     sbVideoHistoryError.value = ''
   } catch (e) {
-    // 失败提示可重试，避免静默置空被误读为「没有历史」
-    sbVideoHistory.value = []
+    // 刷新失败保留上一份成功数据，仅提示可重试（不置空，避免误读为「没有历史」）
     sbVideoHistoryError.value = e.message || '历史记录加载失败'
   }
 }
