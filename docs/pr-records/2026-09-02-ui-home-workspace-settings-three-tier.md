@@ -3,7 +3,7 @@
 > 分支：`feat/ui-home-workspace`
 > 基准：`12121d9`（PR #15 合入后的 master），中途按评审要求变基
 > 日期：2026-09-02（合入 16:03Z）
-> 变更：10 个 commit（含评审修复 `1161c55`、`a6cf3d2`）；首页 index.vue 大幅改造 + 设置页 settings.vue 大范围重构
+> 变更：合并前 7 个提交（含两轮评审修复：首轮三项阻塞 `7b5f684`、复核 P1 `a6cf3d2`），按序变基后合入；首页 index.vue 大幅改造 + 设置页 settings.vue 大范围重构
 > 关联方案：`docs/ui-optimization-plan.md` P0-F 后续与首页双栏、设置页三层结构
 > PR：#16（merge commit `e9ca6ce`）
 
@@ -51,4 +51,4 @@ owner 评审 PR #14/#15 时提出：首页工作台与设置页「目录—详�
 ## 注意事项
 
 - 本机 node 环境在评审期补齐，结构测试可本地实跑；浏览器构建仍建议由 CI 执行。
-- PR 系列 15 与 16 相互独立但同批合入，涉及文件（settings.vue/index.vue/studio.css/tests）无重叠冲突。
+- PR #16 按 owner 指示先合 #15、再变基到含 #15 的最新 master（`12121d9`），与 #15 相关的设置页/测试上下文重叠已在变基中处理；涉及文件（settings.vue/index.vue/studio.css/tests）无遗留冲突。

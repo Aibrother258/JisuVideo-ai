@@ -45,4 +45,4 @@
 ## 注意事项
 
 - 运行时 `data/` 未提交（gitignore 覆盖 db/static/storage）。
-- PR 标题在创建时内联中文损坏（远端存为乱码），内容以本记录与 body 为准。
+- PR #15 标题元数据曾因 Windows PowerShell 下 gh 内联中文参数编码问题损坏（远端乱码），已于 PR #17 批次用 `gh api --input`（UTF-8 JSON）修复为「feat(ui): P1 token 收敛 A1 首批 + episode 资产子资源三态补漏（R1）」，规避规范见 `docs/pr-records/README.md`。
