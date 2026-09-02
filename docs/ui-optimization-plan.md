@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v1.7
+> 版本：v1.8
 > 日期：2026-09-03
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）、批次四 #20（白字白底语义化 + 徽标投影）、批次五 #22（episode 播放器深色与状态色）已合入，A1 全部收口；A2（语义色板规范，裁决 detail 资产类型 scene/prop/amber 系与单次低价值字面量）待做；P2–P4 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）、批次四 #20（白字白底语义化 + 徽标投影）、批次五 #22（episode 播放器深色与状态色）已合入，A1 全部收口；A2（语义色板规范，裁决 detail 资产类型 scene/prop/amber 系与单次低价值字面量）待做；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2–P4 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -19,6 +19,7 @@
 | v1.5 | 2026-09-03 | P1 推进记录（续）：PR #19 合入 `d58e570`（A1 第三批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch3.md`，索引 HB-20260903-01）；A1 第四批在 `feat/ui-token-batch4` 提交待评审（settings/ConfirmDialog/default/detail 白字白底收敛为 `--text-invert`/`--surface-raised`，徽标方形投影新增 `--shadow-badge`；episode 播放器深色体系与 detail 资产类型色 scene/prop/amber 归入 A2 语义色板批次） |
 | v1.6 | 2026-09-03 | P1 推进记录（续）：PR #20 合入 `e2f6f42`（A1 第四批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch4.md`，索引 HB-20260903-02）；A1 第五批在 `feat/ui-token-batch5` 提交待评审（episode 播放器深色体系新增 `--media-stage-bg`，成功/警告状态描边新增 `--success-border(-strong)`/`--warning-border-strong`，白字白底随 `--text-invert`/`--surface-raised`/`--surface-glass`/`--shadow-float` 清零；detail 资产类型色仍归 A2） |
 | v1.7 | 2026-09-03 | P1 推进记录（续，**A1 收口**）：PR #22 合入 `cf3a301`（A1 第五批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch5.md`，索引 HB-20260903-03）；A1（首批 + 二/三/四/五批）全部合入 master；A2 语义色板规范待做（裁决 detail 资产类型 scene/prop/amber 系与 episode/detail 内 `#000`/`#111`/半透明白等单次字面量）；PR #21（设置页音频服务配置板块）独立于 token 线仍在评审 |
+| v1.8 | 2026-09-03 | 独立线收口记录：PR #21 合入 `e3c0724`（`feat/audio-service-config`，8 文件 +77/−26）——设置页新增「音频服务」配置板块（AutoDL IndexTTS2 预设、audio 服务商白名单仅 `autodl`、后端 `ServiceType`/`officialProviders` 扩展 audio、默认生效与优先级暗示按接入状态条件化），经两轮评审边界收敛，归档见 `docs/pr-records/2026-09-03-audio-service-config-settings-board.md`，索引 HB-20260903-04；音频生成链路与工作台接入待后续工作流立项；A2 语义色板规范仍待做 |
 
 ---
 
