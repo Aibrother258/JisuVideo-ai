@@ -299,7 +299,7 @@
                 </label>
               </div>
               <div class="style-detail-foot">
-                <span v-if="styleDirty" class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2">
+                <span v-if="styleDirty" class="tag" style="border-color:var(--unsaved-border);color:var(--unsaved-text);background:var(--unsaved-bg)">
                   <TriangleAlert :size="11" /> 有未保存的修改
                 </span>
                 <span v-else class="dim" style="font-size:11px">修改后点击保存立即生效</span>
@@ -659,7 +659,7 @@
             <div class="dialog-title">有未保存的修改</div>
             <div class="dialog-sub">「{{ currentStyle?.name || '当前风格' }}」的表单已修改但尚未保存。</div>
           </div>
-          <span class="tag" style="border-color:#e0b15a;color:#a06a0e;background:#fbf3e2"><TriangleAlert :size="12" /> 未保存</span>
+          <span class="tag" style="border-color:var(--unsaved-border);color:var(--unsaved-text);background:var(--unsaved-bg)"><TriangleAlert :size="12" /> 未保存</span>
         </div>
         <div class="dialog-body">
           <p class="unsaved-dialog-copy">{{ stylePromptIsNew ? '新建风格会丢弃当前风格的未保存修改。' : '切换风格会丢弃这些修改。' }}「保存并{{ stylePromptIsNew ? '新建' : '切换' }}」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
@@ -1772,7 +1772,7 @@ onMounted(() => {
 .subnav-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subnav-count {
   font-size: 10px; font-weight: 700; font-family: var(--font-mono); flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.06); color: var(--text-2);
+  background: var(--bg-active); color: var(--text-2);
   padding: 1px 6px; border-radius: 99px;
 }
 .subnav-item.active .subnav-count { background: var(--accent-bg); color: var(--accent-text); }

@@ -1149,9 +1149,9 @@ onMounted(load)
   padding-left: 34px;
   border-radius: var(--radius-pill);
   border-color: var(--border);
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--bg-hover);
 }
-.search-box .input:focus { background: #fff; }
+.search-box .input:focus { background: var(--surface-raised); }
 .chip-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 1px; }
 .filter-chip {
   appearance: none;
@@ -1159,14 +1159,14 @@ onMounted(load)
   padding: 6px 14px;
   border: none;
   border-radius: var(--radius-pill);
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--fill-subtle);
   color: var(--text-2);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   transition: all 0.16s var(--ease-out);
 }
-.filter-chip:hover { color: var(--text-0); background: rgba(0, 0, 0, 0.08); }
+.filter-chip:hover { color: var(--text-0); background: var(--fill-hover); }
 .filter-chip:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3.5px var(--button-focus);
@@ -1179,10 +1179,10 @@ onMounted(load)
   min-height: 36px;
   border-radius: var(--radius-pill);
   border-color: var(--border);
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--bg-hover);
   color: var(--text-1);
 }
-.sort-select:focus { background: #fff; }
+.sort-select:focus { background: var(--surface-raised); }
 
 .project-grid {
   display: grid;
@@ -1284,7 +1284,7 @@ onMounted(load)
   opacity: 0;
   transition: opacity 0.15s var(--ease-out), background 0.15s var(--ease-out);
 }
-.cover-more:hover { background: #fff; }
+.cover-more:hover { background: var(--surface-raised); }
 .project-card:hover .cover-more,
 .more-wrap:focus-within .cover-more { opacity: 1; }
 .more-menu {
