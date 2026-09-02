@@ -61,7 +61,9 @@ test('backend rejects unsupported providers at DB and route boundaries', () => {
   assert.doesNotMatch(ai, /'deepseek'/)
   assert.doesNotMatch(ai, /'ali'/)
   assert.doesNotMatch(ai, /'vidu'/)
-  assert.doesNotMatch(ai, /audio:\s*\[/)
+  // 音频仅对 AutoDL 开放「服务配置板块」（IndexTTS2 等工作流），不引入其它 TTS 厂商
+  assert.match(ai, /audio:\s*\[\s*'autodl'\s*\]/)
+  assert.doesNotMatch(ai, /audio:\s*\[\s*[^\]]*minimax/)
   assert.match(ai, /isOfficialProvider/)
   assert.match(ai, /isOfficialProvider\(serviceType,\s*r\.provider\)/)
   assert.match(ai, /isOfficialProvider\(row\.serviceType as ServiceType,\s*row\.provider\)/)

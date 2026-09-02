@@ -17,14 +17,17 @@ test('backend removes the voice assignment agent and tools', () => {
   assert.equal(exists('workspace/skills/voice_assigner/SKILL.md'), false)
 })
 
-test('backend removes audio service providers, TTS adapters, and voice routes', () => {
+test('backend keeps audio to a config-only AutoDL service while TTS adapters and voice routes stay removed', () => {
   const index = read('src/index.ts')
   const ai = read('src/services/ai.ts')
   const registry = read('src/services/adapters/registry.ts')
   const types = read('src/services/adapters/types.ts')
 
   assert.doesNotMatch(index, /aiVoices/)
-  assert.doesNotMatch(ai, /audio/)
+  // 音频作为「服务配置板块」仅开放 AutoDL（IndexTTS2 等工作流），后端仍无独立 TTS 生成链路
+  assert.match(ai, /ServiceType = 'text' \| 'image' \| 'video' \| 'audio'/)
+  assert.match(ai, /audio:\s*\[\s*'autodl'\s*\]/)
+  assert.doesNotMatch(ai, /audio:\s*\[\s*[^\]]*minimax/)
   assert.doesNotMatch(ai, /getAudioConfig/)
   assert.doesNotMatch(registry, /TTS/)
   assert.doesNotMatch(registry, /minimax-tts/)

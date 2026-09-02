@@ -129,7 +129,7 @@
         <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">AI 服务</h2>
-            <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；启用后即可被工作台自动采用，弹窗内有推荐模板可选。</p>
+            <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；已接入工作流的能力启用后即被工作台自动采用，仅配置/测试阶段的接入中能力暂不生效，弹窗内有推荐模板可选。</p>
           </div>
           <div v-if="cfgsLoading" class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
@@ -162,7 +162,8 @@
                 </div>
                 <div class="cap-cell-meta">
                   <span :class="['tag', countActive(st.type) ? 'tag-success' : '']">{{ countActive(st.type) }}/{{ byType(st.type).length }} 启用</span>
-                  <span v-if="defaultModelOf(st.type)?.model" class="cap-default mono" :title="`当前默认${st.label}模型（该类型优先级最高的启用配置首位）`">
+                  <span v-if="st.type === 'audio'" class="cap-none" title="音频工作流接入后，该类型启用配置将按优先级被自动采用">待接入后生效</span>
+                  <span v-else-if="defaultModelOf(st.type)?.model" class="cap-default mono" :title="`当前默认${st.label}模型（该类型优先级最高的启用配置首位）`">
                     <Star :size="10" class="cfg-model-star" /> {{ defaultModelOf(st.type).model }}
                   </span>
                   <span v-else class="cap-none">未设默认</span>
@@ -194,15 +195,18 @@
                       <span v-if="!c.is_active" class="tag">已停用</span>
                     </div>
                     <div class="config-models">
-                      <button
-                        v-for="m in c.model" :key="m" type="button"
-                        :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
-                        :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
-                        @click="setDefaultModel(st.type, c, m)"
-                      >
-                        <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
-                        {{ m }}
-                      </button>
+                      <template v-for="m in c.model" :key="m">
+                        <span v-if="st.type === 'audio'" class="cfg-model-chip mono cfg-model-chip-ro" :title="m">{{ m }}</span>
+                        <button
+                          v-else type="button"
+                          :class="['cfg-model-chip mono', { 'is-default': isDefaultModel(st.type, c, m) }]"
+                          :title="isDefaultModel(st.type, c, m) ? '当前默认模型' : '设为该类型默认模型'"
+                          @click="setDefaultModel(st.type, c, m)"
+                        >
+                          <Star v-if="isDefaultModel(st.type, c, m)" :size="9" class="cfg-model-star" />
+                          {{ m }}
+                        </button>
+                      </template>
                     </div>
                     <div class="config-sub mono truncate">{{ c.base_url || '未设置 Base URL' }}</div>
                     <div class="config-actions">
@@ -513,7 +517,8 @@
           <label class="field">
             <span class="field-label">优先级</span>
             <input v-model.number="cfgForm.priority" class="input" type="number" min="0" max="999" />
-            <span class="field-hint">数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。</span>
+            <span v-if="cfgForm.service_type === 'audio'" class="field-hint">仅保存配置；优先级与自动采用待音频工作流接入后生效。</span>
+            <span v-else class="field-hint">数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。</span>
           </label>
           <label class="field"><span class="field-label">API Key</span><input v-model="cfgForm.api_key" class="input" type="password" placeholder="sk-..." /></label>
           <label class="field"><span class="field-label">Base URL</span><input v-model="cfgForm.base_url" class="input" placeholder="https://..." /></label>
@@ -731,7 +736,7 @@ const SUB_MAX = 360
 const navWidth = ref(NAV_DEFAULT)
 const subWidth = ref(SUB_DEFAULT)
 const paneRef = ref(null)
-// 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video），
+// 右侧当前展示的面板：ai 用 activeSection（ai-overview / ai-text / ai-image / ai-video / ai-audio），
 // styles 用 styleDetailId 记录当前风格；agents 用 agentDetail 记录被选中的 Agent。
 const activeSection = ref('')
 const agentDetail = ref(null)
@@ -766,6 +771,7 @@ const subItems = computed(() => {
       { id: 'ai-text', label: '文本服务', count: byType('text').length },
       { id: 'ai-image', label: '图片服务', count: byType('image').length },
       { id: 'ai-video', label: '视频服务', count: byType('video').length },
+      { id: 'ai-audio', label: '音频服务', count: byType('audio').length },
     ]
   }
   if (tab.value === 'styles') return stylePresets.value.map(p => ({ id: p.id, label: p.name }))
@@ -873,13 +879,19 @@ const cfgFetchingModels = ref(false)
 const fetchedModels = ref([])
 const selectedFetchedModels = ref(new Set())
 const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', modelStr: '', service_type: 'text', priority: 0, temperature: '' })
-const serviceTypes = [{ type: 'text', label: '文本' }, { type: 'image', label: '图片' }, { type: 'video', label: '视频' }]
+const serviceTypes = [{ type: 'text', label: '文本' }, { type: 'image', label: '图片' }, { type: 'video', label: '视频' }, { type: 'audio', label: '音频' }]
 const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'autodl']
-const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
+// 音频服务后端白名单仅有 AutoDL，服务商下拉按类型收窄（其余类型保持通用列表）
+const providerWhitelistByType = { audio: ['autodl'] }
+const providerSelectOptions = computed(() => {
+  const list = providerWhitelistByType[cfgForm.service_type] || providers
+  return list.map(p => ({ label: p, value: p }))
+})
 const serviceMeta = {
   text: { label: '文本', desc: '剧本改写、角色场景提取、分镜拆解等 Agent 文本能力' },
   image: { label: '图片', desc: '角色图、场景图与镜头图等静态图像生成' },
   video: { label: '视频', desc: '镜头视频直出生成，支持 Seedance、MiniMax 与 AutoDL H3 工作流' },
+  audio: { label: '音频', desc: '当前仅保存与测试 AutoDL IndexTTS2 配置；语音生成与工作台接入将在后续工作流完成后开放' },
 }
 const providerPresets = {
   text: {
@@ -894,6 +906,9 @@ const providerPresets = {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128', 'doubao-seedance-2-0-mini-260615'] },
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
     autodl: { label: 'AutoDL H3 工作流', baseUrl: 'https://autodl.art', models: ['minimax_h3_image_audio_to_video_v2_15s', 'minimax_h3_lightx2v_v5_15s', 'minimax_h3_image_audio_to_video_v2', 'minimax_h3_image_audio_to_video', 'minimax_h3_lightx2v_v5', 'minimax_h3_lightx2v_no_pic', 'minimax_h3_lightx2v'] },
+  },
+  audio: {
+    autodl: { label: 'AutoDL IndexTTS2', baseUrl: 'https://autodl.art', models: ['indextts2-v1'] },
   },
 }
 
@@ -1846,6 +1861,7 @@ onMounted(() => {
 }
 .cap-badge.t-image { background: linear-gradient(135deg, #8b5cf6, #4f46e5); }
 .cap-badge.t-video { background: linear-gradient(135deg, #f43f5e, #f97316); }
+.cap-badge.t-audio { background: linear-gradient(135deg, #06b6d4, #10b981); }
 .cap-cell-title {
   font-size: 13.5px; font-weight: 700; color: var(--text-0);
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1951,6 +1967,8 @@ onMounted(() => {
   transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
 .cfg-model-chip:hover { border-color: var(--accent); color: var(--accent); }
+.cfg-model-chip.cfg-model-chip-ro,
+.cfg-model-chip.cfg-model-chip-ro:hover { border-color: var(--border); color: var(--text-2); cursor: default; }
 .cfg-model-chip.is-default {
   border-color: var(--accent);
   background: var(--accent-bg, rgba(0,113,227,0.10));

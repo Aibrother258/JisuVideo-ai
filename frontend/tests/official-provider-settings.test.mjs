@@ -68,5 +68,15 @@ test('provider presets are separated by service capability', () => {
   assert.match(providerPresetBlock('image'), /gemini[\s\S]*openai/)
   assert.match(providerPresetBlock('video'), /volcengine/)
   assert.match(providerPresetBlock('video'), /minimax[\s\S]*autodl/)
-  assert.doesNotMatch(settingsPage, /audio:\s*\{/)
+  // 音频板块：AutoDL IndexTTS2 语音合成工作流，与视频 H3 工作流互相独立
+  assert.match(providerPresetBlock('audio'), /autodl[\s\S]*indextts2-v1/)
+  assert.doesNotMatch(providerPresetBlock('video'), /indextts/)
+  assert.doesNotMatch(providerPresetBlock('audio'), /minimax_h3|doubao-seedance|MiniMax-H3/)
+})
+
+test('audio service provider select is restricted to AutoDL only', () => {
+  // 音频服务后端白名单仅有 autodl：下拉选项不得暴露其它服务商，避免保存时 Unsupported provider
+  assert.match(settingsPage, /providerWhitelistByType\s*=\s*\{\s*audio:\s*\['autodl'\]/)
+  assert.match(settingsPage, /providerSelectOptions = computed\(\(\) => \{\s*\n\s+const list = providerWhitelistByType\[cfgForm\.service_type\] \|\| providers/)
+  assert.doesNotMatch(settingsPage, /providerSelectOptions = computed\(\(\) => providers\.map/)
 })
