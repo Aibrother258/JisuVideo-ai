@@ -52,7 +52,7 @@ export const dramaAPI = {
   get: (id: number) => api.get(`/dramas/${id}`),
   importSource: (url: string) => api.post('/dramas/import-source', { url }),
   analyzeSource: (content: string) => api.post('/dramas/analyze-source', { content }),
-  analyzeEpisodes: (id: number, data: { content: string; episode_count?: number; resolution: string; expected_version: number; review_notes?: Array<{ episode_number: number; title?: string; summary?: string; note: string }> }) => api.post(`/dramas/${id}/analyze-episodes`, data),
+  analyzeEpisodes: (id: number, data: { content: string; episode_count?: number; resolution: string; expected_version: number; requirement?: string; review_notes?: Array<{ episode_number: number; title?: string; summary?: string; note: string }> }) => api.post(`/dramas/${id}/analyze-episodes`, data),
   getEpisodePlan: (id: number) => api.get(`/dramas/${id}/episode-plan`),
   saveEpisodePlan: (id: number, data: { source_content: string; plan: any; resolution: string; selected_episode_number?: number | null; expected_version: number }) => api.put(`/dramas/${id}/episode-plan`, data),
   createEpisodesFromPlan: (id: number, data: { expected_version: number }) => api.post(`/dramas/${id}/episodes/from-plan`, data),
@@ -189,4 +189,6 @@ export const stylePresetAPI = {
   create: (d: any) => api.post('/style-presets', d),
   update: (id: number, d: any) => api.put(`/style-presets/${id}`, d),
   del: (id: number) => api.del(`/style-presets/${id}`),
+  // AI 一次完善风格：{ name?, description?, prompt?, context? } -> { name, description, prompt, value }
+  expand: (d: { name?: string; description?: string; prompt?: string; context?: string }) => api.post('/style-presets/expand', d),
 }

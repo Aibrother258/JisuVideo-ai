@@ -127,8 +127,22 @@
               <button type="button" :class="['btn', 'btn-sm', { on: projectCustomStyleActive }]" @click="toggleProjectCustomStyle">自定义</button>
             </div>
             <div v-if="projectCustomStyleActive" class="project-custom-style">
-              <input v-model.trim="projectCustomStyle.name" class="input" placeholder="自定义风格名称" />
-              <textarea v-model.trim="projectCustomStyle.prompt" class="textarea" rows="3" placeholder="描述色彩、光线、材质、镜头和时代感，可直接作为风格提示词"></textarea>
+              <div class="custom-style-name-row">
+                <input v-model.trim="projectCustomStyle.name" class="input" placeholder="自定义风格名称" />
+                <button
+                  type="button"
+                  class="btn btn-sm custom-style-ai-btn"
+                  title="结合全文一次完善名称、中文说明与英文提示词"
+                  :disabled="projectCustomStyleExpanding"
+                  @click="expandProjectCustomStyle"
+                >
+                  <span v-if="projectCustomStyleExpanding" class="ring-spinner sm"></span>
+                  <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5L14 8m-4 8-2.5 2.5m11 0L16 16M8 8 5.5 5.5"/><circle cx="12" cy="12" r="3"/></svg>
+                  {{ projectCustomStyleExpanding ? '完善中…' : 'AI 完善' }}
+                </button>
+              </div>
+              <input v-model.trim="projectCustomStyle.description" class="input" placeholder="一句中文说明：该风格适合讲什么故事（可选，AI 完善时自动生成）" />
+              <textarea v-model.trim="projectCustomStyle.prompt" class="textarea" rows="3" placeholder="英文风格提示词片段，如 anime style, cel shading, vibrant colors（AI 完善时自动生成）"></textarea>
             </div>
             <label v-else-if="selectedProjectStyle?.source === 'new'" class="project-new-style-confirm">
               <input v-model="confirmProjectNewStyle" type="checkbox" />
@@ -149,10 +163,18 @@
             <h2>AI 集数建议与分集草稿</h2>
             <p>AI 负责判断节奏、给出标题和每集重点；每集正文由系统按原文顺序拆分，不会擅自改写全文。</p>
           </div>
-          <button type="button" class="btn btn-primary" :disabled="episodeAnalyzing || projectDraft.content.trim().length < 20" @click="analyzeEpisodePlan(false)">
-            <span v-if="episodeAnalyzing" class="ring-spinner sm"></span>
-            {{ episodeAnalyzing ? '正在分析全文…' : 'AI 推荐集数' }}
-          </button>
+          <div class="episode-planner-actions">
+            <input
+              v-model.trim="episodeRequirement"
+              class="input episode-requirement-input"
+              placeholder="创作要求（可选）· 如：节奏明快、每集一个爽点、单集约 3000 字"
+              @keydown.enter.prevent="analyzeEpisodePlan(false)"
+            />
+            <button type="button" class="btn btn-primary" :disabled="episodeAnalyzing || projectDraft.content.trim().length < 20" @click="analyzeEpisodePlan(false)">
+              <span v-if="episodeAnalyzing" class="ring-spinner sm"></span>
+              {{ episodeAnalyzing ? '正在分析全文…' : 'AI 推荐集数' }}
+            </button>
+          </div>
         </div>
 
         <div v-if="episodePlan" class="episode-plan-result">
@@ -835,10 +857,12 @@ const sourceSaving = ref(false)
 const projectStyleAnalyzing = ref(false)
 const projectStyleCandidates = ref([])
 const projectCustomStyleActive = ref(false)
-const projectCustomStyle = reactive({ name: '', prompt: '' })
+const projectCustomStyle = reactive({ name: '', description: '', prompt: '' })
+const projectCustomStyleExpanding = ref(false)
 const confirmProjectNewStyle = ref(false)
 const episodeAnalyzing = ref(false)
 const episodeCount = ref(1)
+const episodeRequirement = ref('')
 const episodePlan = ref(null)
 const episodePlanSourceHash = ref('')
 const generatedPlanHash = ref('')
@@ -871,7 +895,7 @@ const resolutionOptions = [
 const projectStyleOptions = computed(() => stylePresets.value.map(style => ({ label: style.name, value: style.value })))
 const selectedProjectStyle = computed(() => {
   if (projectCustomStyleActive.value) {
-    return { source: 'custom', name: projectCustomStyle.name, prompt: projectCustomStyle.prompt, value: '__custom__' }
+    return { source: 'custom', name: projectCustomStyle.name, description: projectCustomStyle.description, prompt: projectCustomStyle.prompt, value: '__custom__' }
   }
   const candidate = projectStyleCandidates.value.find(item => item.value === projectDraft.style)
   if (candidate) return candidate
@@ -1005,6 +1029,46 @@ async function analyzeProjectStyles() {
     toast.error(e.message)
   } finally {
     projectStyleAnalyzing.value = false
+  }
+}
+
+// 超长全文采样（与后端 sampleSourceContent 同规则）：把开头、中段、结尾喂给风格扩写，贴近本项目故事
+function sampleContentForStyleExpand(content) {
+  if (!content) return ''
+  if (content.length <= 36_000) return content
+  const middle = Math.floor(content.length / 2)
+  return [
+    content.slice(0, 20_000),
+    '\n\n【中段摘录】\n',
+    content.slice(middle - 5_000, middle + 5_000),
+    '\n\n【结尾摘录】\n',
+    content.slice(-6_000),
+  ].join('')
+}
+
+async function expandProjectCustomStyle() {
+  if (projectCustomStyleExpanding.value) return
+  const { name, description, prompt } = projectCustomStyle
+  if (!name.trim() && !description.trim() && !prompt.trim()) {
+    toast.warning('请先填写风格名称或描述，AI 才能结合全文完善')
+    return
+  }
+  try {
+    projectCustomStyleExpanding.value = true
+    const r = await stylePresetAPI.expand({
+      name,
+      description,
+      prompt,
+      context: sampleContentForStyleExpand(projectDraft.content),
+    })
+    if (r?.name) projectCustomStyle.name = r.name
+    if (r?.description) projectCustomStyle.description = r.description
+    if (r?.prompt) projectCustomStyle.prompt = r.prompt
+    toast.success('AI 已结合全文完善风格，核对后保存生效')
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    projectCustomStyleExpanding.value = false
   }
 }
 
@@ -1276,6 +1340,7 @@ async function analyzeEpisodePlan(useAdjustedCount = false) {
       episode_count: useAdjustedCount ? Math.max(1, Math.min(30, Number(episodeCount.value) || 1)) : undefined,
       resolution: projectDraft.resolution,
       expected_version: episodePlanVersion.value,
+      requirement: episodeRequirement.value || undefined,
     })
     applyServerEpisodePlan(result)
     toast.success(`已生成 ${result.plan.recommended_count} 集拆分草稿`)
@@ -1305,6 +1370,7 @@ async function reanalyzeFromReviewNotes() {
       resolution: projectDraft.resolution,
       expected_version: episodePlanVersion.value,
       review_notes: reviewNotes,
+      requirement: episodeRequirement.value || undefined,
     })
     applyServerEpisodePlan(result)
     toast.success(`已综合 ${reviewNotes.length} 条批注，重新拆分为 ${result.plan.recommended_count} 集；上一版已归档`)
@@ -1794,10 +1860,14 @@ onBeforeUnmount(() => {
 .project-style-select-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
 .project-style-select-row .btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
 .project-custom-style { display: flex; flex-direction: column; gap: 7px; padding: 10px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-bg); }
+.custom-style-name-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: center; }
+.custom-style-ai-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--surface-raised); }
 .project-new-style-confirm { display: flex; align-items: flex-start; gap: 7px; color: var(--text-1); font-size: 10.5px; line-height: 1.45; }
 .project-new-style-confirm input { margin-top: 2px; accent-color: var(--accent); }
 .project-save-btn { width: 100%; margin-top: 16px; }
 .episode-planner-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.episode-planner-actions { display: flex; flex-direction: column; gap: 8px; width: min(300px, 100%); flex-shrink: 0; }
+.episode-requirement-input { min-height: var(--button-height-sm); font-size: 11.5px; }
 .episode-plan-result { display: flex; flex-direction: column; gap: 16px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .episode-count-control { display: grid; grid-template-columns: minmax(0, 1fr) 100px auto; align-items: end; gap: 12px; }
 .recommended-count { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 9px; }

@@ -386,6 +386,17 @@
           <span class="tag tag-accent ml-auto"><Palette :size="12" /> 风格</span>
         </div>
         <div class="dialog-body config-dialog-body">
+          <div class="style-ai-bar">
+            <div class="style-ai-copy">
+              <span>AI 一键完善</span>
+              <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
+              <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
+              <Sparkles v-else :size="13" />
+              {{ styleExpanding ? '完善中…' : 'AI 完善' }}
+            </button>
+          </div>
           <label class="field">
             <span class="field-label">风格名称 <span class="required">*</span></span>
             <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
@@ -434,7 +445,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
@@ -928,6 +939,32 @@ function startEditStyle(p) {
   styleDialog.value = true
 }
 
+const styleExpanding = ref(false)
+async function expandStyle() {
+  if (styleExpanding.value) return
+  const seed = { name: styleForm.name, description: styleForm.description, prompt: styleForm.prompt }
+  if (!seed.name?.trim() && !seed.description?.trim() && !seed.prompt?.trim()) {
+    toast.warning('请先填写风格名称、描述或提示词，AI 才能据此完善')
+    return
+  }
+  try {
+    styleExpanding.value = true
+    const r = await stylePresetAPI.expand(seed)
+    if (r?.name) styleForm.name = r.name
+    if (r?.description) styleForm.description = r.description
+    if (r?.prompt) styleForm.prompt = r.prompt
+    // 新建风格时 key 可留空，由 AI 给出建议并规范化为合法格式
+    if (!styleEditId.value && !styleForm.value.trim() && r?.value) {
+      styleForm.value = String(r.value).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+    }
+    toast.success('AI 已完善风格信息，核对后保存')
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    styleExpanding.value = false
+  }
+}
+
 async function saveStyle() {
   if (!styleForm.name?.trim() || !styleForm.prompt?.trim() || (!styleEditId.value && !styleForm.value?.trim())) {
     toast.warning('名称、key、提示词片段必填')
@@ -1196,6 +1233,21 @@ onMounted(() => { loadCfgs(); loadAgents(); loadAllSkills(); loadStylePresets() 
 /* Dialogs */
 .config-dialog { width: min(720px, calc(100vw - 40px)); }
 .config-dialog-body { display: flex; flex-direction: column; gap: 14px; }
+/* Style AI expand bar */
+.style-ai-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 9px;
+  background: var(--accent-bg);
+}
+.style-ai-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.style-ai-copy span { font-size: 12px; font-weight: 650; color: var(--accent-text); }
+.style-ai-copy small { font-size: 10.5px; line-height: 1.5; color: var(--text-3); }
+.style-ai-bar .btn { flex-shrink: 0; }
 .skill-dialog { width: 440px; }
 .skill-dialog-body { display: flex; flex-direction: column; gap: 12px; }
 .dialog-sub { margin-top: 4px; font-size: 12px; color: var(--text-2); }
