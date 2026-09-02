@@ -1,8 +1,8 @@
 # JisuVideo-ai 多视频类型扩展完整实施方案
 
-> 版本：v2.2（实施细节冻结稿）  
+> 版本：v2.2（实施细节冻结稿，含 PR #8 评审修订 R20–R23）  
 > 日期：2026-09-02  
-> 状态：待评审、待冻结，尚未进入生产开发  
+> 状态：评审修订完成，待复核冻结；尚未进入生产开发  
 > 适用仓库：`F:/JisuVideo/JisuVideo-ai`、`F:/JisuVideo/shuohao-skills`
 
 ## 0.1 修订记录（v2.0 → v2.2）
@@ -27,7 +27,7 @@ v2.1 基于 `F:/JisuVideo/JisuVideo-ai` 后端/前端代码现状逐项核实后
 
 ### 0.2 v2.2 二次审查修订
 
-本版在 v2.1 基础上继续冻结 8 项容易导致返工的细节。下文保留“v2.1 已确认”作为基线；本版新增内容统一标记为“v2.2 新增”。
+本版在 v2.1 基础上继续冻结 8 项容易导致返工的细节。下文保留"v2.1 已确认"作为基线；本版新增内容统一标记为"v2.2 新增"。
 
 | # | 修订 | 冻结结论 |
 | --- | --- | --- |
@@ -40,9 +40,18 @@ v2.1 基于 `F:/JisuVideo/JisuVideo-ai` 后端/前端代码现状逐项核实后
 | R18 | Provider 限制 | 导入阶段校验静态引用，执行器提交前校验完整 H3/视频参考素材列表；上限与现有 Adapter 一致（图 9、视频 3、音频 3、总数 12） |
 | R19 | 上传限制 | 冻结文件大小、JSON 深度、数组长度和 validation TTL，避免实现各自解释 |
 
+v2.2 收到 PR 评审后新增修订（2026-09-02，四条均属消除"冻结稿不可实施/不可验收"矛盾的必改项）：
+
+| # | 修订 | 冻结结论 | 涉及章节 |
+| --- | --- | --- | --- |
+| R20 | Tier A 真实能力边界 | Tier A 首期只承诺"真实图片/视频/H3 生成 + 已生成镜头按序拼接"；TTS、字幕、时间线、音轨合成明确为轨道 B 或外部后期，narrative/marketing 不得表述为完整成片交付 | 5.0、5.1、5.5、18 |
+| R21 | 首期单机单用户 | 当前仓库无认证/用户/成员/管理员模型；actor 固定为本地操作者，登录/角色/跨用户隔离表述全部降级；多用户与角色鉴权列为未来扩展 | 0.3、1.2、1.3、8.2、9.2、9.3、12.1 |
+| R22 | 导入失败诊断两段事务 | import 记录与业务写入分独立事务：先独立提交 pending，再业务事务；失败后独立事务标 failed 并保存脱敏诊断；补"失败后业务数据为零、诊断仍可查询"集成验收 | 8.3、13.3 |
+| R23 | 任务创建唯一边界 | 允许 generation.ts 兼容性最小改造，提取共享 task-factory，旧 `/api/v1/tasks` 入口与工作流入门共用；参考素材上限与幂等校验不得被旁路 | 7.6、9.3、12.1、12.2 |
+
 ### 0.3 v2.2 数据关系与状态机冻结摘要（新增）
 
-为避免“包校验结果复用”和“项目导入实例”混为一谈，四类实体必须按以下关系实现：
+为避免"包校验结果复用"和"项目导入实例"混为一谈，四类实体必须按以下关系实现：
 
 ```text
 preproduction_packages（原始包，按 content_hash 去重）
@@ -51,19 +60,19 @@ preproduction_packages（原始包，按 content_hash 去重）
                               N ── 1 dramas（实际项目）
 ```
 
-- `preproduction_packages` 是不可变原始包索引；同一 `content_hash` 可被多个用户复用读取，但不得直接把 package 当作项目。复用优先指服务端去重并复用校验结果；若用户无权访问原始包，接口不得因 hash 命中而泄露 manifest 或 artifact 原文。
+- `preproduction_packages` 是不可变原始包索引；同一 `content_hash` 的校验结果可复用（服务端去重），但不得直接把 package 当作项目，也不得因 hash 命中而绕过项目归属校验或泄露 manifest/artifact 原文。首期为单机单用户部署（R21），不存在跨用户共享；多用户授权语义列入未来扩展。
 - `preproduction_validations` 保存校验器版本、输入文件指纹、结果摘要、错误/警告、过期时间和创建者；同 hash 且校验器版本相同且未过期时可复用结果。
-- `preproduction_imports` 保存 `package_id + validation_id + drama_id + actor_id + approve_idempotency_key`，是审计和权限边界的唯一来源；同一 approve 幂等键只能得到一个导入实例。
+- `preproduction_imports` 保存 `package_id + validation_id + drama_id + actor_id + approve_idempotency_key`，是审计记录的唯一来源；`actor_id` 首期固定为唯一本地操作者（为未来多用户预留），同一 approve 幂等键只能得到一个导入实例（首期约束为 `approve_idempotency_key` 全局唯一）。
 - validation 状态：`pending → valid|invalid → expired`；只有 `valid` 且未过期的快照可以 approve。
-- import 状态：`pending → importing → succeeded|failed|rolled_back`；失败保留诊断，业务事务回滚，不能将 package 或 validation 标记为成功。
+- import 状态：`pending → importing → succeeded|failed|rolled_back`；失败保留诊断（由独立事务写入，见 8.3 R22），业务事务回滚，不能将 package 或 validation 标记为成功。
 
 冻结的默认限制：单文件 50 MiB、总包 200 MiB、JSON 最大深度 12、单数组最多 10,000 项、单包最多 100 个 artifact；validation TTL 24 小时。超限统一返回 HTTP 413、业务码 `4130 PACKAGE_LIMIT_EXCEEDED`。实现可通过服务端配置收紧，但不得放宽而不升级方案版本。
 
-权限边界：`validate` 需要登录用户；读取 validation/package 原文仅限创建者、项目成员或管理员；`approve` 仅限项目创建者/管理员（新建项目时为上传者）；强制重生成仅限项目所有者/管理员，并必须二次确认预计费用。所有接口按 `drama_id` 做租户过滤，禁止仅凭 package_id 或 validation_id 跨项目读取原文。
+权限边界（R21 修订）：**首期为单机单用户部署**——当前仓库无 users/session/auth、无 `actor_id`/项目成员/管理员模型，本方案**不引入**认证层与权限矩阵。`actor` 语义固定为唯一本地操作者；`validate`/`approve`/读取/强制重生成接口均以本地操作者身份调用，`actor_id` 仅作审计字段（固定本地值）。仍须约束的是**数据归属**：接口按 `drama_id`/创建者绑定校验，禁止仅凭 package_id 或 validation_id 读取未绑定项目的原文；强制重生成必须二次确认预计费用。登录用户、创建者/成员/管理员角色与跨用户/租户隔离全部列为**未来多用户扩展**（与认证基础设施一并排期，见 12.1），不作为首期承诺或表结构前提。
 
 `sys_task` 幂等字段迁移采用兼容顺序：先加 nullable 字段和普通索引，回填历史任务的 `scope='legacy'`；新代码先写入字段并双读，观测稳定后再对新建任务强制非空。历史任务恢复不得因为缺少幂等字段而重复提交供应商。完整字段、索引和迁移定义见 8.0–8.2.1。
 
-本方案把 JisuVideo-ai 从“以短剧为中心的固定生产链”扩展为“类型目录 + 工作流模板 + 能力注册表 + Agent Profile + 公共生产模块”的视频生产平台。首期支持六个一级视频类型，并通过 shuohao-skills 的五阶段 JSON 策划包导入能力验证类型化架构。
+本方案把 JisuVideo-ai 从"以短剧为中心的固定生产链"扩展为"类型目录 + 工作流模板 + 能力注册表 + Agent Profile + 公共生产模块"的视频生产平台。首期支持六个一级视频类型，并通过 shuohao-skills 的五阶段 JSON 策划包导入能力验证类型化架构。
 
 实施遵循两个边界：
 
@@ -95,16 +104,18 @@ preproduction_packages（原始包，按 content_hash 去重）
 
 一级类型只负责业务语义；`style_preset`、`visual_mode`、`presenter_mode`、`output_profile` 均为独立维度。
 
+> 注：上表"默认呈现方式"为目标形态；凡涉及 TTS 配音、字幕、时间线、音轨合成等呈现，须遵守 4.3.1 能力就绪度与 5.0.1/5.0.2 边界——对应能力为 `gap` 时首期只产出计划/mock/占位，不宣称真实音视频成片；Tier A 首期真实能力范围见 5.0.2。
+
 ### 1.3 首期纳入与不纳入
 
 首期纳入：六类目录、六个基线模板、Schema 驱动创建表单、模板执行器基础能力、策划包导入 MVP、现有生产链适配、回归与观测。
 
-首期不纳入：后端直接运行 Codex/Claude、在线回写 shuohao 源文件、完整插件市场、自动覆盖已有成片、供应商全量重构、面向外部商业化发布。许可证结论未书面确认前只允许内部评估和测试。
+首期不纳入：后端直接运行 Codex/Claude、在线回写 shuohao 源文件、完整插件市场、自动覆盖已有成片、供应商全量重构、面向外部商业化发布；认证/用户/成员/管理员模型与跨用户隔离（首期单机单用户，R21，多用户为未来扩展）。许可证结论未书面确认前只允许内部评估和测试。
 
 ### 1.4 MVP 成功标准（可验收）
 
 1. 合法样例包可被上传、校验、预览并在确认后创建项目。
-2. 六类项目均可完成“输入 → 规划 → 生成/导入 → 结构化时间线 → 合成或计划导出”的最小闭环；其中 Tier A 必须有真实合成，Tier B 仅允许 JSON/EDL 或带水印无声占位预览，mock 不得伪称真实 TTS/ASR/字幕/节拍能力。
+2. 六类项目均可完成"输入 → 规划 → 生成/导入 → 结构化时间线 → 合成或计划导出"的最小闭环；其中 Tier A 首期真实范围为"真实供应商的图片/视频/H3 生成 + 已生成镜头整集拼接（`video.merge`）"，配音、字幕、时间线、音轨合成**不属首期承诺**（见 5.0.2）；Tier B 仅允许 JSON/EDL 或带水印无声占位预览，mock 不得伪称真实 TTS/ASR/字幕/节拍能力。
 3. 新增一个 Level 0 类型不修改核心生产链代码；只需类型目录、Profile、默认参数和 fixture。
 4. 模板版本、供应商版本和项目快照可追溯；旧项目在模板升级后行为不变。
 5. 单阶段失败可重试或局部重跑；事务失败不产生半个项目；已有媒体 URL 不被静默清空。
@@ -267,7 +278,7 @@ export.render                  asset.register
 | export.render | 无独立导出服务；合片后依赖 `video_merges` | partial | - |
 | asset.register | `assets` 表 + 上传落盘 | ready | - |
 
-规则：模板必须声明依赖能力及其就绪度门槛；`gap` 能力未接入真实供应商前，对应模板模式以 mock 通过并在验收中标注"能力模拟"；不支持的组合在创建表单阶段阻止提交。
+规则：模板必须声明依赖能力及其就绪度门槛；`gap` 能力未接入真实供应商前，对应模板模式以 mock 通过并在验收中标注"能力模拟"；不支持的组合在创建表单阶段阻止提交。**Tier A（narrative/marketing）首期模板只允许把 `ready` 能力（`image.generate`/`video.generate`/`video.merge`）作为真实交付承诺**；`voice.tts`、`subtitle.generate`、`timeline.compose` 等 `gap` 能力不得进入 Tier A 首期真实链路，只能作计划占位、降级至 Tier B 验收口径或由外部后期承接（见 5.0.2）。
 
 ## 4.4 Agent Profile
 
@@ -287,36 +298,46 @@ Profile 统一描述：通用 Agent、类型/场景 Profile、输入/输出 Sche
 
 ## 5. 六类基线工作流
 
-所有工作流均使用公共模块；箭头是逻辑阶段，不代表每阶段必须同步执行。5.1–5.6 描述目标完整流程，首期实际执行必须遵守 5.0.1 的 Tier B mock 边界和能力就绪度 gate；流程图中的 TTS、ASR、字幕、节拍和真实导出在能力为 `gap` 时只能落为计划或占位状态。
+所有工作流均使用公共模块；箭头是逻辑阶段，不代表每阶段必须同步执行。5.1–5.6 描述目标完整流程，首期实际执行必须遵守 5.0.1 的 Tier B mock 边界与 5.0.2 的 Tier A 真实能力边界，以及能力就绪度 gate；流程图中的 TTS、ASR、字幕、节拍和真实导出在能力为 `gap` 时只能落为计划或占位状态。
 
 ### 5.0 六类闭环分级（v2.1 已确认，原因 R2）
 
 | 级别 | 类型 | 首期闭环定义 | 依据 |
 | --- | --- | --- | --- |
-| Tier A 真实闭环 | narrative、marketing | 全链路复用现有图片/视频/H3/合片链，真实供应商 | 现有 `sys_task` + H3 + `ffmpeg-merge.ts` 可完整承接 |
+| Tier A 真实闭环（R20 首期范围收窄） | narrative、marketing | 首期真实承诺 = 真实供应商的图片/视频/H3 生成 + 已生成镜头按序拼接（`video.merge`）；配音、字幕、时间线合成、音轨合成**不属于首期承诺**，归轨道 B 或外部后期（见 5.0.2） | 现有 `sys_task` + H3 + `ffmpeg-merge.ts` 可完整承接图片/视频/H3/拼接；TTS/字幕/时间线为 gap（见 4.3.1） |
 | Tier B MVP 闭环 | talking、documentary、knowledge、music | 导入 + 结构化 + 时间线计划 + JSON/EDL 导出（可选带水印无声占位预览）；TTS/ASR/节拍以 mock 占位，真实供应商在轨道 B 接入后切换 | 上述能力当前为 gap（见 4.3.1），无法首期接真实供应商 |
 
 Tier B 模板验收时须在输出中标注"能力模拟"；能力切换真实供应商属于能力版本升级，不影响项目快照与历史项目行为。
 
 #### 5.0.1 Tier B mock 输出与产品文案边界（v2.2 新增）
 
-Tier B 首期只允许生成“可审阅计划”，不得伪装成已完成的媒体能力：
+Tier B 首期只允许生成"可审阅计划"，不得伪装成已完成的媒体能力：
 
 | 能力 | mock 允许输出 | 首期禁止宣称/动作 |
 | --- | --- | --- |
-| `speech.transcribe` | 带来源标记的占位转写 JSON（或用户提供的原文） | 不得标记为“自动转写完成”，不得据此自动生成字幕时间码 |
+| `speech.transcribe` | 带来源标记的占位转写 JSON（或用户提供的原文） | 不得标记为"自动转写完成"，不得据此自动生成字幕时间码 |
 | `speech.diarize` | `speaker_1` 等待确认的说话人占位 | 不得自动绑定真实角色或直接进入口型/数字人合成 |
-| `voice.tts` | 旁白段落与预计时长计划 | 不得生成或播放“已合成”语音，不得写入已完成音频 URL |
+| `voice.tts` | 旁白段落与预计时长计划 | 不得生成或播放"已合成"语音，不得写入已完成音频 URL |
 | `subtitle.generate` | 基于文本的字幕草稿/EDL，时间码标记 `estimated=true` | 不得标记为最终字幕或烧录成片 |
 | `beat.detect` | 节拍点计划（整数毫秒）或人工提供节拍 | 不得宣称已完成自动节拍检测 |
-| `timeline.compose` | JSON/EDL 时间线、依赖清单、缺口列表 | 不得输出“已渲染成片”状态 |
+| `timeline.compose` | JSON/EDL 时间线、依赖清单、缺口列表 | 不得输出"已渲染成片"状态 |
 | `export.render` | 可下载的 JSON/EDL；如需视频仅允许带明显水印的无声占位预览 | 不得生成可对外发布的成片或将占位视频计为完成 |
 
-UI、API 和验收报告统一使用“时间线计划（能力模拟）”“待接入 TTS/ASR”等文案；只有对应能力就绪度变为 `ready`、Provider 健康且真实产物通过质量门后，状态才可变为 `rendered/succeeded`。Tier B MVP 的“闭环完成”定义为计划可审阅、可导出、可恢复，不等同于真实音视频交付。
+UI、API 和验收报告统一使用"时间线计划（能力模拟）""待接入 TTS/ASR"等文案；只有对应能力就绪度变为 `ready`、Provider 健康且真实产物通过质量门后，状态才可变为 `rendered/succeeded`。Tier B MVP 的"闭环完成"定义为计划可审阅、可导出、可恢复，不等同于真实音视频交付。
+
+#### 5.0.2 Tier A 首期真实能力边界（R20 新增）
+
+`narrative`、`marketing` 首期只承诺以下"真实"能力，作为产品文案、验收与后续实施共用的可验收基线：
+
+- **真实交付（就绪度 `ready`，真实供应商）**：`image.generate`、`video.generate`（含 H3）、`video.merge`（已生成镜头按序拼接、音频透传镜头自带音轨）；产物可写 `video_url`、可下载整集拼接视频。
+- **不属于 Tier A 首期承诺（就绪度 `gap`/`partial`）**：`voice.tts`、`subtitle.generate`、`timeline.compose`、`export.render`（多版本/字幕/音轨合成导出）及 TTS/ASR/节拍相关能力。未接入真实能力前，这些环节只能落为计划占位或标注"外部后期承接"，**不得**把 narrative/marketing 产物表述为"完整成片""含配音字幕成片"等。
+- **文案与验收口径统一**：Tier A = "AI 画面/镜头 + 整集拼接片"。5.1 narrative 与 5.5 marketing 流程图末段（配音/字幕/时间线/合成导出）首期对应为"计划占位 → 外部后期或轨道 B"；能力就绪并接入后才升级描述，不影响项目快照与历史项目行为。
 
 ### 5.1 叙事剧情 `narrative.standard`
 
 原文/剧本 → 结构化剧本 → 角色/场景/道具 → 分镜段/切镜 → 图片与视频提示词 → 图片/视频生成 → 配音/字幕 → 时间线 → 合成导出。
+
+> 首期范围（5.0.2）：narrative 为 Tier A，真实交付至"图片/视频/H3 生成 + 整集拼接"；流程末段的配音/字幕/时间线/合成导出在能力接入前只作计划占位，由外部后期或轨道 B 承接。
 
 硬规则：角色、场景、道具使用外部 ID；段级视频任务与切镜分离；单段不超过 15 秒。
 
@@ -341,6 +362,8 @@ UI、API 和验收报告统一使用“时间线计划（能力模拟）”“�
 ### 5.5 产品品牌营销 `marketing.standard`
 
 产品资料/卖点/品牌资产 → 受众与卖点分析 → 营销脚本 → 产品镜头 → B-roll/图片/视频 → 配音字幕音乐 → 多版本合成 → 平台导出。
+
+> 首期范围（5.0.2）：marketing 为 Tier A，真实交付至"图片/视频/H3 生成 + 整集拼接"；流程末段的多版本/配音字幕/平台导出在能力接入前只作计划占位，由外部后期或轨道 B 承接。
 
 硬规则：Logo、商标和免责声明为锁定资产；输出版本只改变 Output Profile，不复制策划数据。
 
@@ -399,7 +422,7 @@ outline ──→ cast / art ──→ script ──→ storyboard
 
 允许只导入 outline 形成草稿。storyboard 必须有可解析的 script、art 和资产引用；缺依赖时只生成预览错误，不创建视频任务。
 
-outline 的全集 `ep` 创建全部剧集壳，状态为“待导入剧本”；script/storyboard 只覆盖部分集时按 `ep` 填充。预览和确认页显示“N 集壳 + M 集含剧本”。首期只允许新建项目，后续批次追加属于迭代 5。
+outline 的全集 `ep` 创建全部剧集壳，状态为"待导入剧本"；script/storyboard 只覆盖部分集时按 `ep` 填充。预览和确认页显示"N 集壳 + M 集含剧本"。首期只允许新建项目，后续批次追加属于迭代 5。
 
 ### 7.3 关键校验规则
 
@@ -439,13 +462,13 @@ outline 的全集 `ep` 创建全部剧集壳，状态为“待导入剧本”；
 
 ### 7.6 cut 首期定位（v2.1 已确认，原因 R4）
 
-现有 `storyboards` 表一行=一个分镜段（`storyboard_number`），`video_prompt`/`minimax_h3_prompt`/`video_url` 与生成任务均以**段**为粒度。`storyboard_cuts` 为新增表，首期仅作为**展示层资产**：承接导入、校验、预览、时长换算与参考图顺序（`storyboard_reference_assets` 按 cut 排序提交 H3 参考图，`cut_number=1` 主帧优先）；**生成任务仍以段为单位**，`video_url` 写回段。cut 级生成任务（每 cut 一个视频）列入 Level 2 能力，不进首期，避免改造 `generation.ts` 与 `episode.vue` 工作台。
+现有 `storyboards` 表一行=一个分镜段（`storyboard_number`），`video_prompt`/`minimax_h3_prompt`/`video_url` 与生成任务均以**段**为粒度。`storyboard_cuts` 为新增表，首期仅作为**展示层资产**：承接导入、校验、预览、时长换算与参考图顺序（`storyboard_reference_assets` 按 cut 排序提交 H3 参考图，`cut_number=1` 主帧优先）；**生成任务仍以段为单位**，`video_url` 写回段。cut 级生成任务（每 cut 一个视频）列入 Level 2 能力，不进首期，`episode.vue` 工作台不改；`generation.ts` 按 R23 允许做兼容性最小改造（提取共享 task-factory，见 9.3/12.2），但不涉及 cut 语义或段粒度变化。
 
 ## 8. 数据模型与迁移
 
 ### 8.0 导入数据关系与状态机（v2.2 新增）
 
-`preproduction_packages` 是不可变内容寻址记录：文件落盘并计算 `content_hash` 后仅保持 `uploaded`，不承载校验或导入结果。校验结果只属于 `preproduction_validations`，项目绑定和导入结果只属于 `preproduction_imports`，从而避免 package 的“不可变”与可变状态相冲突。
+`preproduction_packages` 是不可变内容寻址记录：文件落盘并计算 `content_hash` 后仅保持 `uploaded`，不承载校验或导入结果。校验结果只属于 `preproduction_validations`，项目绑定和导入结果只属于 `preproduction_imports`，从而避免 package 的"不可变"与可变状态相冲突。
 
 ```text
 package(uploaded, immutable)
@@ -471,7 +494,7 @@ style_preset_id, output_profile, workflow_snapshot_json
 **字段语义隔离（v2.1 已确认，原因 R8）**：
 
 - `video_type`（生产类型：narrative/talking/documentary/knowledge/marketing/music）与现有 `genre`（题材，如"都市""悬疑"，已有 `dramas.genre` 字段）**语义不同，不得合并**；
-- 时长单位统一为**秒**（INT）：`dramas.total_duration`、`episodes.duration`、`storyboards.duration`；`minutesPerEpisode × 60 × episodes` 先换算为秒；涉及 cuts 时统一先换算为整数毫秒，段/集/项目落库再按“向上取整到秒”聚合，禁止浮点累加；换算公式 `dramas.total_duration = Σ episodes.duration`；
+- 时长单位统一为**秒**（INT）：`dramas.total_duration`、`episodes.duration`、`storyboards.duration`；`minutesPerEpisode × 60 × episodes` 先换算为秒；涉及 cuts 时统一先换算为整数毫秒，段/集/项目落库再按"向上取整到秒"聚合，禁止浮点累加；换算公式 `dramas.total_duration = Σ episodes.duration`；
 - `dramas.metadata` 只保存导入清单、扩展参数和快照摘要，不作为类型字段真源；新增列必须通过显式、幂等 `ALTER TABLE` 迁移并在 `schema.ts` 同步登记。
 
 ### 8.2 新增表
@@ -484,7 +507,7 @@ style_preset_id, output_profile, workflow_snapshot_json
 | `project_workflow_snapshots` | `drama_id + revision` 唯一 | 项目创建时冻结模板/Profile/配置 |
 | `preproduction_packages` | `content_hash` 唯一；状态固定 `uploaded` | 导入包原始索引、清单和来源（不可变，不绑定项目） |
 | `preproduction_validations` | `package_id + validator_version + input_fingerprint` 索引 | 校验快照、错误/警告、TTL、创建者 |
-| `preproduction_imports` | `approve_idempotency_key`（按 actor 作用域）唯一；`drama_id` 索引 | 每次 approve 的项目绑定实例和审计记录 |
+| `preproduction_imports` | `approve_idempotency_key` 唯一（首期单用户下全局唯一；R21 引入多用户后按 actor 作用域）；`drama_id` 索引 | 每次 approve 的项目绑定实例和审计记录 |
 | `preproduction_artifacts` | `package_id + kind + sha256` 唯一 | 原始 JSON、Schema 结果、覆盖集号 |
 | `preproduction_id_maps` | `package_id + entity_kind + external_id` 唯一 | C/S/P 与数据库 ID 映射 |
 | `preproduction_beats` | `package_id + external_id` 唯一 | 爽点表及集号、setup、payoff |
@@ -505,9 +528,9 @@ style_preset_id, output_profile, workflow_snapshot_json
 | --- | --- | --- |
 | `preproduction_packages` | `id BIGINT PK`、`content_hash CHAR(64)`、`format_version VARCHAR(32)`、`source VARCHAR(64)`、`storage_key VARCHAR(512)`、`manifest_json JSON`、`status ENUM('uploaded')`、`created_by BIGINT`、`created_at DATETIME(3)`、`updated_at DATETIME(3)` | `UNIQUE(content_hash)`；内容和状态不可变，原文不得写日志 |
 | `preproduction_validations` | `id BIGINT PK`、`package_id BIGINT`、`validator_version VARCHAR(64)`、`input_fingerprint CHAR(64)`、`status ENUM('pending','valid','invalid','expired')`、`result_json JSON`、`error_count INT`、`warning_count INT`、`expires_at DATETIME(3)`、`created_by BIGINT`、`created_at DATETIME(3)` | `INDEX(package_id,status,expires_at)`；同一指纹可复用 |
-| `preproduction_imports` | `id BIGINT PK`、`package_id BIGINT`、`validation_id BIGINT`、`drama_id BIGINT`、`actor_id BIGINT`、`approve_idempotency_key VARCHAR(128)`、`status ENUM('pending','importing','succeeded','failed','rolled_back')`、`mapping_json JSON`、`error_json JSON`、`created_at DATETIME(3)`、`completed_at DATETIME(3)` | `UNIQUE(actor_id,approve_idempotency_key)`；`INDEX(drama_id)` |
+| `preproduction_imports` | `id BIGINT PK`、`package_id BIGINT`、`validation_id BIGINT`、`drama_id BIGINT`、`actor_id BIGINT`（首期固定为本地操作者，R21）、`approve_idempotency_key VARCHAR(128)`、`status ENUM('pending','importing','succeeded','failed','rolled_back')`、`mapping_json JSON`、`error_json JSON`、`created_at DATETIME(3)`、`completed_at DATETIME(3)` | 首期 `UNIQUE(approve_idempotency_key)`；引入多用户后升级 `UNIQUE(actor_id,approve_idempotency_key)`；`INDEX(drama_id)` |
 | `project_workflow_snapshots` | `id BIGINT PK`、`drama_id BIGINT`、`revision INT`、`template_key VARCHAR(128)`、`template_version VARCHAR(32)`、`profile_versions_json JSON`、`config_json JSON`、`snapshot_hash CHAR(64)`、`created_by BIGINT`、`created_at DATETIME(3)` | `UNIQUE(drama_id,revision)`；快照不可更新 |
-| `workflow_runs` | `id BIGINT PK`、`drama_id BIGINT`、`parent_run_id BIGINT NULL`、`idempotency_key VARCHAR(128)`、`input_revision CHAR(64)`、`status ENUM('pending','running','succeeded','failed','cancelled')`、`stage_state_json JSON`、`output_revision CHAR(64) NULL`、`error_json JSON NULL`、`actor_id BIGINT`、`started_at DATETIME(3) NULL`、`completed_at DATETIME(3) NULL`、`created_at DATETIME(3)` | `UNIQUE(drama_id,idempotency_key)`；`INDEX(drama_id,status)` |
+| `workflow_runs` | `id BIGINT PK`、`drama_id BIGINT`、`parent_run_id BIGINT NULL`、`idempotency_key VARCHAR(128)`、`input_revision CHAR(64)`、`status ENUM('pending','running','succeeded','failed','cancelled')`、`stage_state_json JSON`、`output_revision CHAR(64) NULL`、`error_json JSON NULL`、`actor_id BIGINT`（首期固定为本地操作者，R21）、`started_at DATETIME(3) NULL`、`completed_at DATETIME(3) NULL`、`created_at DATETIME(3)` | `UNIQUE(drama_id,idempotency_key)`；`INDEX(drama_id,status)` |
 | `sys_task`（新增列） | `scope VARCHAR(64) NULL`、`idempotency_key VARCHAR(128) NULL`、`request_fingerprint CHAR(64) NULL`、`workflow_run_id BIGINT NULL`、`provider_task_id VARCHAR(256) NULL`、`created_at/updated_at DATETIME(3)`（沿用原字段） | `INDEX(scope,idempotency_key)`、`INDEX(request_fingerprint)`；首期允许 NULL 兼容历史 |
 | `asset_variants` | `id BIGINT PK`、`asset_id BIGINT`（变体资产）、`variant_of_id BIGINT`（母资产，同一 assets 实体）、`changes_json JSON`、`source_hash CHAR(64)`、`status ENUM('active','archived')`、`created_at DATETIME(3)` | `UNIQUE(asset_id,variant_of_id)`；删除母资产前必须阻断或级联归档 |
 
@@ -515,16 +538,22 @@ style_preset_id, output_profile, workflow_snapshot_json
 
 ### 8.3 事务与幂等
 
-导入事务顺序：`preproduction_imports（pending/importing） → dramas → episodes（按 outline 全集） → characters/scenes/props → episode 关联表 → storyboards/storyboard_cuts → id_maps/beats/artifacts 状态更新 → preproduction_imports（succeeded）`。事务失败时将导入实例标记为 `failed`；仅在后续提供“撤销本次导入”能力且完成反向删除/归档审计时，才允许使用 `rolled_back`，不得把普通异常误记为回滚。
+导入采用**独立提交的两段事务**（R22 修订；import 记录与业务写入不得在同一事务内，否则业务回滚会连失败诊断一起消失）：
 
-事务失败回滚业务行，`preproduction_imports` 保留 `failed` 和诊断，`preproduction_packages` 与 validation 保持原始/校验事实，不以导入结果覆盖。所有批量写入使用显式事务、唯一索引和 `source_hash`；相同原始包可复用校验结果，但 `approve` 的唯一键必须为 `actor_id + approve_idempotency_key`，并显式绑定新建的 `drama_id`，不得把同一 package 记录静默复用到不同项目。
+1. **事务 T1（独立提交）**：创建并提交 `preproduction_imports(pending)` 记录（含 `package_id + validation_id + approve_idempotency_key + drama_id`，drama_id 可先预分配或成功后回填）；此时仅导入实例落库。
+2. **事务 T2（独立提交）**：导入业务数据，顺序为 `dramas → episodes（按 outline 全集） → characters/scenes/props → episode 关联表 → storyboards/storyboard_cuts → id_maps/beats/artifacts`。T2 内任一步失败则整段回滚，业务数据零残留。
+3. **事务 T3（独立提交）**：T2 成功后把 import 更新为 `succeeded`；T2 失败后用独立事务把 import 更新为 `failed` 并保存**脱敏诊断**（`error_json`，只含 JSON Path/artifact kind/外部 ID/修复建议）。T1/T3 均短事务，T2 为长事务。
+
+仅在后续提供"撤销本次导入"能力且完成反向删除/归档审计时，才允许使用 `rolled_back`，不得把普通异常误记为回滚。`preproduction_packages` 与 validation 在任何路径都保持原始/校验事实，不以导入结果覆盖。所有批量写入使用显式事务、唯一索引和 `source_hash`；相同原始包可复用校验结果，但 `approve` 的唯一键必须为 `approve_idempotency_key`（首期全局唯一，R21 多用户扩展后为 `actor_id + approve_idempotency_key`），并显式绑定新建的 `drama_id`，不得把同一 package 记录静默复用到不同项目。
+
+**集成验收项（R22 新增）**：导入中途失败（在 T2 内任意位置注入失败）后断言：业务数据为零（`dramas`/`episodes`/`characters`/`scenes`/`storyboards` 等均无残留）、`preproduction_imports` 记录为 `failed` 且 `error_json` 诊断可查询、`preproduction_packages`/`validation` 事实未变。
 
 ### 8.4 局部重跑的成本与幂等语义（v2.1 已确认，原因 R7）
 
 - 现有 `sys_task` 无幂等键，且 `generation.ts` 明确"创建请求不自动重试，避免重复扣费"；`workflow_runs.idempotency_key` 仅防重复提交，不防"用户主动重跑产生新扣费"。
 - 默认策略：阶段输入哈希（`input_revision`）未变时，重跑**直接复用** `result_url`/本地产物，零成本；仅当用户显式选择"强制重新生成"才重新调用供应商。
 - `rerun-stage` 在确认前返回 `estimate_cost`（重跑阶段成本 + 已复用阶段 0 成本），前端必须展示成本确认（见 9.3）。
-- 事务失败回滚业务行，`preproduction_imports` 记录保留 `failed` 与诊断；不可变 package 和 validation 事实不被覆盖，已生成媒体 URL 不被静默清空（沿用现有行为）。
+- 导入中途失败时业务事务回滚、业务数据零残留，`preproduction_imports` 记录保留 `failed` 与诊断（按 8.3 两段事务，诊断经独立事务 T3 写入，不被回滚吞掉）；不可变 package 和 validation 事实不被覆盖，已生成媒体 URL 不被静默清空（沿用现有行为）。
 - 指纹规则：`request_fingerprint = SHA-256(capability + provider/model + canonical_input + asset_hashes + output_profile + input_revision + force_nonce)`；JSON 必须 canonicalize，密钥、展示标题和瞬态时间戳不得参与。常规重试的 `force_nonce` 为空；强制重新生成必须使用新的随机 `force_nonce`，从而产生新指纹和新任务记录。
 - 字段职责分离：`idempotency_key` 是服务端按作用域确定性派生的业务防重键（示例：`drama:{dramaId}:{capability}:{input_revision}`），用于同一意图只创建一个任务；`request_fingerprint` 是请求内容指纹，用于检测可复用结果、校验供应商恢复和区分强制重生成。两者均写入 `sys_task`，不可由客户端直接指定。
 
@@ -550,9 +579,9 @@ GET  /api/v1/preproduction/packages/:id/diff
 GET  /api/v1/preproduction/packages/:id/issues
 ```
 
-`validate` 仅限登录用户调用；只返回 `validation_id`、artifact 摘要、覆盖集号、ImportPlan、阻断错误/警告和待确认 cast 映射，不写 `dramas` 等业务表。单文件 50 MiB、总包 200 MiB、JSON 深度 12、数组 10,000 项和 artifact 100 个均在上传/解析前后双重校验。`approve` 仅限创建者或管理员，必须携带用户最终确认的标题、风格、比例、castMappings 和 `approve_idempotency_key`；服务端创建 `preproduction_imports`，不可将 package 直接当作项目。
+`validate`/`approve`/读取接口在**首期单机单用户**部署下均以本地操作者身份调用（R21：无登录/角色概念，本方案不引入 users/session/auth 与权限矩阵）；调用约束退化为**数据归属校验**与**操作确认**。`validate` 只返回 `validation_id`、artifact 摘要、覆盖集号、ImportPlan、阻断错误/警告和待确认 cast 映射，不写 `dramas` 等业务表。单文件 50 MiB、总包 200 MiB、JSON 深度 12、数组 10,000 项和 artifact 100 个均在上传/解析前后双重校验。`approve` 必须携带用户最终确认的标题、风格、比例、castMappings 和 `approve_idempotency_key`；服务端创建 `preproduction_imports`，不可将 package 直接当作项目。
 
-读取 `validation`、`package`、`diff`、`issues` 前必须校验创建者、对应项目成员或管理员身份。未绑定项目的 validation 仅创建者/管理员可读；原始 JSON 不返回给无权用户，且所有按 ID 查询都必须验证所属 `drama_id` 或创建者，防止跨项目枚举。
+读取 `validation`、`package`、`diff`、`issues` 前仍须校验记录归属（所属 `drama_id` 或创建者），禁止仅凭 package_id/validation_id 跨项目枚举读取；未绑定项目的 validation 不向无关上下文返回原文。登录用户、创建者/成员/管理员角色及跨用户隔离列入**未来多用户扩展**（与认证基础设施一并排期，见 12.1），不作为首期契约。
 
 默认值优先级：`manifest.title（用户可改） > outline.source`；风格默认取 `manifest.sourceStyle` 映射结果；比例默认 `16:9`。预览页显示最终可编辑值。
 
@@ -563,11 +592,11 @@ POST /api/v1/workflow-runs
 GET  /api/v1/workflow-runs/:id
 POST /api/v1/workflow-runs/:id/retry
 POST /api/v1/workflow-runs/:id/rerun-stage
-POST /api/v1/tasks                 # 复用现有图片/视频任务入口
+POST /api/v1/tasks                 # 复用现有图片/视频任务入口（经共享 task-factory，R23）
 GET  /api/v1/episodes/:id/generation-tasks
 ```
 
-重跑请求必须说明 `stage_id` 和 `input_revision`；依赖输入版本变化时自动扩展受影响阶段，否则拒绝使用过期输出。`retry` 可由项目成员发起但仅复用或恢复既有指纹；`rerun-stage` 的 `force=true` 仅项目所有者/管理员可用，并须提交成本确认令牌，服务端生成新的 `force_nonce`，客户端不得自行伪造请求指纹。
+重跑请求必须说明 `stage_id` 和 `input_revision`；依赖输入版本变化时自动扩展受影响阶段，否则拒绝使用过期输出。`retry` 仅复用或恢复既有指纹；`rerun-stage` 的 `force=true` 须二次确认预计费用并提交成本确认令牌，服务端生成新的 `force_nonce`，客户端不得自行伪造请求指纹。R21：首期单机单用户不区分角色，创建者/成员/管理员权限限制与成本确认令牌的签发规则列入未来多用户扩展。
 
 `rerun-stage` 在确认前必须返回 `estimate_cost`（预估新增费用与将复用阶段的列表）；前端展示"将重新生成 N 个阶段（预计成本 X）、复用 M 个阶段（0 成本）"，确认后才提交。
 
@@ -615,7 +644,7 @@ pending → running → succeeded
 
 阶段输出使用 `run_id + stage_id + input_revision` 作为版本键。跳过阶段必须记录原因，不能以空输出冒充成功。工作流重试只重试非付费/可确认安全阶段；涉及供应商提交的阶段必须先查询 `sys_task` 的请求指纹和上游 taskId，再决定恢复、复用或人工确认。
 
-**媒体复用默认策略（v2.1 已确认，原因 R7）**：`input_revision` 未变时，局部重跑/断点恢复直接复用既有输出（`result_url`/`local_path`），不重新调用供应商；只有用户显式“强制重新生成”才重新付费调用。强制重生成必须生成新的 request fingerprint，不覆盖旧任务记录，成本确认见 8.4/9.3。
+**媒体复用默认策略（v2.1 已确认，原因 R7）**：`input_revision` 未变时，局部重跑/断点恢复直接复用既有输出（`result_url`/`local_path`），不重新调用供应商；只有用户显式"强制重新生成"才重新付费调用。强制重生成必须生成新的 request fingerprint，不覆盖旧任务记录，成本确认见 8.4/9.3。
 
 ### 11.2 Provider Adapter
 
@@ -627,7 +656,7 @@ Provider 选择顺序：项目显式配置 → 服务类型默认配置 → 健�
 
 ### 11.3 H3 与现有生产链
 
-复用现有 `storyboards.minimax_h3_prompt`、`minimax_h3_source_hash`、`minimax_h3_generated_at`。来源指纹变化只使 H3 结果不可直接复用，不清空已有 `video_url`。参考图使用已有 `storyboard_reference_assets`，按 `sort_order` 提交；执行器在提交 H3 Provider 前对“场景图 + 角色图 + 道具图 + 额外参考图 + 首帧/尾帧”的完整列表统一执行上限：图片最多 9、视频最多 3、音频最多 3、总参考素材最多 12，超限即阻断并返回可定位错误。导入校验只校验可静态确定的引用数量，不重复计算运行时首帧/尾帧。
+复用现有 `storyboards.minimax_h3_prompt`、`minimax_h3_source_hash`、`minimax_h3_generated_at`。来源指纹变化只使 H3 结果不可直接复用，不清空已有 `video_url`。参考图使用已有 `storyboard_reference_assets`，按 `sort_order` 提交；执行器在提交 H3 Provider 前对"场景图 + 角色图 + 道具图 + 额外参考图 + 首帧/尾帧"的完整列表统一执行上限：图片最多 9、视频最多 3、音频最多 3、总参考素材最多 12，超限即阻断并返回可定位错误。导入校验只校验可静态确定的引用数量，不重复计算运行时首帧/尾帧。
 
 ## 12. 分阶段实施计划
 
@@ -658,7 +687,9 @@ Provider 选择顺序：项目显式配置 → 服务类型默认配置 → 健�
 
 v2.1 已确认项：能力就绪度矩阵定稿（4.3.1）；Tier A/B 闭环分级（5.0）；cut 首期定位（7.6）；Agent Profile 注入方式（4.4）；局部重跑成本与媒体复用策略（8.4/9.3）；`genre` 与 `video_type` 语义隔离与时长单位（8.1）。
 
-v2.2 新增拍板项：包/validation/import/drama 四实体关系和状态机（0.3）；单文件 50 MiB、总包 200 MiB、深度 12、数组 10,000、artifact 100、TTL 24 小时（0.3/9.2）；`preproduction_imports` 的 approve 幂等边界（0.3/8.2）；`sys_task` nullable→双读→新任务必填的迁移顺序及请求指纹公式（0.3/8.4）；Provider 参考素材上限（图 9、视频 3、音频 3、总数 12）；Tier B 仅时间线计划、无声水印预览的文案边界（5.0.1）；项目/校验/强制重生成权限矩阵（0.3/9）；**变更性质与试点边界**：本方案定性为平台化增量扩展（additive platform extension），**非重构**；试点以 narrative 为垂直切片跑通"类型目录 → Schema 表单 → 模板 → DAG 执行器 → 复用现有 sys_task/H3/合片链"，并以**一次 Level 0 类型追加**（只加目录项/Profile/fixture，不改核心执行器）实证可扩展性；四条边界为：现有链路零行为变化（回归门禁）、`sys_task` 只加列、`generation.ts` 不改、模板/Profile/能力注册表只增不改。
+v2.2 新增拍板项：包/validation/import/drama 四实体关系和状态机（0.3）；单文件 50 MiB、总包 200 MiB、深度 12、数组 10,000、artifact 100、TTL 24 小时（0.3/9.2）；`preproduction_imports` 的 approve 幂等边界（0.3/8.2）；`sys_task` nullable→双读→新任务必填的迁移顺序及请求指纹公式（0.3/8.4）；Provider 参考素材上限（图 9、视频 3、音频 3、总数 12）；Tier B 仅时间线计划、无声水印预览的文案边界（5.0.1）；项目/校验/强制重生成权限矩阵（0.3/9）；**变更性质与试点边界**：本方案定性为平台化增量扩展（additive platform extension），**非重构**；试点以 narrative 为垂直切片跑通"类型目录 → Schema 表单 → 模板 → DAG 执行器 → 复用现有 sys_task/H3/合片链"，并以**一次 Level 0 类型追加**（只加目录项/Profile/fixture，不改核心执行器）实证可扩展性；四条边界为：现有链路零行为变化（回归门禁）、`sys_task` 只加列、`generation.ts` 仅做**兼容性最小改造并提取共享 task-factory**（R23：旧入口与新工作流入门统一经其创建任务，禁止新增旁路，见 9.3/12.2）、模板/Profile/能力注册表只增不改。
+
+v2.2 评审修订拍板项（R20–R23，2026-09-02）：Tier A 首期真实能力边界（5.0.2，narrative/marketing 不得宣称含配音/字幕的完整成片交付）；首期单机单用户与 actor 语义（R21，登录/用户/成员/管理员与跨用户隔离列为未来扩展）；导入失败诊断采用两段独立事务并补集成验收（8.3）；任务创建唯一边界——`generation.ts` 兼容性最小改造 + 共享 task-factory，参考素材上限与幂等校验不可被 `/api/v1/tasks` 或任何新入口旁路。
 
 ### 12.2 试点垂直切片验收清单（v2.2 新增）
 
@@ -666,7 +697,8 @@ v2.2 新增拍板项：包/validation/import/drama 四实体关系和状态机�
 
 **A0 冻结结束判据（试点启动前）**：
 
-- 变更性质签字：additive platform extension，非重构；四条边界（现有链路零行为变化、`sys_task` 只加列、`generation.ts` 不改、模板/Profile/能力注册表只增不改）书面确认。
+- 变更性质签字：additive platform extension，非重构；四条边界书面确认——现有链路零行为变化、`sys_task` 只加列、`generation.ts` 仅兼容性最小改造并提取共享 task-factory（R23）、模板/Profile/能力注册表只增不改。
+- 首期部署形态签字：单机单用户，actor=本地操作者，认证/角色鉴权列为未来扩展（R21）。
 - narrative 目录项、基线模板、Profile、fixture 与回归基线就绪；12.1 拍板项全部签字。
 - 试点成功判据在启动前公示，禁止试点结束后"补定义"。
 
@@ -675,8 +707,8 @@ v2.2 新增拍板项：包/validation/import/drama 四实体关系和状态机�
 1. 框架链路判据：
    - narrative 类型目录由服务端返回并驱动 Schema 表单与模板选择，前端不硬编码一级类型列表；
    - 模板声明的 capability 引用能解析到现有执行器（模板不得直连供应商）；
-   - 新任务仍走 `sys_task`，并携带 `scope / idempotency_key / request_fingerprint`，历史任务与恢复逻辑回归可读。
-2. narrative 全链路走通：类型目录 → Schema 表单 → 模板注册 → DAG 执行器 → 图片/视频/H3 → 合片 → 项目产出。
+   - 新任务统一经**共享 task-factory** 创建并写入 `sys_task`，携带 `scope / idempotency_key / request_fingerprint`；旧 `/api/v1/tasks` 入口与新工作流入门共用该边界，参考素材上限与幂等校验不可被旁路；历史任务与恢复逻辑回归可读。
+2. narrative 全链路走通：类型目录 → Schema 表单 → 模板注册 → DAG 执行器 → 图片/视频/H3 → 整集拼接（`video.merge`，见 5.0.2 Tier A 真实边界）→ 项目产出。
 3. 回归：现有 narrative 创建/生成/合片/任务恢复路径零行为变化；历史项目快照可读取。
 4. Level 0 追加演练：追加第二个类型（marketing 或一个 mock 类型），仅新增目录项、Profile、fixture 与前端 Schema，**不改核心执行器代码**；第二类型可创建、可执行。
 5. 门禁抽查：未注册 key 无法执行；`gap` 能力组合在表单阶段被 gate；上传/校验限制与权限矩阵抽查通过。
@@ -703,15 +735,16 @@ v2.2 新增拍板项：包/validation/import/drama 四实体关系和状态机�
 ### 13.3 量化发布门禁
 
 - 单元/API/集成测试通过率 100%；合法 fixture 导入成功率 100%，非法 fixture 均在预期阶段阻断。
-- 事务失败后无孤儿业务记录；重复请求不新增项目和付费任务。
+- 导入两段事务验收（R22）：在 T2 内任意位置注入失败后，业务数据为零（无孤儿业务记录）、`preproduction_imports` 记录为 `failed` 且 `error_json` 诊断可查询、package/validation 事实未变（见 8.3）；重复请求不新增项目和付费任务。
 - 局部重跑只执行受影响阶段，未受影响阶段复用率 100%。
 - 现有项目回归通过；历史项目模板快照可读取。
 - P95 validate ≤ 5 秒（不含上传）；P95 预览 API ≤ 1 秒。
 - 能力就绪度 gate：`gap` 能力的模板模式在创建表单阶段 100% 被阻止；mock 能力在验收报告中标注"能力模拟"。
 - 上传限制和 TTL：超过 50 MiB 单文件、200 MiB 总包、深度 12、数组 10,000 项或 artifact 100 个必须 100% 拒绝并返回 `4130`；24 小时后 approve 必须 100% 返回 `4004`。
-- 数据与权限：同一原始包可复用 validation，但每个 approve 必须产生独立 `preproduction_imports`；跨用户/跨项目读取 validation、package 原文、diff、issues 的授权测试必须 100% 拒绝。
-- 付费任务：普通重试仅恢复/复用相同 request fingerprint；`force=true` 必须产生新指纹、新任务和成本确认审计，二者的集成测试均通过。
-- Tier B：仅允许 JSON/EDL 和有水印无声占位预览；不得出现“字幕已生成”“音频已合成”“成片已渲染”等成功文案，真实能力接入前不得用于对外发布。
+- 数据与归属：同一原始包可复用 validation，但每个 approve 必须产生独立 `preproduction_imports`；仅凭 package_id/validation_id 跨项目读取未绑定原文必须 100% 拒绝。R21：首期单机单用户无跨用户语义，跨用户/角色授权测试列入未来多用户扩展。
+- 付费任务：普通重试仅恢复/复用相同 request fingerprint；`force=true` 必须产生新指纹、新任务和成本确认审计，二者的集成测试均通过；所有付费任务创建必须经共享 task-factory（R23）执行参考素材上限与幂等校验，`/api/v1/tasks` 或其他入口不得旁路该边界。
+- Tier B：仅允许 JSON/EDL 和有水印无声占位预览；不得出现"字幕已生成""音频已合成""成片已渲染"等成功文案，真实能力接入前不得用于对外发布。
+- Tier A（R20）：narrative/marketing 验收口径为真实图片/视频/H3 + 整集拼接；不得宣称含 TTS/字幕/时间线/音轨合成的完整成片交付；`voice.tts`/`subtitle.generate`/`timeline.compose` 等 gap 能力接入前，对应环节必须标注"外部后期/计划占位"。
 - 导入、阶段耗时、重试、Provider 错误、成本和合成失败均有看板及告警。
 - 许可证、NOTICE、上游署名链和对外发布范围有书面记录。
 
@@ -788,8 +821,9 @@ v2.2 新增拍板项：包/validation/import/drama 四实体关系和状态机�
 + 项目级快照
 + shuohao 策划包导入 MVP（cut 首期为展示层）
 + Provider Adapter、任务恢复、观测和灰度
++ 单机单用户部署（actor=本地操作者；认证/成员/管理员与多用户隔离为未来扩展，R21）
 ```
 
-首期闭环承诺（v2.2）：**narrative、marketing 为真实供应商闭环**；talking、documentary、knowledge、music 为计划级 MVP 闭环（导入+结构化+时间线计划+JSON/EDL 导出，允许带水印无声占位预览；TTS/ASR/字幕/节拍能力就绪后切换真实供应商）。首期能力缺口（TTS、字幕、转写、说话人识别、节拍检测）在轨道 B 独立排期，不阻塞平台基础设施上线；Tier B 计划不得对外宣称成片交付。
+首期闭环承诺（v2.2，评审修订 R20/R21）：**narrative、marketing 为真实供应商闭环，范围限于“真实图片/视频/H3 生成 + 已生成镜头整集拼接”**——TTS 配音、字幕、时间线合成与音轨合成不属于首期承诺，归轨道 B 或外部后期（见 5.0.2）；talking、documentary、knowledge、music 为计划级 MVP 闭环（导入+结构化+时间线计划+JSON/EDL 导出，允许带水印无声占位预览；TTS/ASR/字幕/节拍能力就绪后切换真实供应商）。首期能力缺口在轨道 B 独立排期，不阻塞平台基础设施上线；**Tier A 与 Tier B 均不得对外宣称含配音/字幕的完整成片交付**，能力就绪并接入前以“整集拼接片/时间线计划（能力模拟）”口径交付。
 
-未来新增类型优先走 Level 0/1；只有确实产生新生产能力时才升级为 Level 2，只有供应商或独立团队边界明确时才建设 Level 3。任何实现若无法满足“先验证后写库、版本可追溯、失败可恢复、旧项目不变、未注册不执行”五项不变量，不得进入合并或发布。
+未来新增类型优先走 Level 0/1；只有确实产生新生产能力时才升级为 Level 2，只有供应商或独立团队边界明确时才建设 Level 3。任何实现若无法满足"先验证后写库、版本可追溯、失败可恢复、旧项目不变、未注册不执行"五项不变量，不得进入合并或发布。
