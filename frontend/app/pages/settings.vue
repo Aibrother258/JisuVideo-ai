@@ -44,7 +44,25 @@
               </button>
             </div>
           </section>
-          <div class="sections">
+          <div v-if="cfgsLoading" class="sections">
+            <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
+              <div class="svc-group-head">
+                <div class="svc-group-heading">
+                  <span class="app-skeleton-line" style="width:64px"></span>
+                  <div class="app-skeleton-line" style="width:220px;height:11px;margin-top:6px"></div>
+                </div>
+              </div>
+              <div class="app-skeleton-line" style="width:100%;height:54px;margin-top:12px"></div>
+              <div class="app-skeleton-line" style="width:100%;height:54px;margin-top:8px"></div>
+            </section>
+          </div>
+          <div v-else-if="cfgsError" class="app-state app-state-error">
+            <div class="app-state-icon"><CircleAlert :size="22" /></div>
+            <div class="app-state-title">服务配置加载失败</div>
+            <p class="app-state-desc">{{ cfgsError }}</p>
+            <button class="btn btn-primary btn-sm" @click="loadCfgs(true)"><RefreshCw :size="12" /> 重试</button>
+          </div>
+          <div v-else class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
               <div class="svc-group-head">
                 <div class="svc-group-heading">
@@ -94,7 +112,23 @@
             <h2 class="settings-title">风格预设</h2>
             <p class="settings-desc">创建项目时选择的视觉风格，其英文提示词片段会自动注入角色图与场景图生成。停用的风格不出现在创建选项中。</p>
           </div>
-          <section class="card svc-group">
+          <section v-if="styleLoading" class="card svc-group">
+            <div class="svc-group-head">
+              <div class="svc-group-heading">
+                <span class="app-skeleton-line" style="width:64px"></span>
+              </div>
+            </div>
+            <div class="app-skeleton-line" style="width:100%;height:54px;margin-top:12px"></div>
+            <div class="app-skeleton-line" style="width:100%;height:54px;margin-top:8px"></div>
+            <div class="app-skeleton-line" style="width:62%;height:54px;margin-top:8px"></div>
+          </section>
+          <div v-else-if="styleError" class="app-state app-state-error">
+            <div class="app-state-icon"><CircleAlert :size="22" /></div>
+            <div class="app-state-title">风格预设加载失败</div>
+            <p class="app-state-desc">{{ styleError }}</p>
+            <button class="btn btn-primary btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="12" /> 重试</button>
+          </div>
+          <section v-else class="card svc-group">
             <div class="svc-group-head">
               <div class="svc-group-heading">
                 <span class="svc-group-title">全部风格</span>
@@ -130,7 +164,24 @@
             <h2 class="settings-title">Agent 配置</h2>
             <p class="settings-desc">高级区只保留 Agent 运行配置。这里可以调整模型、提示词和参数，保存后立即生效。</p>
           </div>
-          <div class="agent-list">
+          <div v-if="agentsLoading" class="agent-list">
+            <div v-for="i in 3" :key="i" class="card agent-card">
+              <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+                <div class="app-skeleton-line" style="width:34px;height:34px;border-radius:10px;flex-shrink:0"></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+                  <div class="app-skeleton-line" style="width:42%"></div>
+                  <div class="app-skeleton-line" style="width:26%;height:11px"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="agentsError" class="app-state app-state-error">
+            <div class="app-state-icon"><CircleAlert :size="22" /></div>
+            <div class="app-state-title">Agent 列表加载失败</div>
+            <p class="app-state-desc">{{ agentsError }}</p>
+            <button class="btn btn-primary btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
+          </div>
+          <div v-else class="agent-list">
             <div v-for="a in agentList" :key="a.type" class="card agent-card">
               <div class="agent-card-head" @click="toggleAgentEdit(a.type)">
                 <div class="agent-type-badge">{{ a.icon }}</div>
@@ -172,17 +223,31 @@
           <!-- Agent 左侧列表 -->
           <aside class="skills-agent-list">
             <div class="skills-agent-title">Agent 列表</div>
-            <button
-              v-for="a in agentList"
-              :key="a.type"
-              :class="['skills-agent-item', { active: selectedAgent === a.type }]"
-              @click="selectAgent(a.type)"
-            >
-              <span class="agent-type-badge">{{ a.icon }}</span>
-              <span class="skills-agent-label">{{ a.label }}</span>
-              <span v-if="agentSkillCount(a.type) > 0" class="skill-count-badge">{{ agentSkillCount(a.type) }}</span>
-            </button>
-            <p v-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            <template v-if="agentsLoading">
+              <div v-for="i in 4" :key="i" style="display:flex;align-items:center;gap:8px;padding:8px 6px">
+                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px;flex-shrink:0"></div>
+                <div class="app-skeleton-line" style="width:58%;height:12px"></div>
+              </div>
+            </template>
+            <template v-else-if="agentsError">
+              <div class="app-state app-state-error compact-state">
+                <div class="app-state-title">Agent 列表加载失败</div>
+                <button class="btn btn-ghost btn-sm" @click="loadAgents(true)"><RefreshCw :size="12" /> 重试</button>
+              </div>
+            </template>
+            <template v-else>
+              <button
+                v-for="a in agentList"
+                :key="a.type"
+                :class="['skills-agent-item', { active: selectedAgent === a.type }]"
+                @click="selectAgent(a.type)"
+              >
+                <span class="agent-type-badge">{{ a.icon }}</span>
+                <span class="skills-agent-label">{{ a.label }}</span>
+                <span v-if="agentSkillCount(a.type) > 0" class="skill-count-badge">{{ agentSkillCount(a.type) }}</span>
+              </button>
+              <p v-if="!agentList.length" class="config-empty">Agent 列表为空，请检查后端服务</p>
+            </template>
           </aside>
 
           <!-- Skill 管理右侧主区域 -->
@@ -199,6 +264,20 @@
               </button>
             </div>
 
+            <!-- Skills 加载中（P0-C1/C2） -->
+            <div v-if="skillsLoading" class="card skills-empty">
+              <div class="skills-empty-icon">
+                <div class="app-skeleton-line" style="width:26px;height:26px;border-radius:8px"></div>
+              </div>
+              <div class="app-skeleton-line" style="width:150px;margin:8px auto 0"></div>
+            </div>
+            <div v-else-if="skillsError" class="app-state app-state-error">
+              <div class="app-state-icon"><CircleAlert :size="22" /></div>
+              <div class="app-state-title">Skills 加载失败</div>
+              <p class="app-state-desc">{{ skillsError }}</p>
+              <button class="btn btn-primary btn-sm" @click="loadAgents(true); loadAllSkills(true)"><RefreshCw :size="12" /> 重试</button>
+            </div>
+            <template v-else>
             <!-- 无 skill 提示 -->
             <div v-if="!currentSkills.length" class="card skills-empty">
               <div class="skills-empty-icon">
@@ -243,6 +322,7 @@
                 </div>
               </div>
             </div>
+            </template>
           </div>
         </div>
       </div>
@@ -438,7 +518,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
@@ -463,6 +543,16 @@ const navGroups = [
     ],
   },
 ]
+
+// ===== 列表加载三态（P0-C1/C2）：初始加载显示骨架，失败内联错误 + 重试 =====
+const cfgsLoading = ref(false)
+const cfgsError = ref('')
+const styleLoading = ref(false)
+const styleError = ref('')
+const agentsLoading = ref(false)
+const agentsError = ref('')
+const skillsLoading = ref(false)
+const skillsError = ref('')
 
 // ===== AI Service Configs =====
 const cfgs = ref([])
@@ -516,7 +606,16 @@ function applyProviderPreset(type, provider) {
   selectedFetchedModels.value = new Set()
 }
 
-async function loadCfgs() { try { cfgs.value = await aiConfigAPI.list() } catch (e) { toast.error(e.message) } }
+async function loadCfgs(initial = false) {
+  if (initial) { cfgsLoading.value = true; cfgsError.value = '' }
+  try { cfgs.value = await aiConfigAPI.list() }
+  catch (e) {
+    if (initial) { cfgsError.value = e.message || '加载失败'; return }
+    toast.error(e.message)
+  } finally {
+    if (initial) cfgsLoading.value = false
+  }
+}
 
 // ===== 默认模型选择 =====
 // 默认解析规则与工作台/后端一致：启用配置中优先级最高者的模型列表首位
@@ -745,9 +844,15 @@ const textModelSelectOptions = computed(() =>
   }))
 )
 
-async function loadAgents() {
+async function loadAgents(initial = false) {
+  if (initial) { agentsLoading.value = true; agentsError.value = '' }
   try { agentCfgs.value = await promptAPI.list() }
-  catch (e) { toast.error(e.message) }
+  catch (e) {
+    if (initial) { agentsError.value = e.message || '加载失败'; return }
+    toast.error(e.message)
+  } finally {
+    if (initial) agentsLoading.value = false
+  }
 }
 
 async function toggleAgentEdit(type) {
@@ -828,9 +933,15 @@ const currentSkills = computed(() =>
   allSkills.value.filter(s => skillBelongsTo(s.id, selectedAgent.value))
 )
 
-async function loadAllSkills() {
+async function loadAllSkills(initial = false) {
+  if (initial) { skillsLoading.value = true; skillsError.value = '' }
   try { allSkills.value = await skillsAPI.list() }
-  catch (e) { toast.error(e.message) }
+  catch (e) {
+    if (initial) { skillsError.value = e.message || '加载失败'; return }
+    toast.error(e.message)
+  } finally {
+    if (initial) skillsLoading.value = false
+  }
 }
 
 async function selectAgent(type) {
@@ -910,8 +1021,15 @@ const styleDialog = ref(false)
 const styleEditId = ref(null)
 const styleForm = reactive({ name: '', value: '', prompt: '', description: '', sort_order: 0 })
 
-async function loadStylePresets() {
-  try { stylePresets.value = await stylePresetAPI.list(true) } catch (e) { toast.error(e.message) }
+async function loadStylePresets(initial = false) {
+  if (initial) { styleLoading.value = true; styleError.value = '' }
+  try { stylePresets.value = await stylePresetAPI.list(true) }
+  catch (e) {
+    if (initial) { styleError.value = e.message || '加载失败'; return }
+    toast.error(e.message)
+  } finally {
+    if (initial) styleLoading.value = false
+  }
 }
 
 async function toggleStyle(p) {
@@ -1009,7 +1127,7 @@ async function saveStyle() {
   } catch (e) { toast.error(e.message) }
 }
 
-onMounted(() => { loadCfgs(); loadAgents(); loadAllSkills(); loadStylePresets() })
+onMounted(() => { loadCfgs(true); loadAgents(true); loadAllSkills(true); loadStylePresets(true) })
 </script>
 
 <style scoped>

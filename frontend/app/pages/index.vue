@@ -43,7 +43,15 @@
       </select>
     </div>
 
-    <div v-if="loading" class="project-grid">
+    <div v-if="loadError" class="app-state app-state-error">
+      <div class="app-state-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="app-state-title">项目加载失败</div>
+      <p class="app-state-desc">{{ loadError }}</p>
+      <button class="btn btn-primary" @click="load()"><RefreshCw :size="13" /> 重试</button>
+    </div>
+    <div v-else-if="loading" class="project-grid">
       <div v-for="i in 6" :key="i" class="card skeleton-card">
         <div class="skeleton-cover"></div>
         <div class="skeleton-body">
@@ -372,6 +380,7 @@ import BaseSelect from '~/components/BaseSelect.vue'
 
 const dramas = ref([])
 const loading = ref(false)
+const loadError = ref('')
 const showCreate = ref(false)
 const searchKeyword = ref('')
 const statusFilter = ref('all')
@@ -477,12 +486,13 @@ const filteredDramas = computed(() => {
 
 async function load() {
   loading.value = true
+  loadError.value = ''
   try {
     const [res, presets] = await Promise.all([dramaAPI.list(), stylePresetAPI.list()])
     dramas.value = res.items || []
     stylePresets.value = presets || []
   } catch (e) {
-    toast.error(e.message)
+    loadError.value = e.message || '加载失败'
   } finally {
     loading.value = false
   }

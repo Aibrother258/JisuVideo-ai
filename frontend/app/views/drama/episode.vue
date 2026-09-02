@@ -1,5 +1,23 @@
 <template>
-  <div class="studio" v-if="drama">
+  <!-- 工作台加载 / 失败态（P0-C1/C2）：初始加载显示骨架，失败内联错误 + 重试 -->
+  <div v-if="pageLoading" class="app-page-loading">
+    <div class="app-state">
+      <div class="app-state-icon"><div class="app-skeleton-line" style="width:24px;height:24px;border-radius:8px"></div></div>
+      <div class="app-skeleton-line" style="width:170px"></div>
+      <div class="app-skeleton-line" style="width:280px;height:11px"></div>
+    </div>
+  </div>
+  <div v-else-if="pageLoadError" class="app-page-loading">
+    <div class="app-state app-state-error">
+      <div class="app-state-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="app-state-title">工作台加载失败</div>
+      <p class="app-state-desc">{{ pageLoadError }}</p>
+      <button class="btn btn-primary btn-sm" @click="refresh(true)">重试</button>
+    </div>
+  </div>
+  <div class="studio" v-else-if="drama">
     <header class="studio-topbar">
       <div class="studio-topbar-main">
         <button class="back-btn topbar-back" @click="navigateTo(`/drama/${dramaId}`)">
@@ -45,6 +63,11 @@
             :default-label="`默认 · ${videoModelOptions[0].model}`"
             :show-config="videoModelMultiCfg"
           />
+          <div v-if="configsLoading" class="model-config-hint">模型配置加载中…</div>
+          <div v-else-if="configsError" class="model-config-hint is-error">
+            <span class="tag tag-error">模型配置加载失败</span>
+            <button class="btn btn-sm btn-ghost" title="重试加载模型配置" @click="loadConfigs"><RefreshCw :size="11" /> 重试</button>
+          </div>
         </div>
         <div class="studio-actions">
           <button class="btn" @click="refresh">
@@ -979,6 +1002,12 @@
                   <span>历史视频</span>
                   <span class="video-player-history-count">{{ sbVideoHistory.length }}</span>
                 </div>
+                <!-- 有数据时刷新失败：非破坏性错误条，保留旧列表 -->
+                <div v-if="sbVideoHistoryError" class="video-history-error-row">
+                  <span class="tag tag-error">历史记录刷新失败</span>
+                  <span class="dim" style="font-size:11px">{{ sbVideoHistoryError }}</span>
+                  <button class="btn btn-sm ml-auto" @click="loadSbVideoHistory"><RefreshCw :size="11" /> 重试</button>
+                </div>
                 <div class="video-player-history-list">
                   <div
                     v-for="t in sbVideoHistory"
@@ -994,6 +1023,16 @@
                     <span v-if="isCurrentVideo(t)" class="video-history-badge">当前</span>
                     <button v-else type="button" class="video-history-del" title="删除该记录" @click.stop="removeHistoryVideo(t)">×</button>
                   </div>
+                </div>
+              </div>
+              <div v-else-if="sbVideoHistoryError" class="video-player-history video-history-error">
+                <div class="video-player-history-head">
+                  <span>历史视频</span>
+                </div>
+                <div class="video-history-error-row">
+                  <span class="tag tag-error">历史记录加载失败</span>
+                  <span class="dim" style="font-size:11px">{{ sbVideoHistoryError }}</span>
+                  <button class="btn btn-sm ml-auto" @click="loadSbVideoHistory"><RefreshCw :size="11" /> 重试</button>
                 </div>
               </div>
               </div>
@@ -1184,17 +1223,41 @@
         </div>
         <div v-else class="export-split">
           <div class="export-main">
+            <!-- 拼接失败内联错误（P0-C3）：发起失败或后台轮询失败均在此呈现，支持一键重试 -->
+            <div v-if="mergeError" class="app-state-inline app-state-error">
+              <div class="app-state-icon"><CircleAlert :size="18" /></div>
+              <div class="app-state-inline-body">
+                <div class="app-state-title">拼接失败</div>
+                <p class="app-state-desc">{{ mergeError }}</p>
+              </div>
+              <div class="app-state-inline-actions">
+                <button class="btn btn-primary btn-sm" @click="doMerge(lastMergeIds)"><RefreshCw :size="12" /> 重试拼接</button>
+                <button class="btn btn-ghost btn-sm" @click="mergeError = ''">关闭</button>
+              </div>
+            </div>
             <!-- 上方:成片列表 -->
             <div class="export-section">
               <div class="export-section-head">
                 <span class="export-section-title">成片列表</span>
                 <span class="dim" style="font-size:11px">{{ exportMerges.length }} 个</span>
-                <button class="btn btn-sm ml-auto" @click="loadExportMerges">
+                <button class="btn btn-sm ml-auto" @click="loadExportMerges(true)">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                   刷新
                 </button>
               </div>
-              <div v-if="exportMerges.length" class="export-merge-strip">
+              <!-- 成片列表加载失败（内联错误 + 重试） -->
+              <div v-if="exportListError" class="app-state app-state-error compact-state">
+                <div class="app-state-icon"><CircleAlert :size="20" /></div>
+                <div class="app-state-title">成片列表加载失败</div>
+                <p class="app-state-desc">{{ exportListError }}</p>
+                <button class="btn btn-primary btn-sm" @click="loadExportMerges(true)"><RefreshCw :size="12" /> 重试</button>
+              </div>
+              <!-- 首次加载骨架 -->
+              <div v-else-if="exportListLoading && !exportMerges.length" class="export-merge-strip">
+                <div class="app-skeleton-line" style="width:260px;height:150px;border-radius:12px"></div>
+                <div class="app-skeleton-line" style="width:260px;height:150px;border-radius:12px"></div>
+              </div>
+              <div v-else-if="exportMerges.length" class="export-merge-strip">
                 <div
                   v-for="m in exportMerges"
                   :key="m.id"
@@ -1308,7 +1371,7 @@
               <div class="video-task-meta">按创建时间倒序 · {{ genTaskRows.length }} 个任务</div>
             </div>
             <div class="task-drawer-head-actions">
-              <button class="btn btn-sm" @click="loadGenTasks">
+              <button class="btn btn-sm" @click="loadGenTasks(true)">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 刷新
               </button>
@@ -1320,7 +1383,21 @@
             <span class="video-task-metric is-done">{{ genTaskDoneCount }} 完成</span>
             <span class="video-task-metric is-failed">{{ genTaskFailedCount }} 失败</span>
           </div>
-          <div v-if="!genTaskRows.length" class="step-empty task-drawer-empty">
+          <!-- 任务列表加载失败：内联错误 + 重试（区分「加载失败」与「真无任务」） -->
+          <div v-if="taskListError" class="task-drawer-body">
+            <div class="app-state app-state-error compact-state">
+              <div class="app-state-icon"><CircleAlert :size="20" /></div>
+              <div class="app-state-title">任务列表加载失败</div>
+              <p class="app-state-desc">{{ taskListError }}</p>
+              <button class="btn btn-primary btn-sm" @click="loadGenTasks(true)"><RefreshCw :size="12" /> 重试</button>
+            </div>
+          </div>
+          <div v-else-if="taskListLoading && !genTaskRows.length" class="task-drawer-body task-drawer-skeleton">
+            <div class="app-skeleton-line" style="height:72px;border-radius:12px"></div>
+            <div class="app-skeleton-line" style="height:72px;border-radius:12px;margin-top:10px"></div>
+            <div class="app-skeleton-line" style="height:72px;border-radius:12px;margin-top:10px"></div>
+          </div>
+          <div v-else-if="!genTaskRows.length" class="step-empty task-drawer-empty">
             <div class="empty-visual">
               <ListTodo :size="32" />
             </div>
@@ -1666,6 +1743,12 @@
           </header>
           <div class="dialog-body ref-asset-picker-body">
             <div v-if="refAssetPickerLoading" class="ref-asset-picker-empty"><Loader2 :size="18" class="animate-spin" /> 正在加载素材库</div>
+            <div v-else-if="refAssetLibraryError" class="app-state app-state-error compact-state">
+              <div class="app-state-icon"><CircleAlert :size="20" /></div>
+              <div class="app-state-title">素材库加载失败</div>
+              <p class="app-state-desc">{{ refAssetLibraryError }}</p>
+              <button class="btn btn-primary btn-sm" @click="loadRefAssetLibrary"><RefreshCw :size="12" /> 重试</button>
+            </div>
             <div v-else-if="refAssetCandidates.length" class="ref-asset-picker-grid">
               <button
                 v-for="asset in refAssetCandidates"
@@ -1786,7 +1869,7 @@ import { toast } from 'vue-sonner'
 import { nextTick } from 'vue'
 import {
   Users, Video, FileText, FolderKanban, Clapperboard, Download, Loader2,
-  MapPin, Play, Plus, X, ListTodo,
+  MapPin, Play, Plus, X, ListTodo, RefreshCw, CircleAlert,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, assetLibraryAPI } from '~/composables/useApi'
 import { useAgent } from '~/composables/useAgent'
@@ -1798,6 +1881,8 @@ const dramaId = Number(route.params.id)
 const episodeNumber = Number(route.params.episodeNumber)
 
 const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]), propItems = ref([]), sbs = ref([]), mergeData = ref(null)
+const pageLoading = ref(false)
+const pageLoadError = ref('')
 // 工作台面板位置记忆（按剧集隔离）：仅页面刷新(reload)时恢复到上次所在步骤；
 // 从列表/详情页点击进入时始终默认「剧本」面板
 const PANEL_STORE_KEY = `huobao:workbench:panel:${dramaId}:${episodeNumber}`
@@ -2083,6 +2168,12 @@ const mergeUrl = computed(() => mergeData.value?.merged_url || mergeData.value?.
 // ===== 拼接导出:镜头选择 + 成片列表 =====
 const exportSelectedIds = ref([]) // 勾选的镜头 id
 const exportMerges = ref([])      // 成片(拼接记录)列表
+// 成片列表加载三态（P0-C3）：失败内联呈现而非静默空列表
+const exportListLoading = ref(false)
+const exportListError = ref('')
+// 拼接失败内联错误（发起失败 / 轮询失败）与一键重试参数
+const mergeError = ref('')
+const lastMergeIds = ref(null)
 let exportSelTouched = false      // 用户手动操作过选择后,不再自动全选
 
 const exportReadyIds = computed(() => sbs.value.filter(s => hasVid(s)).map(s => s.id))
@@ -2109,9 +2200,16 @@ function toggleSelectAllExport() {
   exportSelectedIds.value = exportSelectedReadyIds.value.length === exportReadyIds.value.length ? [] : [...exportReadyIds.value]
 }
 
-async function loadExportMerges() {
+async function loadExportMerges(initial = false) {
   if (!epId.value) return
-  try { exportMerges.value = await mergeAPI.list(epId.value) || [] } catch { /* 静默 */ }
+  if (initial) { exportListLoading.value = true; exportListError.value = '' }
+  try { exportMerges.value = await mergeAPI.list(epId.value) || [] }
+  catch (e) {
+    // 初始加载失败 -> 内联错误 + 重试；后台刷新失败保持旧列表不打扰
+    if (initial) { exportListError.value = e.message || '成片列表加载失败'; return }
+  } finally {
+    if (initial) exportListLoading.value = false
+  }
 }
 
 const scriptStep = ref(storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)
@@ -2128,6 +2226,9 @@ const prodTabIdx = computed({
 const imageConfigs = ref([])
 const videoConfigs = ref([])
 const textConfigs = ref([])
+// 模型配置加载态：失败时顶栏模型下拉静默消失，改为内联提示 + 重试
+const configsLoading = ref(false)
+const configsError = ref('')
 // 生成时可选模型：空串 = 跟随配置默认（models[0]）；选择持久化到 localStorage，刷新页面后保留
 const MODEL_STORE_KEYS = { chat: 'huobao:model:chat', image: 'huobao:model:image', video: 'huobao:model:video' }
 function readStoredModel(key, legacyKey = '') {
@@ -2157,11 +2258,14 @@ const failedVideoMessages = ref({})
 const genTasks = ref([])
 const genMerges = ref([])
 const taskDrawer = ref(false)
+// 任务列表加载三态（P0-C3 扫尾）：打开抽屉失败内联呈现，避免误导「暂无任务」
+const taskListLoading = ref(false)
+const taskListError = ref('')
 let genTasksTimer = null
 
 function openTaskDrawer() {
   taskDrawer.value = true
-  loadGenTasks()
+  loadGenTasks(true)
 }
 function closeTaskDrawer() {
   taskDrawer.value = false
@@ -2175,6 +2279,7 @@ const uploadingRefMedia = ref(false)
 const mediaLibraryAssets = ref([])
 const refAssetPicker = ref({ open: false, kind: 'image' })
 const refAssetPickerLoading = ref(false)
+const refAssetLibraryError = ref('')
 const REF_SELECTION_STORE_KEY = `huobao:video-refs:${dramaId}:${episodeNumber}`
 const storedShotRefSelections = ref((() => {
   try { return JSON.parse(localStorage.getItem(REF_SELECTION_STORE_KEY) || '{}') }
@@ -2676,10 +2781,12 @@ const selectedRefAssetCount = computed(() => selectedRefList().value.length)
 
 async function loadRefAssetLibrary() {
   refAssetPickerLoading.value = true
+  refAssetLibraryError.value = ''
   try {
     mediaLibraryAssets.value = await assetLibraryAPI.list({ drama_id: dramaId, episode_id: epId.value }) || []
   } catch (error) {
-    toast.error(error.message || '素材库加载失败')
+    // 失败内联呈现 + 重试，避免回落误导性「素材库还没有…」空态
+    refAssetLibraryError.value = error.message || '素材库加载失败'
   } finally {
     refAssetPickerLoading.value = false
   }
@@ -2733,12 +2840,14 @@ const videoModelMultiCfg = computed(() => hasMultiConfigs(videoModelOptions.valu
 
 // Production step helpers
 // ========== 任务列表面板 ==========
-async function loadGenTasks() {
+async function loadGenTasks(initial = false) {
   if (!epId.value) return
+  if (initial) { taskListLoading.value = true; taskListError.value = '' }
   try {
     const data = await taskAPI.listByEpisode(epId.value)
     genTasks.value = data?.tasks || []
     genMerges.value = data?.merges || []
+    taskListError.value = ''
 
     // 生成中/失败状态只存在内存里,页面刷新后丢失;从 sys_task 记录按分镜恢复,
     // 否则已失败的镜头刷新后会退化成"待生成"
@@ -2770,7 +2879,12 @@ async function loadGenTasks() {
     }
     pendingVideoIds.value = [...pending]
     failedVideoMessages.value = failed
-  } catch { /* 静默失败,不打断其他刷新 */ }
+  } catch (e) {
+    // 用户打开抽屉/手动刷新失败 -> 内联错误 + 重试；后台轮询刷新保持旧数据
+    if (initial) taskListError.value = e.message || '任务列表加载失败'
+  } finally {
+    if (initial) taskListLoading.value = false
+  }
 }
 
 function stopGenTasksPolling() {
@@ -3217,7 +3331,8 @@ function sceneShotCount(sceneId) {
 watch(rawContent, v => { localRaw.value = v }, { immediate: true })
 watch(scriptContent, v => { localScript.value = v }, { immediate: true })
 
-async function refresh() {
+async function refresh(initial = false) {
+  if (initial) { pageLoading.value = true; pageLoadError.value = '' }
   try {
     drama.value = await dramaAPI.get(dramaId)
     const ep = drama.value.episodes?.find(e => (e.episode_number || e.episodeNumber) === episodeNumber)
@@ -3245,10 +3360,13 @@ async function refresh() {
       else scriptStep.value = 0
     }
   } catch (e) {
+    if (initial) { pageLoadError.value = e.message || '加载失败'; return }
     toast.error(e.message)
+  } finally {
+    if (initial) pageLoading.value = false
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-  await Promise.all([loadGenTasks(), loadExportMerges()])
+  await Promise.all([loadGenTasks(initial), loadExportMerges(initial)])
 }
 
 function saveRaw() { episodeAPI.update(epId.value, { content: localRaw.value }); episode.value.content = localRaw.value }
@@ -3675,6 +3793,7 @@ function hasVid(s) { return !!getVideoUrl(s) }
 // ===== 分镜视频历史（一个分镜可能生成多个视频,sys_task 留存全部记录）=====
 const sbVideoHistory = ref([])
 const previewVideoUrl = ref('') // 正在预览的历史视频(相对路径);空 = 预览当前主视频
+const sbVideoHistoryError = ref('')
 
 // 注意:/tasks 返回原始行(camelCase),/episodes/:id/generation-tasks 返回 snake_case,两种命名都兼容
 function taskVideoPath(t) { return t?.local_path || t?.localPath || t?.result_url || t?.resultUrl || '' }
@@ -3683,13 +3802,17 @@ function isCurrentVideo(t) { const p = taskVideoPath(t); return !!p && p === get
 
 async function loadSbVideoHistory() {
   previewVideoUrl.value = ''
-  if (!selectedSb.value?.id) { sbVideoHistory.value = []; return }
+  if (!selectedSb.value?.id) { sbVideoHistory.value = []; sbVideoHistoryError.value = ''; return }
   try {
     const rows = await taskAPI.list({ type: 'video', storyboard_id: selectedSb.value.id })
     sbVideoHistory.value = (Array.isArray(rows) ? rows : [])
       .filter(t => t.status === 'completed' && taskVideoPath(t))
       .sort((a, b) => taskCreatedAt(b).localeCompare(taskCreatedAt(a)))
-  } catch { sbVideoHistory.value = [] }
+    sbVideoHistoryError.value = ''
+  } catch (e) {
+    // 刷新失败保留上一份成功数据，仅提示可重试（不置空，避免误读为「没有历史」）
+    sbVideoHistoryError.value = e.message || '历史记录加载失败'
+  }
 }
 
 watch(() => [selectedSb.value?.id, getVideoUrl(selectedSb.value)], () => { loadSbVideoHistory() })
@@ -4293,10 +4416,14 @@ async function doMerge(ids) {
     toast.error('请先勾选至少一个已生成视频的镜头')
     return
   }
+  lastMergeIds.value = ids
+  mergeError.value = ''
   try {
     await mergeAPI.merge(epId.value, storyboardIds)
     toast.success('拼接中...')
   } catch (e) {
+    // 发起失败：toast 即时反馈 + 内联错误条可重试
+    mergeError.value = e.message || '拼接失败'
     toast.error(e.message || '拼接失败')
     return
   }
@@ -4306,14 +4433,20 @@ async function doMerge(ids) {
       clearInterval(poll)
       if (mergeData.value.status === 'completed') {
         toast.success('拼接完成')
-        loadExportMerges()
+        mergeError.value = ''
+        loadExportMerges(true)
       } else {
-        toast.error(mergeData.value?.error_msg || mergeData.value?.errorMsg || '拼接失败')
+        // 后台拼接失败：内联错误 + 刷新列表同步失败状态到成片卡片
+        mergeError.value = mergeData.value?.error_msg || mergeData.value?.errorMsg || '拼接失败'
+        toast.error(mergeError.value)
+        loadExportMerges(true)
       }
     }
   }, 3000)
 }
 async function loadConfigs() {
+  configsLoading.value = true
+  configsError.value = ''
   try {
     const [imgCfgs, vidCfgs, txtCfgs] = await Promise.all([
       aiConfigAPI.list('image'),
@@ -4323,10 +4456,16 @@ async function loadConfigs() {
     imageConfigs.value = imgCfgs || []
     videoConfigs.value = vidCfgs || []
     textConfigs.value = txtCfgs || []
-  } catch (e) { console.error('Failed to load AI configs', e) }
+  } catch (e) {
+    // 失败不再静默：顶栏内联提示 + 重试，避免模型下拉「无声消失」
+    configsError.value = e.message || '模型配置加载失败'
+    console.error('Failed to load AI configs', e)
+  } finally {
+    configsLoading.value = false
+  }
 }
 
-onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
+onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() })
 </script>
 
 <style scoped>
@@ -5706,6 +5845,16 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   padding-right: 12px;
   border-right: 1px solid var(--border);
 }
+.model-config-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.model-config-hint .btn { padding: 3px 10px; font-size: 12px; }
+.model-config-hint.is-error .tag { margin: 0; }
 .asset-final-prompt {
   display: flex;
   flex-direction: column;
@@ -5932,6 +6081,13 @@ onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
   border-bottom: 1px solid var(--border);
   background: var(--surface-raised);
 }
+.video-history-error-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.video-history-error-row .tag { margin: 0; flex-shrink: 0; }
 .video-player-history-head {
   display: flex;
   align-items: center;
