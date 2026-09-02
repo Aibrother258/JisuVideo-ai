@@ -16,10 +16,7 @@ test('video presets default to direct Seedance 2.0 generation', () => {
 })
 
 test('video presets use official provider endpoints', () => {
-  const presetsStart = settingsPage.indexOf('const providerPresets = {')
-  const quickStart = settingsPage.indexOf('const huobaoQuickConfigs = [')
-  const providerPresets = settingsPage.slice(presetsStart, quickStart)
-  assert.doesNotMatch(providerPresets, /api\.chatfire\.site/)
+  assert.doesNotMatch(settingsPage, /api\.chatfire\.site/)
   assert.match(settingsPage, /https:\/\/ark\.cn-beijing\.volces\.com/)
   assert.doesNotMatch(settingsPage, /https:\/\/dashscope\.aliyuncs\.com/)
   assert.doesNotMatch(settingsPage, /https:\/\/api\.vidu\.com/)
