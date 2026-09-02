@@ -165,6 +165,7 @@ test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error an
   assert.match(settings, /\.test-result\.ok \{ border-color: var\(--success-border-strong\);/)
   assert.match(settings, /\.test-result\.bad \{ border-color: var\(--error-border-strong\);/)
   assert.doesNotMatch(settings, /var\(--accent-bg,/)
+  assert.doesNotMatch(settings, /var\(--border-strong,/)
   // index：source-badge 归 success/new-style token
   assert.match(index, /\.source-badge\.is-existing \{ background: var\(--success-bg\); color: var\(--success-strong\); \}/)
   assert.match(index, /\.source-badge\.is-new \{ background: var\(--new-style-bg\); color: var\(--new-style\); \}/)

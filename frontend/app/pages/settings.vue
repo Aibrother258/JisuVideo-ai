@@ -1995,7 +1995,7 @@ onMounted(() => {
 .model-fetch-list .cfg-model-chip { padding: 3px 9px; font-size: 11px; gap: 4px; }
 .cfg-model-box {
   width: 11px; height: 11px; flex-shrink: 0; border-radius: 3px;
-  border: 1px solid var(--border-strong, var(--border));
+  border: 1px solid var(--border-strong);
   background: transparent;
 }
 .cfg-model-chip.is-selected .cfg-model-box {
