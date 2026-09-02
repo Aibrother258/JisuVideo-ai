@@ -160,21 +160,21 @@ watch(() => route.path, checkAiConfigs)
 .config-banner {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 24px; flex-shrink: 0;
-  font-size: 12.5px; color: #92400e;
-  background: #fffbeb;
-  border-bottom: 1px solid #fde68a;
+  font-size: 12.5px; color: var(--notice-text);
+  background: var(--notice-bg);
+  border-bottom: 1px solid var(--notice-border);
   position: relative; z-index: 9;
 }
 .config-banner-link {
   margin-left: auto;
   font-size: 12.5px; font-weight: 600;
-  color: #b45309; text-decoration: none;
+  color: var(--notice-link); text-decoration: none;
   padding: 2px 10px; border-radius: var(--radius-pill);
-  border: 1px solid #fcd34d;
+  border: 1px solid var(--notice-link-border);
   transition: all 0.18s var(--ease-out);
   line-height: 1.6;
 }
-.config-banner-link:hover { background: #fef3c7; color: #92400e; }
+.config-banner-link:hover { background: var(--notice-link-hover-bg); color: var(--notice-text); }
 
 /* Content */
 .content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }

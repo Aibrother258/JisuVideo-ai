@@ -83,3 +83,38 @@ test('A1 token batch5: episode player dark stage / on-media whites / status outl
   assert.doesNotMatch(episode, /background: #fff/)
   assert.doesNotMatch(episode, /#0b0d10/)
 })
+
+test('A2 batch1: detail asset-kind/status semantic colors and amber notice banner resolve to tokens', () => {
+  const detail = read('../app/views/drama/detail.vue')
+  const layout = read('../app/layouts/default.vue')
+  // 资产类别语义 token（scene 绿 / prop 琥珀；character 沿用 accent）
+  assert.match(studioCss, /--kind-scene:\s*#16a34a;/)
+  assert.match(studioCss, /--kind-scene-strong:\s*#15803d;/)
+  assert.match(studioCss, /--kind-scene-bg:\s*rgba\(34,197,94,0\.10\);/)
+  assert.match(studioCss, /--kind-prop:\s*#b45309;/)
+  assert.match(studioCss, /--kind-prop-bg:\s*rgba\(180,83,9,0\.10\);/)
+  // amber 提示横幅 token（布局 config banner）
+  assert.match(studioCss, /--notice-bg:\s*#fffbeb;/)
+  assert.match(studioCss, /--notice-border:\s*#fde68a;/)
+  assert.match(studioCss, /--notice-text:\s*#92400e;/)
+  assert.match(studioCss, /--notice-link:\s*#b45309;/)
+  assert.match(studioCss, /--notice-link-border:\s*#fcd34d;/)
+  assert.match(studioCss, /--notice-link-hover-bg:\s*#fef3c7;/)
+  // detail 素材分组头改引用（值不变）
+  assert.match(detail, /\.asset-group-head\.is-scene[\s\S]*?border-left-color: var\(--kind-scene\)/)
+  assert.match(detail, /\.asset-group-head\.is-scene[\s\S]*?background: var\(--kind-scene-bg\)[\s\S]*?color: var\(--kind-scene-strong\)/)
+  assert.match(detail, /\.asset-group-head\.is-prop[\s\S]*?border-left-color: var\(--kind-prop\)[\s\S]*?background: var\(--kind-prop-bg\)[\s\S]*?color: var\(--kind-prop\)/)
+  // 「制作中」状态归入 success 家族（原 scene 同值绿 #16a34a 属状态语义）
+  assert.match(detail, /\.ep-status-active[\s\S]*?background: var\(--success-bg\)[\s\S]*?color: var\(--success-strong\)/)
+  assert.match(detail, /\.dot-active[\s\S]*?box-shadow: 0 0 4px var\(--success-border-strong\)/)
+  // detail 素材封面玻璃徽标 → 既有 glass/float token（同值）
+  assert.match(detail, /\.asset-cover-badge[\s\S]*?background: var\(--surface-glass\)[\s\S]*?box-shadow: var\(--shadow-float\)/)
+  // 布局 amber 横幅字面量清零、改引用
+  assert.match(layout, /\.config-banner[\s\S]*?color: var\(--notice-text\)[\s\S]*?background: var\(--notice-bg\)[\s\S]*?border-bottom: 1px solid var\(--notice-border\)/)
+  assert.match(layout, /\.config-banner-link[\s\S]*?color: var\(--notice-link\)[\s\S]*?border: 1px solid var\(--notice-link-border\)/)
+  assert.match(layout, /\.config-banner-link:hover[\s\S]*?background: var\(--notice-link-hover-bg\)[\s\S]*?color: var\(--notice-text\)/)
+  // 批次内字面量清零（A2 前 detail scene/prop 色与 default amber 横幅不复现）
+  assert.doesNotMatch(detail, /#16a34a|#15803d|#b45309/)
+  assert.doesNotMatch(detail, /rgba\(34,197,94|rgba\(180,83,9/)
+  assert.doesNotMatch(layout, /#fffbeb|#fde68a|#fcd34d|#fef3c7|#92400e|#b45309/)
+})
