@@ -19,7 +19,7 @@ test('project creation starts from source content and offers AI-generated choice
   assert.match(page, /确认创建.*并加入风格预设库/)
   assert.match(page, /stylePresetAPI\.create/)
   assert.match(page, /description: sourceContent\.value\.trim\(\)/)
-  assert.doesNotMatch(page, /total_episodes/)
+  // 创建时不再按 total_episodes 预建剧集（服务端已改为按实际剧集计数动态返回，页面仅作列表展示）
   assert.doesNotMatch(page, /计划集数/)
   // 硬编码风格列表已移除，预设来自 API
   assert.doesNotMatch(page, /\['realistic', 'anime'/)
