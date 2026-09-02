@@ -101,6 +101,12 @@
   --shadow-float: 0 1px 4px rgba(0,0,0,0.08);
   /* A1 第四批：彩色徽标/头像方形投影（settings cap-badge/style-detail-badge/provider-badge 三处同值） */
   --shadow-badge: 0 1px 4px rgba(0,0,0,0.12);
+  /* A1 第五批：媒体深色台面（episode 播放舞台/历史/merge/exp 缩略图 letterbox 底 #0b0d10×4，暗色可覆盖） */
+  --media-stage-bg: #0b0d10;
+  /* A1 第五批：成功/警告状态描边（值不变改引用：0.30 步骤完成节点，0.32 视频任务徽标成对描边） */
+  --success-border: rgba(52,199,89,0.30);
+  --success-border-strong: rgba(52,199,89,0.32);
+  --warning-border-strong: rgba(255,159,10,0.32);
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);

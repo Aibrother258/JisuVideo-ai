@@ -4769,7 +4769,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 }
 .pipe-section.is-done .pipe-section-state {
   background: var(--success-bg); color: var(--success);
-  border: 1px solid rgba(52,199,89,0.3);
+  border: 1px solid var(--success-border);
 }
 .pipe-section-dot {
   width: 5px; height: 5px; border-radius: 999px;
@@ -4854,12 +4854,12 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   position: relative;
   z-index: 1;
 }
-.pipe-item.active .pipe-icon { background: var(--sel); border-color: var(--sel); color: #fff; }
-.pipe-item.done .pipe-icon { background: var(--success-bg); border-color: rgba(52,199,89,0.3); color: var(--success); }
-.pipe-item.active.done .pipe-icon { background: var(--sel); border-color: var(--sel); color: #fff; }
-.icon-active { background: var(--sel) !important; border-color: var(--sel) !important; color: #fff !important; }
-.icon-done { background: var(--success-bg) !important; border-color: rgba(52,199,89,0.3) !important; color: var(--success) !important; }
-.pipe-item.active.done .icon-done { background: var(--sel) !important; border-color: var(--sel) !important; color: #fff !important; }
+.pipe-item.active .pipe-icon { background: var(--sel); border-color: var(--sel); color: var(--text-invert); }
+.pipe-item.done .pipe-icon { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.pipe-item.active.done .pipe-icon { background: var(--sel); border-color: var(--sel); color: var(--text-invert); }
+.icon-active { background: var(--sel) !important; border-color: var(--sel) !important; color: var(--text-invert) !important; }
+.icon-done { background: var(--success-bg) !important; border-color: var(--success-border) !important; color: var(--success) !important; }
+.pipe-item.active.done .icon-done { background: var(--sel) !important; border-color: var(--sel) !important; color: var(--text-invert) !important; }
 
 .pipe-label { flex: 1; font-size: 11px; }
 .pipe-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -4961,7 +4961,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   font-size: 12px;
 }
 .stage-subnav-item.active {
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--text-0);
   box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 }
@@ -5126,7 +5126,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--text-1);
   cursor: pointer;
   text-align: left;
@@ -5138,7 +5138,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   box-shadow: var(--shadow-card);
 }
 .storyboard-shot-card.active {
-  background: #fff;
+  background: var(--surface-raised);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(0,113,227,0.15);
 }
@@ -5360,7 +5360,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 7px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface-raised);
   cursor: pointer;
   transition: border-color 0.15s var(--ease-out), opacity 0.15s var(--ease-out);
 }
@@ -5616,7 +5616,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   color: var(--accent-text);
   box-shadow: none;
 }
-.asset-btn-batch:hover { background: var(--accent); color: #fff; }
+.asset-btn-batch:hover { background: var(--accent); color: var(--text-invert); }
 
 /* 资产分区标题：新增入口 + 卡片删除按钮 */
 .asset-section-title { display: flex; align-items: center; gap: 8px; }
@@ -5649,7 +5649,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   justify-content: center;
   border: none;
   background: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  color: var(--text-invert);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background 0.15s;
@@ -5669,7 +5669,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text-invert);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -5938,10 +5938,10 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   align-items: center;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  background: var(--surface-glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-float);
   color: var(--text-2);
   font-size: 9.5px;
   font-weight: 700;
@@ -6034,7 +6034,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .frame-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .frame-re {
   position: absolute; top: 3px; right: 3px; width: 18px; height: 18px;
-  border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff;
+  border-radius: 50%; background: rgba(0,0,0,0.5); color: var(--text-invert);
   display: none; align-items: center; justify-content: center;
 }
 .frame-thumb:hover .frame-re { display: flex; }
@@ -6141,7 +6141,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   overflow: hidden;
   border: 1.5px solid var(--surface-outline);
   border-radius: var(--radius);
-  background: #0b0d10;
+  background: var(--media-stage-bg);
   cursor: pointer;
   transition: border-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
 }
@@ -6166,7 +6166,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 1px 4px;
   border-radius: 3px;
   background: rgba(0,0,0,0.6);
-  color: #fff;
+  color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 9px;
 }
@@ -6177,7 +6177,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 1px 5px;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--text-invert);
   font-size: 9px;
   font-weight: 700;
 }
@@ -6193,7 +6193,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border: 0;
   border-radius: 50%;
   background: rgba(0,0,0,0.62);
-  color: #fff;
+  color: var(--text-invert);
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
@@ -6230,7 +6230,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0b0d10;
+  background: var(--media-stage-bg);
 }
 .video-player-video {
   width: 100%;
@@ -6306,7 +6306,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-task-metric.is-done,
 .video-task-status.is-done {
   color: var(--success);
-  border-color: rgba(52,199,89,0.32);
+  border-color: var(--success-border-strong);
   background: var(--success-bg);
 }
 .video-task-metric.is-pending,
@@ -6320,7 +6320,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-task-status.is-failed,
 .video-task-status.is-blocked {
   color: var(--warning);
-  border-color: rgba(255,159,10,0.32);
+  border-color: var(--warning-border-strong);
   background: var(--warning-bg);
 }
 .video-task-table {
@@ -6389,7 +6389,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 1px 5px;
   border-radius: 4px;
   background: rgba(0,0,0,0.56);
-  color: #fff;
+  color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 800;
@@ -6529,7 +6529,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 4px 6px;
   overflow: hidden;
   background: rgba(0,0,0,0.55);
-  color: #fff;
+  color: var(--text-invert);
   font-size: 10px;
   text-align: left;
   text-overflow: ellipsis;
@@ -6600,7 +6600,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .ref-asset-audio-preview { height: 112px; display: grid; place-items: center; border-radius: calc(var(--radius) - 2px); background: linear-gradient(145deg, var(--accent-bg), var(--bg-2)); color: var(--accent); font-size: 36px; }
 .ref-asset-card strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .ref-asset-card small { color: var(--text-3); font-size: 10px; }
-.ref-asset-card-check { position: absolute; top: 13px; right: 13px; z-index: 1; padding: 3px 6px; border-radius: 999px; background: rgba(20,20,24,.72); color: #fff; font-size: 9px; }
+.ref-asset-card-check { position: absolute; top: 13px; right: 13px; z-index: 1; padding: 3px 6px; border-radius: 999px; background: rgba(20,20,24,.72); color: var(--text-invert); font-size: 9px; }
 .ref-asset-picker-empty { min-height: 220px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); font-size: 12px; }
 
 /* Prod grid */
@@ -6619,11 +6619,11 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .prod-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .prod-idx {
   position: absolute; top: 5px; left: 5px; font-size: 10px; font-weight: 700;
-  font-family: var(--font-mono); background: rgba(0,0,0,0.5); color: #fff; padding: 1px 5px; border-radius: 3px;
+  font-family: var(--font-mono); background: rgba(0,0,0,0.5); color: var(--text-invert); padding: 1px 5px; border-radius: 3px;
 }
 .prod-overlay-badge {
   position: absolute; bottom: 5px; right: 5px; font-size: 10px; font-weight: 600;
-  background: var(--success); color: #fff; padding: 1px 5px; border-radius: 3px;
+  background: var(--success); color: var(--text-invert); padding: 1px 5px; border-radius: 3px;
 }
 .prod-info { padding: 10px 12px 8px; }
 .prod-desc { font-size: 12px; line-height: 1.4; }
@@ -7007,7 +7007,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .image-viewer-dialog {
   width: min(1100px, calc(100vw - 56px));
   max-height: calc(100vh - 56px);
-  background: rgba(255,255,255,0.85);
+  background: var(--surface-glass);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
@@ -7057,14 +7057,14 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   gap: 6px;
   padding: 8px;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
 }
 .merge-card video {
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
-  background: #0b0d10;
+  background: var(--media-stage-bg);
   display: block;
 }
 .merge-card-pending {
@@ -7094,7 +7094,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   justify-content: center;
   border-radius: 6px;
   background: rgba(0,0,0,0.28);
-  color: #fff;
+  color: var(--text-invert);
   opacity: 0;
   transition: opacity 0.15s var(--ease-out);
   pointer-events: none;
@@ -7132,7 +7132,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
 }
-.exp-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px; border-radius: var(--radius); background: #fff; border: 1px solid var(--border); }
+.exp-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px; border-radius: var(--radius); background: var(--surface-raised); border: 1px solid var(--border); }
 .exp-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
 .exp-card.playable { cursor: pointer; }
 .exp-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,113,227,0.15); }
@@ -7148,7 +7148,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,0.9);
   background: rgba(0,0,0,0.35);
-  color: #fff;
+  color: var(--text-invert);
 }
 .exp-check.on { background: var(--accent); border-color: var(--accent); }
 .exp-thumb {
@@ -7158,7 +7158,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   overflow: hidden;
   border: 1px solid var(--surface-outline);
   border-radius: 6px;
-  background: #0b0d10;
+  background: var(--media-stage-bg);
 }
 .exp-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .exp-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
@@ -7169,7 +7169,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 1px 5px;
   border-radius: 4px;
   background: rgba(0,0,0,0.56);
-  color: #fff;
+  color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 800;
@@ -7181,7 +7181,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 1px 4px;
   border-radius: 3px;
   background: rgba(0,0,0,0.6);
-  color: #fff;
+  color: var(--text-invert);
   font-family: var(--font-mono);
   font-size: 9px;
 }

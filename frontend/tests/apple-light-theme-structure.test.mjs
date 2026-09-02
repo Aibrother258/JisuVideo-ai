@@ -52,3 +52,34 @@ test('A1 token batch4: badge/on-dark/panel whites resolve to tokens across core 
   for (const src of [settings, dialog, layout, detail]) assert.doesNotMatch(src, /color: #fff/)
   assert.doesNotMatch(settings, /rgba\(0, 0, 0, 0\.12\)/)
 })
+
+test('A1 token batch5: episode player dark stage / on-media whites / status outlines resolve to tokens', () => {
+  const episode = read('../app/views/drama/episode.vue')
+  // 媒体深色台面 token（letterbox 底 #0b0d10×4：历史缩略图 / 播放舞台 / merge 卡视频 / exp 缩略图）
+  assert.match(studioCss, /--media-stage-bg: #0b0d10;/)
+  assert.match(episode, /\.video-history-item[\s\S]*?background: var\(--media-stage-bg\)/)
+  assert.match(episode, /\.video-player-stage[\s\S]*?background: var\(--media-stage-bg\)/)
+  assert.match(episode, /\.merge-card video[\s\S]*?background: var\(--media-stage-bg\)/)
+  assert.match(episode, /\.exp-thumb[\s\S]*?background: var\(--media-stage-bg\)/)
+  // 状态描边：0.30 步骤完成节点 / 0.32 视频任务成功·失败徽标成对描边
+  assert.match(studioCss, /--success-border: rgba\(52,199,89,0\.30\);/)
+  assert.match(studioCss, /--success-border-strong: rgba\(52,199,89,0\.32\);/)
+  assert.match(studioCss, /--warning-border-strong: rgba\(255,159,10,0\.32\);/)
+  assert.match(episode, /\.pipe-item\.done \.pipe-icon[\s\S]*?border-color: var\(--success-border\)/)
+  assert.match(episode, /\.video-task-metric\.is-done,[\s\S]*?border-color: var\(--success-border-strong\)/)
+  assert.match(episode, /\.video-task-status\.is-blocked[\s\S]*?border-color: var\(--warning-border-strong\)/)
+  // 深底/彩底白字 → 反色文字 token（播放器叠层、勾选、角标、成功徽标等）
+  assert.match(episode, /\.asset-del-btn[\s\S]*?color: var\(--text-invert\)/)
+  assert.match(episode, /\.shot-check[\s\S]*?color: var\(--text-invert\)/)
+  assert.match(episode, /\.video-history-time[\s\S]*?color: var\(--text-invert\)/)
+  assert.match(episode, /\.prod-overlay-badge[\s\S]*?color: var\(--text-invert\)/)
+  assert.match(episode, /\.exp-thumb-duration[\s\S]*?color: var\(--text-invert\)/)
+  // 白底卡/激活块 → 表面 token；玻璃徽标/浮层 → 既有 glass/float token
+  assert.match(episode, /\.stage-subnav-item\.active[\s\S]*?background: var\(--surface-raised\)/)
+  assert.match(episode, /\.merge-card[\s\S]*?background: var\(--surface-raised\)/)
+  assert.match(episode, /\.asset-cover-badge[\s\S]*?background: var\(--surface-glass\)/)
+  // 批次内 #fff 白字白底与深色台面字面量清零（#000/#111/半透明白等单次低价值字面量留待 A2 色板）
+  assert.doesNotMatch(episode, /color: #fff/)
+  assert.doesNotMatch(episode, /background: #fff/)
+  assert.doesNotMatch(episode, /#0b0d10/)
+})
