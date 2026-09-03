@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v2.1
+> 版本：v2.2
 > 日期：2026-09-03
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1 起步——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）及 detail/episode 标准弹窗迁移（PR #31）均随三批 PR 合入，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；P2 余 B1 后续组件（StatusBadge/EmptyState/Skeleton/LoadingButton/Field）与 B2/B3 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）与 StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）均随四批 PR 合入，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；B1 余 EmptyState/Skeleton/LoadingButton/Field 与 B2/B3 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -23,6 +23,7 @@
 | v1.9 | 2026-09-03 | P1 推进记录（续，**A2 收口**）：PR #25 合入 `1c090e1`（A2 批次一：detail 资产类别 scene/prop 与 amber 横幅收敛为语义 token + 语义色板规范 v1，归档见 `docs/pr-records/2026-09-03-ui-semantic-a2-batch1.md`，索引 HB-20260903-05）；PR #26 合入 `5b9ae75`（A2 批次二：episode 媒体遮罩/白字/焦点环收敛、R5/R6 全仓清理、`--new-style` 家族，规范升 v2，经两轮 R5 补漏评审收口，归档见 `docs/pr-records/2026-09-03-ui-semantic-a2-batch2.md`，索引 HB-20260903-06）。A2 全部收口，遗留字面量与 R3 归一记录归档于规范 §5/§6；P1 余 A3（动效体系化）待排期 |
 | v2.0 | 2026-09-03 | P1 推进记录（续，**P1 全部收口**）：PR #28 合入 `72edeac`（A3 动效体系化：studio.css 新增六档时长 token `--dur-instant/fast/base/med/slow/stagger`，`--dur-slow` 取 0.30/0.32/0.35 中值 0.32 守 0.03s 归一边界；约 30 处默认 ease 显式补 `--ease-out`；detail/index 局部 `@keyframes spin` 收敛至 studio.css 单一来源；settings 内联 `transition:'0.2s'`（缺属性名被忽略）修复；新增动效规范 v1 `docs/ui-motion-spec.md`；经一轮 dur-slow 偏差评审修正，归档见 `docs/pr-records/2026-09-03-ui-motion-a3.md`，索引 HB-20260903-07）。**P1（A1/A2/A3）至此全部收口**，动效与语义色板两规范并列为基准；下一步 P2（组件化/拆分）或暗色主题批次可启动 |
 | v2.1 | 2026-09-03 | P2 推进记录（续，**P2-B1 起步收口**）：B1 通用弹窗/抽屉组件抽取经三批 PR 全部合入——PR #30 `c9be4df`（新增 `AppDialog`：`.overlay>.dialog` 骨架 + head/body/foot 三段 + form 开关 + `width` prop 内联宽度 + Esc/遮罩统一关闭；settings 四个配置/风格弹窗迁移，归档见 `docs/pr-records/2026-09-03-ui-b1-dialog-batch1.md`）、PR #31 `04b128a`（detail 创建新集 + episode 新增资产/参考资产选择三处标准弹窗迁移，AppDialog 增 `dialogStyle` 多维尺寸 prop 与 `:style` 数组合并，`ref-asset-picker-overlay` 经组件根透传保留 z-index:120，归档见 `docs/pr-records/2026-09-03-ui-b1-dialog-batch2.md`）、PR #32 `e23ec12`（新增 `AppDrawer`：右侧滑出骨架 + `z-index:118` + `appDrawerIn` 复用 A3 动效 token + 关闭协议对齐；episode 任务抽屉迁移，Esc 经 `esc-close=false` 显式交还页面级 imageViewer→assetDetail→taskDrawer 优先级协议，归档见 `docs/pr-records/2026-09-03-ui-b1-dialog-batch3.md`，索引 HB-20260903-08/09/10）。**边界**：仅标准 head/body/foot 弹窗与标准右侧抽屉迁入组件，素材详情/viewer/多步创建等深度定制界面保留手写（结构测试守卫）；评审建议「最上层弹窗独占 Esc + 焦点返回」记录在案转深度定制界面专项；B1 余 StatusBadge/EmptyState/Skeleton/LoadingButton/Field 与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
+| v2.2 | 2026-09-03 | P2 推进记录（续，**B1 组件再收一子**）：PR #34 合入 `d61683f`（新增 `StatusBadge`：cover 封面玻璃角标 / pill 行内胶囊双形态 + `state` 三态语义 token 映射；detail/episode 共 8 处手写 `.asset-cover-badge`/`.mat-detail-state`/`.asset-detail-state` 迁移，样式逐字节下沉、状态判断与文案留在调用页；原 A1 batch5/A2 batch1 断言改指组件 `.sb-cover`，新增 batch4 断言组，归档见 `docs/pr-records/2026-09-03-ui-b1-badge-batch4.md`，索引 HB-20260903-11）。**边界**：组件只收「形态+状态样式」，中文文案与业务条件不外提；cover 态定位上下文依赖调用页父容器 `position:relative`；B1 余 EmptyState/Skeleton/LoadingButton/Field 与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
 
 ---
 
