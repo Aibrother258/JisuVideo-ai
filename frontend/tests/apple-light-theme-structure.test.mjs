@@ -414,3 +414,42 @@ test('B1 batch6: LoadingButton owns busy-disabled button with spinner, settings 
   assert.match(index, /\.spinner-sm/)
   assert.match(episode, /\.step-loading/)
 })
+
+test('B1 batch7: episode Loader2 icon buttons migrated to LoadingButton, page keeps non-button load states', () => {
+  const lb = read('../app/components/LoadingButton.vue')
+  const episode = read('../app/views/drama/episode.vue')
+  // import 自包含 + 组件内 Loader2 import（batch6 复核结论延续）
+  assert.match(episode, /import LoadingButton from '~\/components\/LoadingButton\.vue'/)
+  assert.match(lb, /import \{ Loader2 \} from 'lucide-vue-next'/)
+  // 迁移面抽样：资产提取（单目标 v-for + 全量）、角色/场景/道具卡行生成与上传、
+  // 剧本改写、分镜拆分（bar + 空态 + videos 空态）、批量提示词（bar + 选择栏 + videos bar）、
+  // 视频提示词与 H3（storyboard prompt stack + video inspector）、资产详情（提示词/上传/保存）、资产新增
+  assert.match(episode, /:loading="isExtracting\(t\.key\)"/)
+  assert.match(episode, /:loading="!!extractingTargets\.length"/)
+  assert.match(episode, /:loading="isPendingCharImage\(c\.id\)"/)
+  assert.match(episode, /:loading="isUploadingAsset\('character', c\.id\)"/)
+  assert.match(episode, /:loading="isPendingSceneImage\(s\.id\)"/)
+  assert.match(episode, /:loading="isUploadingAsset\('scene', s\.id\)"/)
+  assert.match(episode, /:loading="isPendingPropImage\(p\.id\)"/)
+  assert.match(episode, /:loading="isUploadingAsset\('prop', p\.id\)"/)
+  assert.match(episode, /:loading="rn && rt === 'script_rewriter'"/)
+  assert.match(episode, /:loading="rt === 'storyboard_breaker'"/)
+  assert.match(episode, /:loading="videoPromptBatch\.running"/)
+  assert.match(episode, /:loading="videoPromptGeneratingIds\.includes\(selectedSb\?\.id\)"/)
+  assert.match(episode, /:loading="minimaxH3PromptGeneratingIds\.includes\(selectedSb\?\.id\)"/)
+  assert.match(episode, /:loading="isGeneratingPrompt\(assetDetail\.type, assetDetail\.item\.id\)"/)
+  assert.match(episode, /:loading="isUploadingAsset\(assetDetail\.type, assetDetail\.item\.id\)"/)
+  assert.match(episode, /:loading="savingAssetDetail"/)
+  assert.match(episode, /:loading="assetCreate\.saving"/)
+  assert.match(episode, /#icon/)
+  // busy 与 disabled 分离：组件 only 收敛 loading 恒禁用，其余额外禁用仍留在调用页
+  assert.match(episode, /:disabled="rn && rt !== 'script_rewriter'"/)
+  assert.match(episode, /:disabled="!selectedSbIds\.length"/)
+  assert.match(episode, /:disabled="videoPromptBatch\.running"/)
+  // 页面手写按钮内 Loader2 spinner 清零：episode 剩余 Loader2 仅限
+  // 「整块加载态」（.step-loading 24px ×3）、视频任务缩略图占位（18px）、素材库加载占位（18px）
+  assert.match(episode, /\.step-loading/)
+  assert.match(episode, /<Loader2 :size="24" class="animate-spin"/)
+  assert.match(episode, /<Loader2 v-if="genTaskStateClass\(row\.status\) === 'pending'"/)
+  assert.match(episode, /<Loader2 :size="18" class="animate-spin" \/> 正在加载素材库/)
+})

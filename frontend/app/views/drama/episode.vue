@@ -218,11 +218,10 @@
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
                 跳过改写
               </button>
-              <button v-if="scriptContent" class="btn btn-sm" @click="doRewrite" :disabled="rn">
-                <Loader2 v-if="rn && rt === 'script_rewriter'" :size="11" class="animate-spin" />
-                <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+              <LoadingButton v-if="scriptContent" :loading="rn && rt === 'script_rewriter'" :disabled="rn && rt !== 'script_rewriter'" class="btn btn-sm" spinner-size="11" @click="doRewrite">
+                <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></template>
                 重新改写
-              </button>
+              </LoadingButton>
             </div>
           </div>
 
@@ -274,17 +273,17 @@
               <span class="tag mono">{{ assetReadyCount }}/{{ assetTotalCount }} 已就绪</span>
               <span class="tag">{{ lockedImageConfigLabel }}</span>
               <div class="ml-auto flex gap-1 asset-bar-actions">
-                <button
+                <LoadingButton
                   v-for="t in EXTRACT_TARGETS"
                   :key="t.key"
+                  :loading="isExtracting(t.key)"
                   class="btn btn-sm asset-btn-extract"
-                  :disabled="isExtracting(t.key)"
+                  spinner-size="11"
                   @click="doExtract(t.key)"
                 >
-                  <Loader2 v-if="isExtracting(t.key)" :size="11" class="animate-spin" />
-                  <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></template>
                   {{ (t.key === 'characters' ? chars.length : t.key === 'scenes' ? scenes.length : propItems.length) ? `重提${t.label}` : `提取${t.label}` }}
-                </button>
+                </LoadingButton>
                 <span class="asset-bar-divider" />
                 <button class="btn btn-sm asset-btn-batch" @click="batchCharImages">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -317,11 +316,10 @@
               </div>
               <div class="empty-title">开始提取资产</div>
               <div class="empty-desc">角色、场景和道具会在提取后显示在这里，可分别单独提取，也可一键并行提取全部。</div>
-              <button class="btn btn-primary" :disabled="!!extractingTargets.length" @click="doExtractAll">
-                <Loader2 v-if="extractingTargets.length" :size="13" class="animate-spin" />
-                <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <LoadingButton :loading="!!extractingTargets.length" class="btn btn-primary" spinner-size="13" @click="doExtractAll">
+                <template #icon><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></template>
                 {{ extractingTargets.length ? `正在提取${extractingLabels}…` : '开始提取' }}
-              </button>
+              </LoadingButton>
             </div>
             <template v-else>
             <!-- R1：有旧数据时刷新失败：非破坏性错误条，保留已加载资产 -->
@@ -376,15 +374,13 @@
                           <span>妆造：{{ characterStylingValue(c) }}</span>
                         </div>
                       </div>
-                      <button class="btn btn-sm character-gen-btn" :disabled="isPendingCharImage(c.id)" @click.stop="genCharImg(c.id)">
-                        <Loader2 v-if="isPendingCharImage(c.id)" :size="11" class="animate-spin" />
+                      <LoadingButton class="btn btn-sm character-gen-btn" :loading="isPendingCharImage(c.id)" spinner-size="11" @click.stop="genCharImg(c.id)">
                         {{ (c.image_url || c.imageUrl) ? '重绘' : (isPendingCharImage(c.id) ? '生成中' : '生成') }}
-                      </button>
-                      <button class="btn btn-sm" title="上传角色形象图" :disabled="isUploadingAsset('character', c.id)" @click.stop="uploadAssetImage('character', c.id)">
-                        <Loader2 v-if="isUploadingAsset('character', c.id)" :size="11" class="animate-spin" />
-                        <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      </LoadingButton>
+                      <LoadingButton class="btn btn-sm" title="上传角色形象图" :loading="isUploadingAsset('character', c.id)" spinner-size="11" @click.stop="uploadAssetImage('character', c.id)">
+                        <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></template>
                         上传
-                      </button>
+                      </LoadingButton>
                     </div>
                   </div>
                   <div class="asset-final-prompt" :title="c.final_prompt || c.finalPrompt || ''">
@@ -438,15 +434,13 @@
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', (s.image_url || s.imageUrl) && 'ok', isPendingSceneImage(s.id) && 'pending']" />
-                  <button class="btn btn-sm ml-auto" title="上传场景图" :disabled="isUploadingAsset('scene', s.id)" @click.stop="uploadAssetImage('scene', s.id)">
-                    <Loader2 v-if="isUploadingAsset('scene', s.id)" :size="11" class="animate-spin" />
-                    <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <LoadingButton class="btn btn-sm ml-auto" title="上传场景图" :loading="isUploadingAsset('scene', s.id)" spinner-size="11" @click.stop="uploadAssetImage('scene', s.id)">
+                    <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></template>
                     上传
-                  </button>
-                  <button class="btn btn-sm" :disabled="isPendingSceneImage(s.id)" @click.stop="genSceneImg(s.id)">
-                    <Loader2 v-if="isPendingSceneImage(s.id)" :size="11" class="animate-spin" />
+                  </LoadingButton>
+                  <LoadingButton class="btn btn-sm" :loading="isPendingSceneImage(s.id)" spinner-size="11" @click.stop="genSceneImg(s.id)">
                     {{ (s.image_url || s.imageUrl) ? '重绘' : (isPendingSceneImage(s.id) ? '生成中' : '生成') }}
-                  </button>
+                  </LoadingButton>
                 </div>
               </div>
             </div>
@@ -495,15 +489,13 @@
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', (p.image_url || p.imageUrl) && 'ok', isPendingPropImage(p.id) && 'pending']" />
-                  <button class="btn btn-sm ml-auto" title="上传道具图" :disabled="isUploadingAsset('prop', p.id)" @click.stop="uploadAssetImage('prop', p.id)">
-                    <Loader2 v-if="isUploadingAsset('prop', p.id)" :size="11" class="animate-spin" />
-                    <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <LoadingButton class="btn btn-sm ml-auto" title="上传道具图" :loading="isUploadingAsset('prop', p.id)" spinner-size="11" @click.stop="uploadAssetImage('prop', p.id)">
+                    <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></template>
                     上传
-                  </button>
-                  <button class="btn btn-sm" :disabled="isPendingPropImage(p.id)" @click.stop="genPropImg(p.id)">
-                    <Loader2 v-if="isPendingPropImage(p.id)" :size="11" class="animate-spin" />
+                  </LoadingButton>
+                  <LoadingButton class="btn btn-sm" :loading="isPendingPropImage(p.id)" spinner-size="11" @click.stop="genPropImg(p.id)">
                     {{ (p.image_url || p.imageUrl) ? '重绘' : (isPendingPropImage(p.id) ? '生成中' : '生成') }}
-                  </button>
+                  </LoadingButton>
                 </div>
               </div>
             </div>
@@ -518,16 +510,14 @@
               <span class="tag mono">{{ sbs.length }} 段落 · {{ totalDuration }}s</span>
               <span class="tag">{{ lockedVideoConfigLabel }}</span>
               <div class="ml-auto flex gap-1">
-                <button class="btn btn-sm" :disabled="rn" @click="doBreakdown">
-                  <Loader2 v-if="rt === 'storyboard_breaker'" :size="11" class="animate-spin" />
-                  <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <LoadingButton :loading="rt === 'storyboard_breaker'" :disabled="rn && rt !== 'storyboard_breaker'" class="btn btn-sm" spinner-size="11" @click="doBreakdown">
+                  <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></template>
                   {{ sbs.length ? '重新拆分' : '开始拆分' }}
-                </button>
-                <button class="btn btn-sm" :disabled="videoPromptBatch.running || !sbs.length" @click="batchVideoPrompts">
-                  <Loader2 v-if="videoPromptBatch.running" :size="11" class="animate-spin" />
-                  <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </LoadingButton>
+                <LoadingButton :loading="videoPromptBatch.running" :disabled="!sbs.length" class="btn btn-sm" spinner-size="11" @click="batchVideoPrompts">
+                  <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></template>
                   {{ videoPromptBatch.running ? `提示词 ${videoPromptBatch.completed}/${videoPromptBatch.total}` : (selectedSbIds.length ? `生成所选提示词(${selectedSbIds.length})` : '批量视频提示词') }}
-                </button>
+                </LoadingButton>
               </div>
             </div>
 
@@ -606,10 +596,9 @@
                     <span class="shot-select-count">已选 {{ selectedSbIds.length }} 个</span>
                     <button class="btn btn-sm" @click="exitSbSelectMode">取消</button>
                   </div>
-                  <button class="btn btn-sm btn-primary shot-select-go" :disabled="!selectedSbIds.length || videoPromptBatch.running" @click="generateSelectedVideoPrompts">
-                    <Loader2 v-if="videoPromptBatch.running" :size="11" class="animate-spin" />
+                  <LoadingButton :loading="videoPromptBatch.running" :disabled="!selectedSbIds.length" class="btn btn-sm btn-primary shot-select-go" spinner-size="11" @click="generateSelectedVideoPrompts">
                     {{ videoPromptBatch.running ? `生成中 ${videoPromptBatch.completed}/${videoPromptBatch.total}` : `生成视频提示词(${selectedSbIds.length})` }}
-                  </button>
+                  </LoadingButton>
                 </div>
               </aside>
 
@@ -689,15 +678,16 @@
                     <div ref="storyboardVideoPromptEl" class="detail-section">
                       <div class="detail-section-head">
                         <span class="detail-section-title">视频提示词</span>
-                        <button
+                        <LoadingButton
+                          :loading="videoPromptGeneratingIds.includes(selectedSb?.id)"
+                          :disabled="videoPromptBatch.running"
                           type="button"
                           class="btn btn-sm"
-                          :disabled="videoPromptGeneratingIds.includes(selectedSb?.id) || videoPromptBatch.running"
+                          spinner-size="11"
                           @click="genVideoPrompt(selectedSb)"
                         >
-                          <Loader2 v-if="videoPromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
                           {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? '重新生成' : 'AI 生成' }}
-                        </button>
+                        </LoadingButton>
                       </div>
                       <div class="detail-section-copy">根据当前分镜的画面描述（含台词/旁白）与氛围生成</div>
                       <MentionTextarea
@@ -724,15 +714,15 @@
                     <div class="detail-section">
                       <div class="detail-section-head">
                         <span class="detail-section-title">MiniMax H3 大模型提示词</span>
-                        <button
+                        <LoadingButton
+                          :loading="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)"
                           type="button"
                           class="btn btn-sm"
-                          :disabled="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)"
+                          spinner-size="11"
                           @click="genMinimaxH3Prompt(selectedSb)"
                         >
-                          <Loader2 v-if="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
                           MiniMax H3 提示词
-                        </button>
+                        </LoadingButton>
                       </div>
                       <div class="detail-section-copy">根据中文版视频提示词和实际参考素材顺序生成；不会覆盖中文版</div>
                       <textarea
@@ -830,11 +820,10 @@
               </div>
               <div class="empty-title">开始拆分分镜</div>
               <div class="empty-desc">根据剧本、角色和场景拆分镜头，生成分镜描述和绑定信息。</div>
-              <button class="btn btn-primary" :disabled="rn" @click="doBreakdown">
-                <Loader2 v-if="rt === 'storyboard_breaker'" :size="13" class="animate-spin" />
-                <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <LoadingButton :loading="rt === 'storyboard_breaker'" :disabled="rn && rt !== 'storyboard_breaker'" class="btn btn-primary" spinner-size="13" @click="doBreakdown">
+                <template #icon><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></template>
                 开始拆分
-              </button>
+              </LoadingButton>
             </div>
           </div>
 
@@ -844,11 +833,10 @@
               <span class="dim" style="font-size:12px">{{ sbs.length }} 个镜头</span>
               <span class="tag mono">{{ shotVidCount }}/{{ sbs.length }} 已生成</span>
               <div class="ml-auto flex gap-1">
-                <button class="btn btn-sm" :disabled="videoPromptBatch.running || !sbs.length" @click="batchVideoPrompts">
-                  <Loader2 v-if="videoPromptBatch.running" :size="11" class="animate-spin" />
-                  <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <LoadingButton :loading="videoPromptBatch.running" :disabled="!sbs.length" class="btn btn-sm" spinner-size="11" @click="batchVideoPrompts">
+                  <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></template>
                   {{ videoPromptBatch.running ? `提示词 ${videoPromptBatch.completed}/${videoPromptBatch.total}` : (selectedSbIds.length ? `生成所选提示词(${selectedSbIds.length})` : '批量视频提示词') }}
-                </button>
+                </LoadingButton>
                 <button class="btn btn-sm" :disabled="!sbs.length" @click="batchVideos">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                   批量视频
@@ -862,11 +850,10 @@
               <div class="empty-title">先生成分镜</div>
               <div class="empty-desc">视频任务来自分镜拆分结果。先生成分镜描述和视频提示词，再批量生成视频。</div>
               <div class="locked-config-banner">当前集视频模型：{{ lockedVideoConfigLabel }}</div>
-              <button class="btn btn-primary" :disabled="rn" @click="prodTab = 'storyboard'; doBreakdown()">
-                <Loader2 v-if="rt === 'storyboard_breaker'" :size="13" class="animate-spin" />
-                <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <LoadingButton :loading="rt === 'storyboard_breaker'" :disabled="rn && rt !== 'storyboard_breaker'" class="btn btn-primary" spinner-size="13" @click="prodTab = 'storyboard'; doBreakdown()">
+                <template #icon><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></template>
                 AI 生成分镜
-              </button>
+              </LoadingButton>
             </div>
             <div
               v-else
@@ -1066,15 +1053,16 @@
                   <section class="video-inspector-section">
                     <div class="video-inspector-prompt-head">
                       <span class="video-inspector-label video-inspector-label-hero">视频提示词</span>
-                      <button
+                      <LoadingButton
+                        :loading="videoPromptGeneratingIds.includes(selectedSb?.id)"
+                        :disabled="videoPromptBatch.running"
                         type="button"
                         class="btn btn-sm"
-                        :disabled="videoPromptGeneratingIds.includes(selectedSb?.id) || videoPromptBatch.running"
+                        spinner-size="11"
                         @click="genVideoPrompt(selectedSb)"
                       >
-                        <Loader2 v-if="videoPromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
                         {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? '重新生成' : 'AI 生成' }}
-                      </button>
+                      </LoadingButton>
                     </div>
                     <MentionTextarea
                       :model-value="selectedSb.video_prompt || selectedSb.videoPrompt || ''"
@@ -1092,15 +1080,15 @@
                         <span class="video-inspector-label video-inspector-label-hero">MiniMax H3 大模型提示词</span>
                         <div class="video-inspector-hint">按实际参考素材自动选择 T2VA / I2VA / Ref2VA</div>
                       </div>
-                      <button
+                      <LoadingButton
+                        :loading="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)"
                         type="button"
                         class="btn btn-sm"
-                        :disabled="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)"
+                        spinner-size="11"
                         @click="genMinimaxH3Prompt(selectedSb)"
                       >
-                        <Loader2 v-if="minimaxH3PromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
                         MiniMax H3 提示词
-                      </button>
+                      </LoadingButton>
                     </div>
                     <textarea
                       :value="selectedSb.minimax_h3_prompt || selectedSb.minimaxH3Prompt || ''"
@@ -1661,14 +1649,15 @@
               <div class="asset-detail-section-title">
                 <span>{{ assetDetail.type === 'character' ? '最终提示词 · 三视图' : assetDetail.type === 'scene' ? '最终提示词 · 固定视角' : '最终提示词 · 白底单品' }}</span>
                 <div class="asset-detail-prompt-head-actions">
-                  <button
+                  <LoadingButton
+                    :loading="isGeneratingPrompt(assetDetail.type, assetDetail.item.id)"
+                    :disabled="isAssetImagePending(assetDetail.type, assetDetail.item.id)"
                     class="btn btn-sm"
-                    :disabled="isGeneratingPrompt(assetDetail.type, assetDetail.item.id) || isAssetImagePending(assetDetail.type, assetDetail.item.id)"
+                    spinner-size="11"
                     @click="genAssetFinalPrompt"
                   >
-                    <Loader2 v-if="isGeneratingPrompt(assetDetail.type, assetDetail.item.id)" :size="11" class="animate-spin" />
                     {{ isGeneratingPrompt(assetDetail.type, assetDetail.item.id) ? '生成中' : (assetFinalPrompt ? '重新生成' : '生成提示词') }}
-                  </button>
+                  </LoadingButton>
                   <StatusBadge :state="assetFinalPrompt ? 'ready' : ''">
                     {{ assetFinalPrompt ? '已生成' : '待生成' }}
                   </StatusBadge>
@@ -1709,15 +1698,15 @@
               <button class="btn" @click="closeAssetDetail">关闭</button>
             </div>
             <div class="asset-detail-primary-actions">
-              <button
+              <LoadingButton
+                :loading="isUploadingAsset(assetDetail.type, assetDetail.item.id)"
                 class="btn"
-                :disabled="isUploadingAsset(assetDetail.type, assetDetail.item.id)"
+                spinner-size="11"
                 @click="uploadAssetImage(assetDetail.type, assetDetail.item.id)"
               >
-                <Loader2 v-if="isUploadingAsset(assetDetail.type, assetDetail.item.id)" :size="11" class="animate-spin" />
-                <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></template>
                 上传图片
-              </button>
+              </LoadingButton>
               <button
                 v-if="assetDetail.type === 'character'"
                 class="btn"
@@ -1742,10 +1731,9 @@
               >
                 {{ assetImageSrc(assetDetail.item) ? '重绘道具图' : (isPendingPropImage(assetDetail.item.id) ? '生成中' : '生成道具图') }}
               </button>
-              <button class="btn btn-primary" :disabled="savingAssetDetail" @click="saveAssetDetail">
-                <Loader2 v-if="savingAssetDetail" :size="12" class="animate-spin" />
+              <LoadingButton :loading="savingAssetDetail" class="btn btn-primary" spinner-size="12" @click="saveAssetDetail">
                 保存修改
-              </button>
+              </LoadingButton>
             </div>
           </footer>
         </section>
@@ -1870,10 +1858,9 @@
         </div>
         <template #foot>
           <button class="btn" @click="assetCreate.open = false">取消</button>
-          <button class="btn btn-primary" :disabled="assetCreate.saving" @click="saveAssetCreate">
-            <Loader2 v-if="assetCreate.saving" :size="12" class="animate-spin" />
+          <LoadingButton :loading="assetCreate.saving" class="btn btn-primary" spinner-size="12" @click="saveAssetCreate">
             新增
-          </button>
+          </LoadingButton>
         </template>
       </AppDialog>
 
@@ -1901,6 +1888,7 @@ import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propA
 import AppDialog from '~/components/AppDialog.vue'
 import AppDrawer from '~/components/AppDrawer.vue'
 import StatusBadge from '~/components/StatusBadge.vue'
+import LoadingButton from '~/components/LoadingButton.vue'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
