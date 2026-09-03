@@ -69,23 +69,27 @@ test('detail/episode top-level loading shows skeleton and inline error instead o
 
 test('export panel shows inline merge error with retry and list load states', () => {
   const ep = read('app/views/drama/episode.vue')
-  // 拼接失败内联横幅（内联错误条 + 重试/关闭）
-  assert.match(ep, /v-if="mergeError" class="app-state-inline app-state-error"/)
-  assert.match(ep, /@click="doMerge\(lastMergeIds\)"/)
-  assert.match(ep, /@click="mergeError = ''"/)
-  // 发起失败与后台轮询失败都写入内联错误（不再只依赖 toast）
+  // P2-B2：拼接导出面板已下沉 EpisodeExportPanel.vue；面板 UI 三态在组件内，主壳保留 doMerge/轮询
+  const panel = read('app/components/EpisodeExportPanel.vue')
+  // 拼接失败内联横幅（内联错误条 + 重试/关闭）随 UI 下沉组件，重试/关闭经事件回主壳
+  assert.match(panel, /v-if="mergeError" class="app-state-inline app-state-error"/)
+  assert.match(panel, /@click="emit\('retry-merge'\)"/)
+  assert.match(panel, /@click="emit\('clear-merge-error'\)"/)
+  // 发起失败与后台轮询失败都写入内联错误（仍在主壳 doMerge 内，经 mergeError prop 呈现在组件）
   assert.match(ep, /catch \(e\) \{[\s\S]*?mergeError\.value = e\.message \|\| '拼接失败'/)
   assert.match(ep, /mergeError\.value = mergeData\.value\?\.error_msg \|\| mergeData\.value\?\.errorMsg \|\| '拼接失败'/)
-  // 成片列表三态：骨架 / 内联错误 / 列表
-  assert.match(ep, /const exportListLoading = ref\(false\)/)
-  assert.match(ep, /const exportListError = ref\(''\)/)
-  assert.match(ep, /v-if="exportListError" class="app-state app-state-error compact-state"/)
-  assert.match(ep, /v-else-if="exportListLoading && !exportMerges\.length"/)
-  assert.match(ep, /@click="loadExportMerges\(true\)"/)
+  // 成片列表三态：骨架 / 内联错误 / 列表（随组件下沉）
+  assert.match(panel, /const exportListLoading = ref\(false\)/)
+  assert.match(panel, /const exportListError = ref\(''\)/)
+  assert.match(panel, /v-if="exportListError" class="app-state app-state-error compact-state"/)
+  assert.match(panel, /v-else-if="exportListLoading && !exportMerges\.length"/)
+  assert.match(panel, /@click="loadExportMerges\(true\)"/)
   // 段头“刷新”按钮是用户显式动作，必须走 initial=true（失败显示内联错误而非静默保留）
-  assert.match(ep, /class="btn btn-sm ml-auto" @click="loadExportMerges\(true\)"/)
-  // 页面初始刷新时成片列表同步走 initial 三态
-  assert.match(ep, /loadExportMerges\(initial\)/)
+  assert.match(panel, /class="btn btn-sm ml-auto" @click="loadExportMerges\(true\)"/)
+  // 面板挂载即走 initial 三态；主壳 refresh/拼接完成后以 listRev 令牌通知静默刷新
+  assert.match(panel, /onMounted\(\(\) => loadExportMerges\(true\)\)/)
+  assert.match(panel, /watch\(\(\) => props\.listRev, \(\) => loadExportMerges\(\)\)/)
+  assert.match(ep, /exportListRev\.value\+\+/)
 })
 
 test('residual silent loads get inline error + retry (drawer/picker/models/history)', () => {

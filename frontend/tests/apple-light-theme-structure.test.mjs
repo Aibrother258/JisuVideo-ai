@@ -11,6 +11,7 @@ const surfaces = [
   read('../app/pages/index.vue'),
   read('../app/views/drama/detail.vue'),
   read('../app/views/drama/episode.vue'),
+  read('../app/components/EpisodeExportPanel.vue'),
   read('../app/pages/settings.vue'),
 ].join('\n')
 
@@ -55,13 +56,15 @@ test('A1 token batch4: badge/on-dark/panel whites resolve to tokens across core 
 
 test('A1 token batch5: episode player dark stage / on-media whites / status outlines resolve to tokens', () => {
   const episode = read('../app/views/drama/episode.vue')
+  // P2-B2：拼接导出面板（merge 卡 / exp 卡）样式随 EpisodeExportPanel.vue 下沉，归入本批次一并守卫
+  const exportPanel = read('../app/components/EpisodeExportPanel.vue')
   const statusBadge = read('../app/components/StatusBadge.vue')
   // 媒体深色台面 token（letterbox 底 #0b0d10×4：历史缩略图 / 播放舞台 / merge 卡视频 / exp 缩略图）
   assert.match(studioCss, /--media-stage-bg: #0b0d10;/)
   assert.match(episode, /\.video-history-item[\s\S]*?background: var\(--media-stage-bg\)/)
   assert.match(episode, /\.video-player-stage[\s\S]*?background: var\(--media-stage-bg\)/)
-  assert.match(episode, /\.merge-card video[\s\S]*?background: var\(--media-stage-bg\)/)
-  assert.match(episode, /\.exp-thumb[\s\S]*?background: var\(--media-stage-bg\)/)
+  assert.match(exportPanel, /\.merge-card video[\s\S]*?background: var\(--media-stage-bg\)/)
+  assert.match(exportPanel, /\.exp-thumb[\s\S]*?background: var\(--media-stage-bg\)/)
   // 状态描边：0.30 步骤完成节点 / 0.32 视频任务成功·失败徽标成对描边
   assert.match(studioCss, /--success-border: rgba\(52,199,89,0\.30\);/)
   assert.match(studioCss, /--success-border-strong: rgba\(52,199,89,0\.32\);/)
@@ -74,15 +77,18 @@ test('A1 token batch5: episode player dark stage / on-media whites / status outl
   assert.match(episode, /\.shot-check[\s\S]*?color: var\(--text-invert\)/)
   assert.match(episode, /\.video-history-time[\s\S]*?color: var\(--text-invert\)/)
   assert.match(episode, /\.prod-overlay-badge[\s\S]*?color: var\(--text-invert\)/)
-  assert.match(episode, /\.exp-thumb-duration[\s\S]*?color: var\(--text-invert\)/)
+  assert.match(exportPanel, /\.exp-thumb-duration[\s\S]*?color: var\(--text-invert\)/)
   // 白底卡/激活块 → 表面 token；玻璃徽标/浮层 → 既有 glass/float token（B1 batch4 起徽标样式下沉组件）
   assert.match(episode, /\.stage-subnav-item\.active[\s\S]*?background: var\(--surface-raised\)/)
-  assert.match(episode, /\.merge-card[\s\S]*?background: var\(--surface-raised\)/)
+  assert.match(exportPanel, /\.merge-card[\s\S]*?background: var\(--surface-raised\)/)
   assert.match(statusBadge, /\.sb-cover[\s\S]*?background: var\(--surface-glass\)/)
   // 批次内 #fff 白字白底与深色台面字面量清零（#000/#111/半透明白等单次低价值字面量留待 A2 色板）
   assert.doesNotMatch(episode, /color: #fff/)
   assert.doesNotMatch(episode, /background: #fff/)
   assert.doesNotMatch(episode, /#0b0d10/)
+  assert.doesNotMatch(exportPanel, /color: #fff/)
+  assert.doesNotMatch(exportPanel, /background: #fff/)
+  assert.doesNotMatch(exportPanel, /#0b0d10/)
 })
 
 test('A2 batch1: detail asset-kind/status semantic colors and amber notice banner resolve to tokens', () => {
@@ -123,6 +129,8 @@ test('A2 batch1: detail asset-kind/status semantic colors and amber notice banne
 
 test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error and new-style tokens resolve', () => {
   const episode = read('../app/views/drama/episode.vue')
+  // P2-B2：merge 卡播放浮层 / exp 勾选浮层样式随拼接导出面板下沉 EpisodeExportPanel.vue
+  const exportPanel = read('../app/components/EpisodeExportPanel.vue')
   const settings = read('../app/pages/settings.vue')
   const index = read('../app/pages/index.vue')
   const layout = read('../app/layouts/default.vue')
@@ -145,9 +153,9 @@ test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error an
   assert.match(episode, /\.video-task-index[\s\S]*?background: var\(--media-scrim\)/)
   assert.match(episode, /\.video-history-time[\s\S]*?background: var\(--media-scrim-strong\)/)
   assert.match(episode, /\.video-history-del[\s\S]*?background: var\(--media-scrim-strong\)/)
-  assert.match(episode, /\.merge-card-play[\s\S]*?background: var\(--media-scrim-soft\)/)
-  assert.match(episode, /\.exp-check[\s\S]*?background: var\(--media-scrim-soft\)/)
-  assert.match(episode, /\.exp-check[\s\S]*?border: 1\.5px solid var\(--media-text\)/)
+  assert.match(exportPanel, /\.merge-card-play[\s\S]*?background: var\(--media-scrim-soft\)/)
+  assert.match(exportPanel, /\.exp-check[\s\S]*?background: var\(--media-scrim-soft\)/)
+  assert.match(exportPanel, /\.exp-check[\s\S]*?border: 1\.5px solid var\(--media-text\)/)
   assert.match(episode, /\.video-player-empty[\s\S]*?color: var\(--media-text-dim\)/)
   assert.match(episode, /\.video-player-empty-title \{ color: var\(--media-text\)/)
   assert.match(episode, /\.storyboard-shot-card\.active[\s\S]*?box-shadow: 0 0 0 3px var\(--accent-glow\)/)
@@ -155,11 +163,14 @@ test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error an
   assert.match(episode, /\.ref-asset-card img,[\s\S]*?background: var\(--media-stage-bg\);/)
   assert.match(episode, /\.storyboard-shot-card\.is-selected[\s\S]*?background: var\(--accent-soft\);/)
   assert.match(episode, /\.video-ref-media-chip[\s\S]*?background: var\(--surface-muted\);/)
-  // episode：R5 fallback 清零（未定义的 accent-soft/surface-2 已正式化或改已定义 token）
+  // episode + EpisodeExportPanel：R5 fallback 清零（未定义的 accent-soft/surface-2 已正式化或改已定义 token）
   assert.doesNotMatch(episode, /var\(--[\w-]+,\s*(?:#|rgba)/)
+  assert.doesNotMatch(exportPanel, /var\(--[\w-]+,\s*(?:#|rgba)/)
   // 静态非颜色 fallback 也清零（radius-sm/font-mono 已全局定义；运行时动态拖拽宽度 fallback 保留）
   assert.doesNotMatch(episode, /var\(--radius-sm, 6px\)/)
+  assert.doesNotMatch(exportPanel, /var\(--radius-sm, 6px\)/)
   assert.doesNotMatch(episode, /font-family: var\(--font-mono,/)
+  assert.doesNotMatch(exportPanel, /font-family: var\(--font-mono,/)
   // --sel 局部定义维持（裁决：单页模型选中语义，规范 §5 记录；暗色主题批次再定全局）
   // default：顶部玻璃条与导航激活段 shadow 收敛
   assert.match(layout, /background: var\(--bar-glass\);/)
