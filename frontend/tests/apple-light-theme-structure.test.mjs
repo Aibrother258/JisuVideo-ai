@@ -222,3 +222,31 @@ test('A3 motion: duration tiers/easing tokens defined, component+page animations
     assert.doesNotMatch(src, /\b0\.(?:1[2456]|2[24]?|3[25]?)s\b/)
   }
 })
+
+test('B1 batch1: AppDialog owns overlay/dialog shell + close protocol, settings dialogs migrated', () => {
+  const appDialog = read('../app/components/AppDialog.vue')
+  const settings = read('../app/pages/settings.vue')
+  // 组件收敛 .overlay/.dialog 骨架与 head/body/foot 三段
+  assert.match(appDialog, /class="overlay"/)
+  assert.match(appDialog, /class="dialog"/)
+  assert.match(appDialog, /class="dialog-head"/)
+  assert.match(appDialog, /class="dialog-body"/)
+  assert.match(appDialog, /class="dialog-foot"/)
+  // form 模式：渲染 <form> 并 prevent 默认提交；宽度走 prop 内联样式（规避页面 scoped 类跨组件失效）
+  assert.match(appDialog, /:is="form \? 'form' : 'div'"/)
+  assert.match(appDialog, /@submit\.prevent="handleSubmit"/)
+  assert.match(appDialog, /:style="width \? \{ width \} : undefined"/)
+  // 关闭协议：Esc 与遮罩点击统一派发 close（与 ConfirmDialog 对齐）
+  assert.match(appDialog, /Escape/)
+  assert.match(appDialog, /emit\('close'\)/)
+  // settings 四个手写弹窗已迁移至 <AppDialog>，不再有裸 .overlay / @click.self 关闭
+  assert.match(settings, /<AppDialog v-if="cfgDialog"/)
+  assert.match(settings, /<AppDialog v-if="addSkillDialog"/)
+  assert.match(settings, /<AppDialog v-if="styleDialog"/)
+  assert.match(settings, /<AppDialog v-if="stylePromptOpen"/)
+  assert.doesNotMatch(settings, /class="overlay"/)
+  assert.doesNotMatch(settings, /@click\.self/)
+  // 原 scoped 弹窗宽度类（.config-dialog/.skill-dialog）已改由 width prop 提供
+  assert.doesNotMatch(settings, /\.config-dialog \{/)
+  assert.doesNotMatch(settings, /\.skill-dialog \{/)
+})
