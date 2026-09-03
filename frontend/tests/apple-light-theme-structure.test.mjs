@@ -339,3 +339,40 @@ test('B1 batch4: StatusBadge owns cover glass badge + state pill, detail/episode
   assert.doesNotMatch(episode, /\.asset-cover-badge/)
   assert.doesNotMatch(episode, /\.asset-detail-state/)
 })
+
+test('B1 batch5: EmptyState owns dashed-card empty state, index/detail migrated', () => {
+  const es = read('../app/components/EmptyState.vue')
+  const index = read('../app/pages/index.vue')
+  const detail = read('../app/views/drama/detail.vue')
+  const episode = read('../app/views/drama/episode.vue')
+  // 组件收敛「虚线圈框卡片空态」：容器 + 图标方块 + 标题 + 描述 + 默认插槽（动作）
+  assert.match(es, /class="empty-state"/)
+  assert.match(es, /title: string/)
+  assert.match(es, /desc\?: string/)
+  assert.match(es, /class="empty-icon"/)
+  assert.match(es, /class="empty-title"/)
+  assert.match(es, /class="empty-desc"/)
+  assert.match(es, /<slot \/>/)
+  // 卡片样式随组件下沉（原 index.vue / detail.vue 同名 scoped 类；desc 单行短句统一 260px 视觉零变化）
+  assert.match(es, /\.empty-state \{[\s\S]*?min-height: 280px[\s\S]*?border: 1px dashed var\(--border-strong\)[\s\S]*?background: var\(--surface-raised\)/)
+  assert.match(es, /\.empty-icon \{[\s\S]*?width: 56px[\s\S]*?background: var\(--bg-2\)/)
+  assert.match(es, /\.empty-title \{ font-size: 14px; font-weight: 700; color: var\(--text-1\); \}/)
+  assert.match(es, /\.empty-desc \{ font-size: 12px; color: var\(--text-3\); max-width: 260px; line-height: 1.6; \}/)
+  // index/detail 模板迁移：空态块均改 <EmptyState>，图标经 #icon 插槽，按钮/动作留在默认插槽
+  assert.match(index, /<EmptyState/)
+  assert.match(index, /#icon/)
+  assert.match(index, /@click="openCreateDialog"/)
+  assert.match(detail, /<EmptyState/)
+  assert.match(detail, /#icon/)
+  assert.match(detail, /还没有任何素材/)
+  assert.match(detail, /暂无\$\{tabLabel\(assetTab\)\}素材/)
+  // 页面手写卡片空态样式清零（视觉零变化，样式下沉组件内）
+  assert.doesNotMatch(index, /\.empty-state \{/)
+  assert.doesNotMatch(index, /\.empty-icon \{/)
+  assert.doesNotMatch(detail, /\.empty-state \{/)
+  assert.doesNotMatch(detail, /\.empty-icon \{/)
+  // 特殊形态不迁移守卫：episode 展示体空态与 detail 可点击 ep-empty CTA 卡仍手写页面作用域
+  assert.match(episode, /\.step-empty \{/)
+  assert.match(episode, /\.step-empty-actions \{/)
+  assert.match(detail, /\.ep-empty[\s\S]*?hover/)
+})

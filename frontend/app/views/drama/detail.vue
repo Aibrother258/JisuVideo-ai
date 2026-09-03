@@ -485,15 +485,13 @@
       </div>
 
       <!-- 全部素材为空 -->
-      <div v-if="!materials.length" class="empty-state">
-        <div class="empty-icon">
+      <EmptyState v-if="!materials.length" title="还没有任何素材" desc="在剧情工作台中通过「提取资产」生成角色、场景与道具后，会自动收录到这里，并可直接生成素材图。">
+        <template #icon>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
           </svg>
-        </div>
-        <p class="empty-title">还没有任何素材</p>
-        <p class="empty-desc">在剧情工作台中通过「提取资产」生成角色、场景与道具后，会自动收录到这里，并可直接生成素材图。</p>
-      </div>
+        </template>
+      </EmptyState>
 
       <div v-else-if="materials.length" class="asset-groups">
         <template v-for="g in assetGroups" :key="g.kindKey">
@@ -619,15 +617,17 @@
         </template>
 
         <!-- 筛选某一类但该类暂无素材 -->
-        <div v-if="assetTab !== 'all' && !visibleAssets.length" class="empty-state">
-          <div class="empty-icon">
+        <EmptyState
+          v-if="assetTab !== 'all' && !visibleAssets.length"
+          :title="`暂无${tabLabel(assetTab)}素材`"
+          :desc="`在剧情工作台中提取并生成${tabLabel(assetTab)}后，会显示在这里。`"
+        >
+          <template #icon>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
             </svg>
-          </div>
-          <p class="empty-title">暂无{{ tabLabel(assetTab) }}素材</p>
-          <p class="empty-desc">在剧情工作台中提取并生成{{ tabLabel(assetTab) }}后，会显示在这里。</p>
-        </div>
+          </template>
+        </EmptyState>
       </div>
 
       <!-- 素材详情 / 编辑对话框（与工作台资产卡片同款布局） -->
@@ -2401,27 +2401,6 @@ onBeforeUnmount(() => {
   animation: spin 0.8s linear infinite;
 }
 .ring-spinner.sm { width: 13px; height: 13px; border-width: 2px; }
-
-.empty-state {
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  text-align: center;
-}
-.empty-icon {
-  width: 56px; height: 56px; border-radius: var(--radius-lg);
-  background: var(--bg-2); color: var(--text-3);
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 4px;
-}
-.empty-title { font-size: 14px; font-weight: 700; color: var(--text-1); }
-.empty-desc { font-size: 12px; color: var(--text-3); max-width: 260px; line-height: 1.6; }
 
 .viewer-overlay { align-items: center; }
 .viewer-dialog { width: min(960px, calc(100vw - 48px)); padding: 14px; }

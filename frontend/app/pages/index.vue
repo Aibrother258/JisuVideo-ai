@@ -127,18 +127,20 @@
       </article>
     </div>
 
-    <div v-else class="empty-state">
-      <div class="empty-icon">
+    <EmptyState
+      v-else
+      :title="dramas.length ? '没有匹配的项目' : '新建第一个短剧项目'"
+      :desc="dramas.length ? '调整搜索词或筛选条件。' : '创建后选择集开始制作。'"
+    >
+      <template #icon>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
           <rect x="3" y="3" width="18" height="18" rx="3"/>
           <line x1="12" y1="8" x2="12" y2="16"/>
           <line x1="8" y1="12" x2="16" y2="12"/>
         </svg>
-      </div>
-      <p class="empty-title">{{ dramas.length ? '没有匹配的项目' : '新建第一个短剧项目' }}</p>
-      <p class="empty-desc">{{ dramas.length ? '调整搜索词或筛选条件。' : '创建后选择集开始制作。' }}</p>
+      </template>
       <button v-if="!dramas.length" class="btn btn-primary" @click="openCreateDialog">新建项目</button>
-    </div>
+    </EmptyState>
     </main>
 
     <!-- 侧栏：继续上次 / 制作进度 / 风格灵感 -->
@@ -1390,32 +1392,6 @@ onMounted(load)
 .skeleton-line.w-60 { width: 60%; }
 .skeleton-line.w-40 { width: 40%; }
 @keyframes skeleton-pulse { to { opacity: 0.55; } }
-
-.empty-state {
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  text-align: center;
-}
-.empty-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-3);
-  margin-bottom: 4px;
-}
-.empty-title { font-size: 14px; font-weight: 700; color: var(--text-1); }
-.empty-desc { font-size: 12px; color: var(--text-3); max-width: 240px; line-height: 1.6; }
 
 .create-dialog { width: 880px; max-width: calc(100vw - 32px); }
 .dialog-head-copy { display: flex; flex-direction: column; gap: 2px; }
