@@ -44,6 +44,7 @@
 | HB-20260903-08 | UI P2-B1 批次一——AppDialog 通用弹窗组件 + settings 四个配置弹窗迁移 | 完成（PR #30，merge `c9be4df`）；结构测试 84/84 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch1.md) |
 | HB-20260903-09 | UI P2-B1 批次二——detail/episode 标准弹窗迁移至 AppDialog + dialogStyle | 完成（PR #31，merge `04b128a`）；结构测试 85/85 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch2.md) |
 | HB-20260903-10 | UI P2-B1 批次三——AppDrawer 右侧抽屉组件 + episode 任务抽屉迁移（Esc 交还页面优先级） | 完成（PR #32，merge `e23ec12`）；结构测试 86/86 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch3.md) |
+| HB-20260903-11 | UI P2-B1 批次四——StatusBadge 状态徽标组件 + detail/episode 封面角标/胶囊迁移 | 完成（PR #34，merge `d61683f`）；结构测试 87/87 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-badge-batch4.md) |
 
 ## 记录规范
 
