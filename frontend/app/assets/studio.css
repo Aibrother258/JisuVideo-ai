@@ -401,6 +401,8 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
 .mono { font-family: var(--font-mono); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dim { color: var(--text-3); }
+/* 表单必填红点星标（随 P2-B1 Field 抽取由 settings/index scoped 类提升为全局，供 Field #label 插槽与 required prop 共用） */
+.required { color: var(--error); }
 .flex { display: flex; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
