@@ -90,6 +90,17 @@ test('export panel shows inline merge error with retry and list load states', ()
   assert.match(panel, /onMounted\(\(\) => loadExportMerges\(true\)\)/)
   assert.match(panel, /watch\(\(\) => props\.listRev, \(\) => loadExportMerges\(\)\)/)
   assert.match(ep, /exportListRev\.value\+\+/)
+  // P2-B2 评审修复：勾选集合为页面级状态（切面板/重挂载不丢选择）——
+  // 主壳持 exportSelectedIds + watch sbs 自动全选，组件受控渲染并以 update:selectedIds 上报
+  assert.match(ep, /const exportSelectedIds = ref\(\[\]\)/)
+  assert.match(ep, /const exportReadyIds = computed\(\(\) => sbs\.value\.filter\(s => hasVid\(s\)\)\.map\(s => s\.id\)\)/)
+  assert.match(ep, /watch\(exportReadyIds, \(ids\) => \{/)
+  assert.match(ep, /@update:selected-ids="onExportSelectedChange"/)
+  assert.match(ep, /:selected-ids="exportSelectedIds"/)
+  assert.match(panel, /selectedIds: \{ type: Array, default: \(\) => \[\] \}/)
+  assert.match(panel, /emit\('update:selectedIds', next\)/)
+  // 列表成功刷新后清除过时加载错误（对齐迁移前 doMerge 完成调 initial 刷新的语义）
+  assert.match(panel, /if \(exportListError\.value\) exportListError\.value = ''/)
 })
 
 test('residual silent loads get inline error + retry (drawer/picker/models/history)', () => {

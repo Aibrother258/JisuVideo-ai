@@ -1,8 +1,10 @@
 <template>
   <!-- ===== EXPORT PANEL：拼接导出（成片列表 + 镜头素材勾选） =====
-       组件职责：拼接导出面板 UI + 镜头选择 + 成片列表加载三态。
-       主壳保留：doMerge/轮询/mergeError 等与全局 mergeData 纠缠的状态，
-       经 props/emits 通信（@merge/@retry-merge 发起，@preview-merge 打开成片大预览）。 -->
+       组件职责：拼接导出面板 UI + 成片列表加载三态 + 镜头勾选交互。
+       主壳保留：doMerge/轮询/mergeError 等与全局 mergeData 纠缠的状态；
+       勾选集合为页面级状态（selected-ids prop + update:selectedIds 事件受控，
+       保证切面板/重挂载不丢选择），自动全选由主壳 watch sbs 承担。
+       经事件通信（@merge/@retry-merge 发起，@preview-merge 打开成片大预览）。 -->
   <div class="export-split">
     <div class="export-main">
       <!-- 拼接失败内联错误（P0-C3）：发起失败或后台轮询失败均在此呈现，支持一键重试 -->
@@ -152,11 +154,14 @@ import { mergeAPI } from '~/composables/useApi'
 const props = defineProps({
   sbs: { type: Array, required: true },
   episodeId: { type: Number, default: 0 },
+  // P2-B2 评审修复：勾选的镜头 id 是页面级状态（切面板/重挂载不丢失，与迁移前一致），
+  // 由主壳持有 exportSelectedIds 并经 update:selectedIds 受控回传，本组件仅负责交互与渲染
+  selectedIds: { type: Array, default: () => [] },
   mergeError: { type: String, default: '' },
   // 主壳每次 refresh/拼接完成后自增，通知本面板静默刷新成片列表
   listRev: { type: Number, default: 0 },
 })
-const emit = defineEmits(['merge', 'retry-merge', 'clear-merge-error', 'preview-merge'])
+const emit = defineEmits(['merge', 'retry-merge', 'clear-merge-error', 'preview-merge', 'update:selectedIds'])
 
 // ===== 镜头素材:已生成判定（纯函数，随拆分下沉到面板组件） =====
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
@@ -170,43 +175,38 @@ function formatHistoryTime(iso) {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-// ===== 拼接导出:镜头选择 + 成片列表 =====
-const exportSelectedIds = ref([]) // 勾选的镜头 id
+// ===== 拼接导出:成片列表三态 + 镜头勾选渲染 =====
+// 自动全选（sbs 就绪/变化时若用户未手动勾选则全选已生成）由主壳 watch 承担，本组件只上报交互结果
 const exportMerges = ref([])      // 成片(拼接记录)列表
 // 成片列表加载三态（P0-C3）：失败内联呈现而非静默空列表
 const exportListLoading = ref(false)
 const exportListError = ref('')
-let exportSelTouched = false      // 用户手动操作过选择后,不再自动全选
 
 const exportReadyIds = computed(() => props.sbs.filter(s => hasVid(s)).map(s => s.id))
-const exportSelectedReadyIds = computed(() => exportSelectedIds.value.filter(id => exportReadyIds.value.includes(id)))
+const exportSelectedReadyIds = computed(() => props.selectedIds.filter(id => exportReadyIds.value.includes(id)))
 
-watch(exportReadyIds, (ids) => {
-  if (exportSelTouched) {
-    exportSelectedIds.value = exportSelectedIds.value.filter(id => ids.includes(id))
-  } else {
-    exportSelectedIds.value = [...ids]
-  }
-})
-
-function isExportSelected(id) { return exportSelectedIds.value.includes(id) }
+function isExportSelected(id) { return props.selectedIds.includes(id) }
 function toggleExportSelect(sb) {
   if (!hasVid(sb)) return
-  exportSelTouched = true
-  exportSelectedIds.value = isExportSelected(sb.id)
-    ? exportSelectedIds.value.filter(x => x !== sb.id)
-    : [...exportSelectedIds.value, sb.id]
+  const next = isExportSelected(sb.id)
+    ? props.selectedIds.filter(x => x !== sb.id)
+    : [...props.selectedIds, sb.id]
+  emit('update:selectedIds', next)
 }
 function toggleSelectAllExport() {
-  exportSelTouched = true
-  exportSelectedIds.value = exportSelectedReadyIds.value.length === exportReadyIds.value.length ? [] : [...exportReadyIds.value]
+  const all = exportReadyIds.value
+  const next = all.length && props.selectedIds.filter(id => all.includes(id)).length === all.length ? [] : [...all]
+  emit('update:selectedIds', next)
 }
 
 async function loadExportMerges(initial = false) {
   if (!props.episodeId) return
   if (initial) { exportListLoading.value = true; exportListError.value = '' }
-  try { exportMerges.value = await mergeAPI.list(props.episodeId) || [] }
-  catch (e) {
+  try {
+    exportMerges.value = await mergeAPI.list(props.episodeId) || []
+    // 列表成功刷新后清除过时的加载错误横幅（对齐迁移前 doMerge 完成调 loadExportMerges(true) 的语义）
+    if (exportListError.value) exportListError.value = ''
+  } catch (e) {
     // 初始加载失败 -> 内联错误 + 重试；后台刷新失败保持旧列表不打扰
     if (initial) { exportListError.value = e.message || '成片列表加载失败'; return }
   } finally {

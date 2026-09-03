@@ -1222,18 +1222,21 @@
           <div class="empty-desc">请先完成分镜和制作流程</div>
           <button class="btn btn-primary" @click="panel = 'script'">前往剧本</button>
         </div>
-        <!-- P2-B2：拼接导出面板下沉 EpisodeExportPanel（镜头选择/成片列表三态随组件迁移；
-             拼接发起与轮询仍主壳持有——mergeData 供顶栏/侧栏/阶段进度读取，事件回调协作） -->
+        <!-- P2-B2：拼接导出面板下沉 EpisodeExportPanel（成片列表三态与勾选交互在组件内；
+             拼接发起与轮询仍主壳持有——mergeData 供顶栏/侧栏/阶段进度读取；
+             勾选集合为页面级受控状态 selected-ids，切面板不丢选择，自动全选由主壳 watch sbs 承担） -->
         <EpisodeExportPanel
           v-else
           :sbs="sbs"
           :episode-id="epId"
+          :selected-ids="exportSelectedIds"
           :merge-error="mergeError"
           :list-rev="exportListRev"
           @merge="doMerge"
           @retry-merge="doMerge(lastMergeIds)"
           @clear-merge-error="mergeError = ''"
           @preview-merge="activeMerge = $event"
+          @update:selected-ids="onExportSelectedChange"
         />
       </div>
 
@@ -2060,11 +2063,28 @@ const scriptLen = computed(() => localScript.value.replace(/\s/g, '').length || 
 const mergeUrl = computed(() => mergeData.value?.merged_url || mergeData.value?.mergedUrl || null)
 
 // ===== 拼接导出（P2-B2）：面板 UI 已下沉 EpisodeExportPanel =====
-// 主壳保留：拼接发起/轮询需读写 mergeData（顶栏「查看成片」/侧栏阶段/底部气泡共用），
-// mergeError + lastMergeIds 供重试回调；exportListRev 自增通知子组件静默刷新成片列表
+// 主壳保留：① 拼接发起/轮询需读写 mergeData（顶栏「查看成片」/侧栏阶段/底部气泡共用）；
+// ② 镜头勾选 exportSelectedIds 为页面级状态——迁移前主壳 watch sbs 自动全选/保留跨面板切换选择，
+//    故提升于主壳、以 selected-ids 受控下发，避免面板切 tab 卸载丢选择（P2-B2 评审修复）；
+// ③ mergeError + lastMergeIds 供重试回调；exportListRev 自增通知子组件静默刷新成片列表
 const mergeError = ref('')
 const lastMergeIds = ref(null)
 const exportListRev = ref(0)
+// 镜头勾选（页面级状态，跨面板切换保留；面板内勾选/全选经 update:selected-ids 事件回写）
+const exportSelectedIds = ref([]) // 勾选的镜头 id
+let exportSelTouched = false      // 用户手动操作过选择后,不再自动全选
+const exportReadyIds = computed(() => sbs.value.filter(s => hasVid(s)).map(s => s.id))
+watch(exportReadyIds, (ids) => {
+  if (exportSelTouched) {
+    exportSelectedIds.value = exportSelectedIds.value.filter(id => ids.includes(id))
+  } else {
+    exportSelectedIds.value = [...ids]
+  }
+})
+function onExportSelectedChange(ids) {
+  exportSelTouched = true
+  exportSelectedIds.value = ids
+}
 
 const scriptStep = ref(storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)
 const prodTab = ref(['assets', 'storyboard', 'videos'].includes(storedPanel?.prodTab) ? storedPanel.prodTab : 'assets')
