@@ -47,6 +47,7 @@
 | HB-20260903-11 | UI P2-B1 批次四——StatusBadge 状态徽标组件 + detail/episode 封面角标/胶囊迁移 | 完成（PR #34，merge `d61683f`）；结构测试 87/87 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-badge-batch4.md) |
 | HB-20260903-12 | UI P2-B1 批次五——EmptyState 通用空态组件 + index/detail 卡片空态迁移 | 完成（PR #36，merge `c4cf9eb`）；结构测试 88/88 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-empty-batch5.md) |
 | HB-20260903-13 | UI P2-B1 批次六——LoadingButton 通用加载按钮组件 + settings Loader2 图标族按钮迁移 | 完成（PR #38，merge `bec885a`）；经一轮复核修正（Loader2 组件内自包含 import），结构测试 89/89 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-loading-batch6.md) |
+| HB-20260903-14 | UI P2-B1 批次七——episode Loader2 图标族 23 处按钮迁移至 LoadingButton（loading/disabled 语义拆分） | 完成（PR #40，merge `2b8b6c4`）；一轮复核通过，结构测试 90/90 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-loading-batch7.md) |
 
 ## 记录规范
 
