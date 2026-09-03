@@ -3,7 +3,7 @@
     <component
       :is="form ? 'form' : 'div'"
       class="dialog"
-      :style="width ? { width } : undefined"
+      :style="[{ width: width || undefined }, dialogStyle]"
       role="dialog"
       aria-modal="true"
       @submit.prevent="handleSubmit"
@@ -33,7 +33,8 @@
 //   </AppDialog>
 //
 // 说明：head/body/foot 的插槽内容仍在调用页作用域编译，调用页 scoped 类可正常命中，
-// 故尺寸等页面私有样式不必下沉到组件内部；统一宽度请用 width prop（内联样式，规避 scoped 失效）。
+// 故尺寸等页面私有样式不必下沉到组件内部；尺寸请用 width / dialogStyle（内联样式，规避 scoped 失效）。
+// overlay 级修饰（如 z-index 覆盖）可经组件根透传 class 实现（组件根 .overlay 会继承调用页 scope）。
 // 关闭协议：Esc（escClose，默认开）与点击遮罩（maskClose，默认开）统一派发 close，
 // 与 ConfirmDialog 行为对齐；form 模式渲染 <form>，foot 中 type="submit" 触发 @submit。
 
@@ -42,6 +43,8 @@ const props = withDefaults(defineProps<{
   form?: boolean
   /** 弹窗宽度（CSS width 值，直接内联到 .dialog；不传则按内容自适应） */
   width?: string
+  /** 追加到 .dialog 的内联样式（如 maxHeight/maxWidth，因页面 scoped 类无法命中组件内部骨架） */
+  dialogStyle?: Record<string, string>
   /** Esc 键关闭 */
   escClose?: boolean
   /** 点击遮罩关闭 */
@@ -49,6 +52,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   form: false,
   width: '',
+  dialogStyle: () => ({}),
   escClose: true,
   maskClose: true,
 })

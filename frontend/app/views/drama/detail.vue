@@ -821,35 +821,33 @@
       </div>
     </div>
 
-    <div v-if="addDialog" class="overlay" @click.self="addDialog = false">
-      <div class="dialog ep-dialog">
-        <div class="dialog-head">
-          <div class="dialog-title">创建新集</div>
-          <button class="btn btn-icon btn-sm btn-ghost ml-auto dialog-close" @click="addDialog = false">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div class="dialog-body">
-          <label class="field">
-            <span class="field-label">标题</span>
-            <input v-model="newEpisodeTitle" class="input" placeholder="默认按集数自动命名" />
-            <span class="field-hint">留空时会自动按集数命名，例如“第 3 集”。</span>
-          </label>
-          <label class="field">
-            <span class="field-label">视频分辨率</span>
-            <BaseSelect v-model="newEpisodeResolution" :options="resolutionOptions" placeholder="选择分辨率" />
-            <span class="field-hint">创建后本集视频按此分辨率生成，之后仍可在集卡片上修改。</span>
-          </label>
-        </div>
-        <div class="dialog-foot">
-          <span class="dialog-foot-copy">创建后自动锁定当前启用的图片与视频生成能力。</span>
-          <button class="btn" @click="addDialog = false">取消</button>
-          <button class="btn btn-primary" :disabled="creatingEpisode" @click="addEpisode">
-            {{ creatingEpisode ? '创建中...' : '创建' }}
-          </button>
-        </div>
+    <AppDialog v-if="addDialog" width="min(480px, 100%)" @close="addDialog = false">
+      <template #head>
+        <div class="dialog-title">创建新集</div>
+        <button class="btn btn-icon btn-sm btn-ghost ml-auto dialog-close" @click="addDialog = false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </template>
+      <div class="ep-add-fields">
+        <label class="field">
+          <span class="field-label">标题</span>
+          <input v-model="newEpisodeTitle" class="input" placeholder="默认按集数自动命名" />
+          <span class="field-hint">留空时会自动按集数命名，例如“第 3 集”。</span>
+        </label>
+        <label class="field">
+          <span class="field-label">视频分辨率</span>
+          <BaseSelect v-model="newEpisodeResolution" :options="resolutionOptions" placeholder="选择分辨率" />
+          <span class="field-hint">创建后本集视频按此分辨率生成，之后仍可在集卡片上修改。</span>
+        </label>
       </div>
-    </div>
+      <template #foot>
+        <span class="dialog-foot-copy">创建后自动锁定当前启用的图片与视频生成能力。</span>
+        <button class="btn" @click="addDialog = false">取消</button>
+        <button class="btn btn-primary" :disabled="creatingEpisode" @click="addEpisode">
+          {{ creatingEpisode ? '创建中...' : '创建' }}
+        </button>
+      </template>
+    </AppDialog>
     <ConfirmDialog
       :open="!!episodeToDelete"
       title="删除本集"
@@ -865,6 +863,7 @@
 import { toast } from 'vue-sonner'
 import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, stylePresetAPI } from '~/composables/useApi'
 import BaseSelect from '~/components/BaseSelect.vue'
+import AppDialog from '~/components/AppDialog.vue'
 import { isServerPlanGenerated } from '~/utils/episode-plan-state.mjs'
 
 const route = useRoute()
@@ -2153,9 +2152,8 @@ onBeforeUnmount(() => {
 }
 
 /* Create Episode Dialog (on top of global .dialog skeleton) */
-.ep-dialog { width: min(480px, 100%); }
 .dialog-close { flex-shrink: 0; color: var(--text-2); }
-.dialog-body { display: flex; flex-direction: column; gap: 20px; }
+.ep-add-fields { display: flex; flex-direction: column; gap: 20px; }
 
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field-label { font-size: 12.5px; font-weight: 600; color: var(--text-1); }

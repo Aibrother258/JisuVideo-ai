@@ -1745,47 +1745,51 @@
         </section>
       </div>
 
-      <div v-if="refAssetPicker.open" class="overlay ref-asset-picker-overlay" @click.self="closeRefAssetPicker">
-        <section class="dialog ref-asset-picker-dialog" role="dialog" aria-modal="true" :aria-label="`选择参考${refAssetKindLabel}`">
-          <header class="dialog-head">
-            <div>
-              <h2 class="dialog-title">选择参考{{ refAssetKindLabel }}</h2>
-              <p class="ref-asset-picker-sub">可选择本剧已有资产，也可复用之前从本地上传并保存到素材库的文件。</p>
-            </div>
-            <button class="btn btn-ghost btn-icon" @click="closeRefAssetPicker"><X :size="14" /></button>
-          </header>
-          <div class="dialog-body ref-asset-picker-body">
-            <div v-if="refAssetPickerLoading" class="ref-asset-picker-empty"><Loader2 :size="18" class="animate-spin" /> 正在加载素材库</div>
-            <div v-else-if="refAssetLibraryError" class="app-state app-state-error compact-state">
-              <div class="app-state-icon"><CircleAlert :size="20" /></div>
-              <div class="app-state-title">素材库加载失败</div>
-              <p class="app-state-desc">{{ refAssetLibraryError }}</p>
-              <button class="btn btn-primary btn-sm" @click="loadRefAssetLibrary"><RefreshCw :size="12" /> 重试</button>
-            </div>
-            <div v-else-if="refAssetCandidates.length" class="ref-asset-picker-grid">
-              <button
-                v-for="asset in refAssetCandidates"
-                :key="asset.key"
-                type="button"
-                :class="['ref-asset-card', { selected: isRefAssetSelected(asset), locked: isAutoBoundImageAsset(asset) }]"
-                @click="toggleRefAsset(asset)"
-              >
-                <img v-if="asset.kind === 'image'" :src="asset.thumbnail || asset.url" :alt="asset.name" loading="lazy" />
-                <video v-else-if="asset.kind === 'video'" :src="asset.url" preload="metadata" muted playsinline />
-                <div v-else class="ref-asset-audio-preview">♫</div>
-                <span class="ref-asset-card-check">{{ isAutoBoundImageAsset(asset) ? '已绑定' : isRefAssetSelected(asset) ? '已选' : '选择' }}</span>
-                <strong>{{ asset.name }}</strong>
-                <small>{{ asset.source }}</small>
-              </button>
-            </div>
-            <div v-else class="ref-asset-picker-empty">素材库里还没有{{ refAssetKindLabel }}，请先使用“本地上传”。</div>
+      <AppDialog
+        v-if="refAssetPicker.open"
+        class="ref-asset-picker-overlay"
+        width="min(920px, calc(100vw - 48px))"
+        :dialog-style="{ maxHeight: 'min(760px, calc(100vh - 48px))' }"
+        @close="closeRefAssetPicker"
+      >
+        <template #head>
+          <div>
+            <h2 class="dialog-title">选择参考{{ refAssetKindLabel }}</h2>
+            <p class="ref-asset-picker-sub">可选择本剧已有资产，也可复用之前从本地上传并保存到素材库的文件。</p>
           </div>
-          <footer class="dialog-foot">
-            <span class="dim">已选 {{ selectedRefAssetCount }} 个</span>
-            <button class="btn btn-primary" @click="closeRefAssetPicker">完成</button>
-          </footer>
-        </section>
-      </div>
+          <button class="btn btn-ghost btn-icon" @click="closeRefAssetPicker"><X :size="14" /></button>
+        </template>
+        <div class="ref-asset-picker-body">
+          <div v-if="refAssetPickerLoading" class="ref-asset-picker-empty"><Loader2 :size="18" class="animate-spin" /> 正在加载素材库</div>
+          <div v-else-if="refAssetLibraryError" class="app-state app-state-error compact-state">
+            <div class="app-state-icon"><CircleAlert :size="20" /></div>
+            <div class="app-state-title">素材库加载失败</div>
+            <p class="app-state-desc">{{ refAssetLibraryError }}</p>
+            <button class="btn btn-primary btn-sm" @click="loadRefAssetLibrary"><RefreshCw :size="12" /> 重试</button>
+          </div>
+          <div v-else-if="refAssetCandidates.length" class="ref-asset-picker-grid">
+            <button
+              v-for="asset in refAssetCandidates"
+              :key="asset.key"
+              type="button"
+              :class="['ref-asset-card', { selected: isRefAssetSelected(asset), locked: isAutoBoundImageAsset(asset) }]"
+              @click="toggleRefAsset(asset)"
+            >
+              <img v-if="asset.kind === 'image'" :src="asset.thumbnail || asset.url" :alt="asset.name" loading="lazy" />
+              <video v-else-if="asset.kind === 'video'" :src="asset.url" preload="metadata" muted playsinline />
+              <div v-else class="ref-asset-audio-preview">♫</div>
+              <span class="ref-asset-card-check">{{ isAutoBoundImageAsset(asset) ? '已绑定' : isRefAssetSelected(asset) ? '已选' : '选择' }}</span>
+              <strong>{{ asset.name }}</strong>
+              <small>{{ asset.source }}</small>
+            </button>
+          </div>
+          <div v-else class="ref-asset-picker-empty">素材库里还没有{{ refAssetKindLabel }}，请先使用“本地上传”。</div>
+        </div>
+        <template #foot>
+          <span class="dim">已选 {{ selectedRefAssetCount }} 个</span>
+          <button class="btn btn-primary" @click="closeRefAssetPicker">完成</button>
+        </template>
+      </AppDialog>
 
       <div v-if="imageViewer.open && imageViewer.src" class="overlay image-viewer-overlay" @click.self="closeImageViewer">
         <div class="dialog image-viewer-dialog">
@@ -1827,42 +1831,45 @@
         </div>
       </div>
 
-      <div v-if="assetCreate.open" class="overlay" @click.self="assetCreate.open = false">
-        <div class="dialog asset-create-dialog">
-          <header class="dialog-head">
-            <h2 class="dialog-title">新增{{ assetCreateTypeLabel }}</h2>
-            <button class="btn btn-ghost btn-icon" @click="assetCreate.open = false">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </header>
-          <div class="dialog-body asset-create-body">
-            <template v-if="assetCreate.type === 'character'">
-              <label class="field"><span class="field-label">名称</span><input v-model="assetCreateDraft.name" class="input" placeholder="角色名称" /></label>
-              <label class="field"><span class="field-label">角色定位</span><input v-model="assetCreateDraft.role" class="input" placeholder="如：主角 / 反派 / 配角" /></label>
-              <label class="field"><span class="field-label">样貌</span><textarea v-model="assetCreateDraft.appearance" class="textarea" rows="3" placeholder="外貌特征（可融入性格）" /></label>
-              <label class="field"><span class="field-label">妆造</span><textarea v-model="assetCreateDraft.styling" class="textarea" rows="2" placeholder="服装、妆容、配饰" /></label>
-            </template>
-            <template v-else-if="assetCreate.type === 'scene'">
-              <label class="field"><span class="field-label">地点</span><input v-model="assetCreateDraft.location" class="input" placeholder="场景地点" /></label>
-              <label class="field"><span class="field-label">时间</span><input v-model="assetCreateDraft.time" class="input" placeholder="如：白天 / 夜晚" /></label>
-              <label class="field"><span class="field-label">场景描述</span><textarea v-model="assetCreateDraft.prompt" class="textarea" rows="3" placeholder="环境、陈设、氛围" /></label>
-              <label class="field"><span class="field-label">场景光影</span><input v-model="assetCreateDraft.lighting" class="input" placeholder="如：黄昏暖光、冷清顶光" /></label>
-            </template>
-            <template v-else>
-              <label class="field"><span class="field-label">名称</span><input v-model="assetCreateDraft.name" class="input" placeholder="道具名称" /></label>
-              <label class="field"><span class="field-label">类型</span><input v-model="assetCreateDraft.type" class="input" placeholder="如：武器 / 信物 / 文件" /></label>
-              <label class="field"><span class="field-label">物品外貌</span><textarea v-model="assetCreateDraft.description" class="textarea" rows="3" placeholder="只描述物品的外观，与其他无关" /></label>
-            </template>
-          </div>
-          <footer class="dialog-foot">
-            <button class="btn" @click="assetCreate.open = false">取消</button>
-            <button class="btn btn-primary" :disabled="assetCreate.saving" @click="saveAssetCreate">
-              <Loader2 v-if="assetCreate.saving" :size="12" class="animate-spin" />
-              新增
-            </button>
-          </footer>
+      <AppDialog
+        v-if="assetCreate.open"
+        width="440px"
+        :dialog-style="{ maxWidth: 'calc(100vw - 48px)' }"
+        @close="assetCreate.open = false"
+      >
+        <template #head>
+          <h2 class="dialog-title">新增{{ assetCreateTypeLabel }}</h2>
+          <button class="btn btn-ghost btn-icon" @click="assetCreate.open = false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </template>
+        <div class="asset-create-body">
+          <template v-if="assetCreate.type === 'character'">
+            <label class="field"><span class="field-label">名称</span><input v-model="assetCreateDraft.name" class="input" placeholder="角色名称" /></label>
+            <label class="field"><span class="field-label">角色定位</span><input v-model="assetCreateDraft.role" class="input" placeholder="如：主角 / 反派 / 配角" /></label>
+            <label class="field"><span class="field-label">样貌</span><textarea v-model="assetCreateDraft.appearance" class="textarea" rows="3" placeholder="外貌特征（可融入性格）" /></label>
+            <label class="field"><span class="field-label">妆造</span><textarea v-model="assetCreateDraft.styling" class="textarea" rows="2" placeholder="服装、妆容、配饰" /></label>
+          </template>
+          <template v-else-if="assetCreate.type === 'scene'">
+            <label class="field"><span class="field-label">地点</span><input v-model="assetCreateDraft.location" class="input" placeholder="场景地点" /></label>
+            <label class="field"><span class="field-label">时间</span><input v-model="assetCreateDraft.time" class="input" placeholder="如：白天 / 夜晚" /></label>
+            <label class="field"><span class="field-label">场景描述</span><textarea v-model="assetCreateDraft.prompt" class="textarea" rows="3" placeholder="环境、陈设、氛围" /></label>
+            <label class="field"><span class="field-label">场景光影</span><input v-model="assetCreateDraft.lighting" class="input" placeholder="如：黄昏暖光、冷清顶光" /></label>
+          </template>
+          <template v-else>
+            <label class="field"><span class="field-label">名称</span><input v-model="assetCreateDraft.name" class="input" placeholder="道具名称" /></label>
+            <label class="field"><span class="field-label">类型</span><input v-model="assetCreateDraft.type" class="input" placeholder="如：武器 / 信物 / 文件" /></label>
+            <label class="field"><span class="field-label">物品外貌</span><textarea v-model="assetCreateDraft.description" class="textarea" rows="3" placeholder="只描述物品的外观，与其他无关" /></label>
+          </template>
         </div>
-      </div>
+        <template #foot>
+          <button class="btn" @click="assetCreate.open = false">取消</button>
+          <button class="btn btn-primary" :disabled="assetCreate.saving" @click="saveAssetCreate">
+            <Loader2 v-if="assetCreate.saving" :size="12" class="animate-spin" />
+            新增
+          </button>
+        </template>
+      </AppDialog>
 
       <ConfirmDialog
         :open="assetDelete.open"
@@ -1885,6 +1892,7 @@ import {
   MapPin, Play, Plus, X, ListTodo, RefreshCw, CircleAlert,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, assetLibraryAPI } from '~/composables/useApi'
+import AppDialog from '~/components/AppDialog.vue'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
@@ -5733,7 +5741,6 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .shot-select-go { width: 100%; justify-content: center; }
 
 /* 新增资产弹窗 */
-.asset-create-dialog { width: 440px; max-width: calc(100vw - 48px); }
 .asset-create-body { display: flex; flex-direction: column; gap: 10px; }
 
 /* Asset grid */
@@ -6573,7 +6580,6 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .video-duration-input { width: 64px; padding: 4px 8px; font-size: 12px; }
 
 .ref-asset-picker-overlay { z-index: 120; }
-.ref-asset-picker-dialog { width: min(920px, calc(100vw - 48px)); max-height: min(760px, calc(100vh - 48px)); }
 .ref-asset-picker-sub { margin: 4px 0 0; color: var(--text-3); font-size: 11px; }
 .ref-asset-picker-body { min-height: 260px; overflow-y: auto; }
 .ref-asset-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }

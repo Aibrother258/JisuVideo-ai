@@ -232,10 +232,11 @@ test('B1 batch1: AppDialog owns overlay/dialog shell + close protocol, settings 
   assert.match(appDialog, /class="dialog-head"/)
   assert.match(appDialog, /class="dialog-body"/)
   assert.match(appDialog, /class="dialog-foot"/)
-  // form 模式：渲染 <form> 并 prevent 默认提交；宽度走 prop 内联样式（规避页面 scoped 类跨组件失效）
+  // form 模式：渲染 <form> 并 prevent 默认提交；尺寸走 prop 内联样式（规避页面 scoped 类跨组件失效）
   assert.match(appDialog, /:is="form \? 'form' : 'div'"/)
   assert.match(appDialog, /@submit\.prevent="handleSubmit"/)
-  assert.match(appDialog, /:style="width \? \{ width \} : undefined"/)
+  assert.match(appDialog, /width \|\| undefined.*dialogStyle|:style="\[/)
+  assert.match(appDialog, /dialogStyle/)
   // 关闭协议：Esc 与遮罩点击统一派发 close（与 ConfirmDialog 对齐）
   assert.match(appDialog, /Escape/)
   assert.match(appDialog, /emit\('close'\)/)
@@ -249,4 +250,31 @@ test('B1 batch1: AppDialog owns overlay/dialog shell + close protocol, settings 
   // 原 scoped 弹窗宽度类（.config-dialog/.skill-dialog）已改由 width prop 提供
   assert.doesNotMatch(settings, /\.config-dialog \{/)
   assert.doesNotMatch(settings, /\.skill-dialog \{/)
+})
+
+test('B1 batch2: detail/episode standard dialogs migrate to AppDialog, body layouts stay page-scoped', () => {
+  const detail = read('../app/views/drama/detail.vue')
+  const episode = read('../app/views/drama/episode.vue')
+  // detail 创建新集 / episode 新增资产 / 参考素材选择均已迁移
+  assert.match(detail, /<AppDialog v-if="addDialog"/)
+  assert.match(episode, /<AppDialog\s+v-if="assetCreate\.open"/)
+  assert.match(episode, /<AppDialog\s+v-if="refAssetPicker\.open"/)
+  // overlay 修饰类经组件根透传保留（ref-asset-picker-overlay 的 z-index:120 提升）
+  assert.match(episode, /class="ref-asset-picker-overlay"/)
+  // 宽度/最大高度经 width + dialogStyle 内联（scoped 类无法命中组件内部 .dialog）
+  assert.match(detail, /<AppDialog v-if="addDialog" width="min\(480px, 100%\)"/)
+  assert.match(episode, /width="440px"/)
+  assert.match(episode, /maxHeight: 'min\(760px, calc\(100vh - 48px\)\)'/)
+  // body 内容间距保留在页面插槽内的私有容器（原 .dialog-body 覆盖迁移为插槽容器类）
+  assert.match(detail, /<div class="ep-add-fields">/)
+  assert.match(episode, /<div class="asset-create-body">/)
+  assert.match(episode, /<div class="ref-asset-picker-body">/)
+  // 已删除不再引用的 scoped 弹窗尺寸类与骨架覆盖
+  assert.doesNotMatch(detail, /\.ep-dialog \{/)
+  assert.doesNotMatch(detail, /^\.dialog-body \{/)
+  assert.doesNotMatch(episode, /\.asset-create-dialog \{/)
+  assert.doesNotMatch(episode, /\.ref-asset-picker-dialog \{/)
+  // 骨架深度定制/多步/抽屉类弹窗保留手写（本轮不迁移，避免视觉回归）
+  assert.match(detail, /mat-detail-dialog/)
+  assert.match(episode, /task-drawer/)
 })
