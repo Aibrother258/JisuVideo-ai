@@ -184,6 +184,7 @@ test('A3 motion: duration tiers/easing tokens defined, component+page animations
   const settings = read('../app/pages/settings.vue')
   const index = read('../app/pages/index.vue')
   const layout = read('../app/layouts/default.vue')
+  const appDrawer = read('../app/components/AppDrawer.vue')
   const baseSelect = read('../app/components/BaseSelect.vue')
   const modelSelect = read('../app/components/ModelSelect.vue')
   // 时长档 token 定义
@@ -203,7 +204,7 @@ test('A3 motion: duration tiers/easing tokens defined, component+page animations
   assert.match(studioCss, /\.stagger-5 \{ animation-delay: calc\(var\(--dur-stagger\) \* 5\); \}/)
   // 进入动画按 slow 档；页面与菜单浮层引用档 token
   assert.match(episode, /animation: fadeIn var\(--dur-slow\) var\(--ease-out\);/)
-  assert.match(episode, /animation: taskDrawerIn var\(--dur-med\) var\(--ease-out\);/)
+  assert.match(appDrawer, /animation: appDrawerIn var\(--dur-med\) var\(--ease-out\);/)
   assert.match(detail, /animation: fadeUp var\(--dur-slow\) var\(--ease-out\) both;/)
   assert.match(modelSelect, /animation: modelMenuIn var\(--dur-fast\) var\(--ease-out\);/)
   assert.match(baseSelect, /animation: baseSelectIn var\(--dur-fast\) var\(--ease-out\);/)
@@ -218,7 +219,7 @@ test('A3 motion: duration tiers/easing tokens defined, component+page animations
   assert.doesNotMatch(detail, /@keyframes spin/)
   assert.doesNotMatch(index, /@keyframes spin/)
   // 归一档字面量清零（spin/skeleton/progress 等循环例外保留：0.7/0.8/0.9/1.4/1.6/0.4/0.28s）
-  for (const src of [episode, detail, settings, index, layout, baseSelect, modelSelect]) {
+  for (const src of [episode, detail, settings, index, layout, appDrawer, baseSelect, modelSelect]) {
     assert.doesNotMatch(src, /\b0\.(?:1[2456]|2[24]?|3[25]?)s\b/)
   }
 })
@@ -274,7 +275,40 @@ test('B1 batch2: detail/episode standard dialogs migrate to AppDialog, body layo
   assert.doesNotMatch(detail, /^\.dialog-body \{/)
   assert.doesNotMatch(episode, /\.asset-create-dialog \{/)
   assert.doesNotMatch(episode, /\.ref-asset-picker-dialog \{/)
-  // 骨架深度定制/多步/抽屉类弹窗保留手写（本轮不迁移，避免视觉回归）
+  // 骨架深度定制/多步/查看类弹窗保留手写（批量评审边界：需专项设计后再迁移；
+  // 任务抽屉骨架已于 batch3 收敛至 AppDrawer，此处仅核对其余手写 overlay 仍在页面）
   assert.match(detail, /mat-detail-dialog/)
-  assert.match(episode, /task-drawer/)
+  assert.match(episode, /image-viewer-overlay/)
+  assert.match(episode, /asset-detail-overlay/)
+})
+
+test('B1 batch3: AppDrawer owns right-drawer shell, episode task drawer migrated', () => {
+  const appDrawer = read('../app/components/AppDrawer.vue')
+  const episode = read('../app/views/drama/episode.vue')
+  // 组件收敛抽屉骨架：复用全局 .overlay 遮罩（面板定位右端 + z-index:118）、面板、#head 槽
+  assert.match(appDrawer, /class="overlay app-drawer-overlay"/)
+  assert.match(appDrawer, /class="app-drawer"/)
+  assert.match(appDrawer, /class="app-drawer-head"/)
+  assert.match(appDrawer, /justify-content: flex-end;/)
+  assert.match(appDrawer, /z-index: 118;/)
+  assert.match(appDrawer, /@click\.self="handleMaskClick"/)
+  // 关闭协议与 AppDialog 对齐：Esc / 遮罩统一 emit close
+  assert.match(appDrawer, /Escape/)
+  assert.match(appDrawer, /emit\('close'\)/)
+  // episode 任务抽屉已迁移至 <AppDrawer>（宽度 prop、#head 槽、遮罩关闭）
+  assert.match(episode, /<AppDrawer\s+v-if="taskDrawer"/)
+  assert.match(episode, /width="min\(560px, 100vw\)"/)
+  assert.match(episode, /<template #head>/)
+  assert.match(episode, /@close="closeTaskDrawer"/)
+  // 手写抽屉骨架清零（.task-drawer-overlay/.task-drawer/@keyframes taskDrawerIn 已下沉组件）
+  assert.doesNotMatch(episode, /class="task-drawer-overlay"/)
+  assert.doesNotMatch(episode, /\.task-drawer \{/)
+  assert.doesNotMatch(episode, /@keyframes taskDrawerIn/)
+  // Esc 优先级协议仍在页面集中处理，组件内 Esc 关闭置否（避免上层浮层打开时误关抽屉）
+  assert.match(episode, /:esc-close="false"/)
+  assert.match(episode, /handleImageViewerKeydown[\s\S]{0,400}closeTaskDrawer\(\)/)
+  // 抽屉内容级布局类保留页面作用域（head 操作 / metrics / 列表滚动 / 空态）
+  assert.match(episode, /\.task-drawer-head-actions \{/)
+  assert.match(episode, /\.task-drawer-metrics \{/)
+  assert.match(episode, /\.task-drawer-body \{/)
 })

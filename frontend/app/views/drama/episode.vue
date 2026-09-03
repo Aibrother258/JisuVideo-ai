@@ -1376,99 +1376,105 @@
       </div>
 
       <!-- ===== TASK DRAWER ===== -->
-      <div v-if="taskDrawer" class="task-drawer-overlay" @click.self="closeTaskDrawer">
-        <aside class="task-drawer" role="dialog" aria-modal="true" aria-label="生成任务列表">
-          <header class="task-drawer-head">
-            <div>
-              <div class="video-task-title">生成任务列表</div>
-              <div class="video-task-meta">按创建时间倒序 · {{ genTaskRows.length }} 个任务</div>
-            </div>
-            <div class="task-drawer-head-actions">
-              <button class="btn btn-sm" @click="loadGenTasks(true)">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                刷新
-              </button>
-              <button class="btn btn-ghost btn-icon" @click="closeTaskDrawer"><X :size="14" /></button>
-            </div>
-          </header>
-          <div class="video-task-metrics task-drawer-metrics">
-            <span class="video-task-metric is-pending">{{ genTaskActiveCount }} 生成中</span>
-            <span class="video-task-metric is-done">{{ genTaskDoneCount }} 完成</span>
-            <span class="video-task-metric is-failed">{{ genTaskFailedCount }} 失败</span>
+      <!-- P2-B1 batch3：抽屉骨架收敛至 AppDrawer；Esc 关闭沿用页面 handleImageViewerKeydown
+           优先级协议（imageViewer → assetDetail → taskDrawer），故组件内 Esc 置否 -->
+      <AppDrawer
+        v-if="taskDrawer"
+        width="min(560px, 100vw)"
+        aria-label="生成任务列表"
+        :esc-close="false"
+        @close="closeTaskDrawer"
+      >
+        <template #head>
+          <div>
+            <div class="video-task-title">生成任务列表</div>
+            <div class="video-task-meta">按创建时间倒序 · {{ genTaskRows.length }} 个任务</div>
           </div>
-          <!-- 任务列表加载失败：内联错误 + 重试（区分「加载失败」与「真无任务」） -->
-          <div v-if="taskListError" class="task-drawer-body">
-            <div class="app-state app-state-error compact-state">
-              <div class="app-state-icon"><CircleAlert :size="20" /></div>
-              <div class="app-state-title">任务列表加载失败</div>
-              <p class="app-state-desc">{{ taskListError }}</p>
-              <button class="btn btn-primary btn-sm" @click="loadGenTasks(true)"><RefreshCw :size="12" /> 重试</button>
-            </div>
+          <div class="task-drawer-head-actions">
+            <button class="btn btn-sm" @click="loadGenTasks(true)">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              刷新
+            </button>
+            <button class="btn btn-ghost btn-icon" @click="closeTaskDrawer"><X :size="14" /></button>
           </div>
-          <div v-else-if="taskListLoading && !genTaskRows.length" class="task-drawer-body task-drawer-skeleton">
-            <div class="app-skeleton-line" style="height:72px;border-radius:12px"></div>
-            <div class="app-skeleton-line" style="height:72px;border-radius:12px;margin-top:10px"></div>
-            <div class="app-skeleton-line" style="height:72px;border-radius:12px;margin-top:10px"></div>
+        </template>
+        <div class="video-task-metrics task-drawer-metrics">
+          <span class="video-task-metric is-pending">{{ genTaskActiveCount }} 生成中</span>
+          <span class="video-task-metric is-done">{{ genTaskDoneCount }} 完成</span>
+          <span class="video-task-metric is-failed">{{ genTaskFailedCount }} 失败</span>
+        </div>
+        <!-- 任务列表加载失败：内联错误 + 重试（区分「加载失败」与「真无任务」） -->
+        <div v-if="taskListError" class="task-drawer-body">
+          <div class="app-state app-state-error compact-state">
+            <div class="app-state-icon"><CircleAlert :size="20" /></div>
+            <div class="app-state-title">任务列表加载失败</div>
+            <p class="app-state-desc">{{ taskListError }}</p>
+            <button class="btn btn-primary btn-sm" @click="loadGenTasks(true)"><RefreshCw :size="12" /> 重试</button>
           </div>
-          <div v-else-if="!genTaskRows.length" class="step-empty task-drawer-empty">
-            <div class="empty-visual">
-              <ListTodo :size="32" />
-            </div>
-            <div class="empty-title">暂无生成任务</div>
-            <div class="empty-desc">在资产、分镜或视频步骤中触发图片 / 视频生成后,任务会自动出现在这里。</div>
+        </div>
+        <div v-else-if="taskListLoading && !genTaskRows.length" class="task-drawer-body task-drawer-skeleton">
+          <div class="app-skeleton-line" style="height:72px;border-radius:12px"></div>
+          <div class="app-skeleton-line" style="height:72px;border-radius:12px;margin-top:10px"></div>
+          <div class="app-skeleton-line" style="height:72px;border-radius:12px;margin-top:10px"></div>
+        </div>
+        <div v-else-if="!genTaskRows.length" class="step-empty task-drawer-empty">
+          <div class="empty-visual">
+            <ListTodo :size="32" />
           </div>
-          <div v-else class="video-task-table task-drawer-body">
-            <div
-              v-for="row in genTaskRows"
-              :key="row.key"
-              :class="['video-task-row', 'gen-task-row', 'is-' + genTaskStateClass(row.status)]"
-            >
-              <div class="video-task-preview">
-                <video
-                  v-if="row.previewUrl && (row.kind === 'video' || row.kind === 'merge')"
-                  :src="genTaskPreviewSrc(row.previewUrl)"
-                  :poster="posterOf(genTaskPreviewSrc(row.previewUrl)) || undefined"
-                  controls
-                  preload="none"
-                  playsinline
-                />
-                <img
-                  v-else-if="row.previewUrl"
-                  :src="thumbOf(genTaskPreviewSrc(row.previewUrl))"
-                  :alt="row.targetLabel"
-                  loading="lazy"
-                  @error="thumbFallback($event, genTaskPreviewSrc(row.previewUrl))"
-                  @click="openImageViewer(genTaskPreviewSrc(row.previewUrl), row.targetLabel)"
-                />
-                <div v-else class="video-task-empty">
-                  <Loader2 v-if="genTaskStateClass(row.status) === 'pending'" :size="18" class="animate-spin" />
-                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                </div>
-                <span class="video-task-index">{{ genTaskKindLabel(row.kind) }}</span>
+          <div class="empty-title">暂无生成任务</div>
+          <div class="empty-desc">在资产、分镜或视频步骤中触发图片 / 视频生成后,任务会自动出现在这里。</div>
+        </div>
+        <div v-else class="video-task-table task-drawer-body">
+          <div
+            v-for="row in genTaskRows"
+            :key="row.key"
+            :class="['video-task-row', 'gen-task-row', 'is-' + genTaskStateClass(row.status)]"
+          >
+            <div class="video-task-preview">
+              <video
+                v-if="row.previewUrl && (row.kind === 'video' || row.kind === 'merge')"
+                :src="genTaskPreviewSrc(row.previewUrl)"
+                :poster="posterOf(genTaskPreviewSrc(row.previewUrl)) || undefined"
+                controls
+                preload="none"
+                playsinline
+              />
+              <img
+                v-else-if="row.previewUrl"
+                :src="thumbOf(genTaskPreviewSrc(row.previewUrl))"
+                :alt="row.targetLabel"
+                loading="lazy"
+                @error="thumbFallback($event, genTaskPreviewSrc(row.previewUrl))"
+                @click="openImageViewer(genTaskPreviewSrc(row.previewUrl), row.targetLabel)"
+              />
+              <div v-else class="video-task-empty">
+                <Loader2 v-if="genTaskStateClass(row.status) === 'pending'" :size="18" class="animate-spin" />
+                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
               </div>
-              <div class="video-task-main">
-                <div class="video-task-line">
-                  <strong class="video-task-name truncate">{{ row.targetLabel }}</strong>
-                </div>
-                <div class="video-task-meta-line">
-                  <span class="video-task-loc truncate">{{ row.provider }}{{ row.model ? ' · ' + row.model : '' }}</span>
-                  <template v-if="genTaskDuration(row)">
-                    <span class="video-task-sep">·</span>
-                    <span>耗时 {{ genTaskDuration(row) }}</span>
-                  </template>
+              <span class="video-task-index">{{ genTaskKindLabel(row.kind) }}</span>
+            </div>
+            <div class="video-task-main">
+              <div class="video-task-line">
+                <strong class="video-task-name truncate">{{ row.targetLabel }}</strong>
+              </div>
+              <div class="video-task-meta-line">
+                <span class="video-task-loc truncate">{{ row.provider }}{{ row.model ? ' · ' + row.model : '' }}</span>
+                <template v-if="genTaskDuration(row)">
                   <span class="video-task-sep">·</span>
-                  <span>#{{ row.id }}</span>
-                </div>
-                <div v-if="row.errorMsg" class="video-task-error">{{ row.errorMsg }}</div>
+                  <span>耗时 {{ genTaskDuration(row) }}</span>
+                </template>
+                <span class="video-task-sep">·</span>
+                <span>#{{ row.id }}</span>
               </div>
-              <span :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
-                <span :class="['dot', genTaskStateClass(row.status) === 'done' && 'ok', genTaskStateClass(row.status) === 'pending' && 'pending']" />
-                {{ genTaskStatusLabel(row.status) }}
-              </span>
+              <div v-if="row.errorMsg" class="video-task-error">{{ row.errorMsg }}</div>
             </div>
+            <span :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
+              <span :class="['dot', genTaskStateClass(row.status) === 'done' && 'ok', genTaskStateClass(row.status) === 'pending' && 'pending']" />
+              {{ genTaskStatusLabel(row.status) }}
+            </span>
           </div>
-        </aside>
-      </div>
+        </div>
+      </AppDrawer>
 
       <div v-if="showBottomBubble" class="step-bubble">
         <button
@@ -1893,6 +1899,7 @@ import {
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, assetLibraryAPI } from '~/composables/useApi'
 import AppDialog from '~/components/AppDialog.vue'
+import AppDrawer from '~/components/AppDrawer.vue'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
@@ -7306,40 +7313,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   line-height: 1;
 }
 
-/* 右侧抽屉 */
-.task-drawer-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 118;
-  display: flex;
-  justify-content: flex-end;
-  background: var(--overlay-mask);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  animation: fadeIn var(--dur-base) var(--ease-out);
-}
-.task-drawer {
-  width: min(560px, 100vw);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--panel-bg);
-  border-left: 1px solid var(--panel-border);
-  box-shadow: var(--shadow-xl);
-  animation: taskDrawerIn var(--dur-med) var(--ease-out);
-}
-@keyframes taskDrawerIn {
-  from { transform: translateX(24px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-.task-drawer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--surface-outline);
-}
+/* 右侧抽屉内容布局（骨架已收敛至 AppDrawer；此处仅剩插槽内页面级布局类） */
 .task-drawer-head-actions {
   display: flex;
   align-items: center;
