@@ -134,7 +134,23 @@ git push -u origin feat/我要做的东西
    head repository: <你的用户名>/JisuVideo-ai   compare: feat/我要做的东西
    ```
 
-   > 如果默认指向了 `chatfire-AI/huobao-drama`，说明选错 base 了，手动改回来。
+   > ⚠️ **最常见的坑：GitHub 会默认把 base 指到上游去。**
+   > 因为 `Aibrother258/JisuVideo-ai` 本身是 `chatfire-AI/huobao-drama` 的 fork，
+   > 点「Compare & pull request」时 GitHub 会自作主张把 base 设成 `chatfire-AI/huobao-drama`，
+   > 意思是"替你向原项目贡献代码"。**每次发 PR 都必须手动改回 `Aibrother258/JisuVideo-ai`。**
+
+   **方法 A（推荐）：用直链打开创建页**，base 自动锁定为正确的仓库：
+
+   ```
+   https://github.com/Aibrother258/JisuVideo-ai/compare/master...<你的用户名>:feat/我要做的东西
+   ```
+
+   **方法 B：页面上手动切换** —— 点顶部 `base: xxx ← compare: yyy` 那一行的
+   **base repository** 下拉框 → 选 `Aibrother258/JisuVideo-ai` → base 分支选 `master`
+   → compare 选你的分支。
+
+   **点 Create 之前最后确认一次**：地址栏是 `github.com/Aibrother258/JisuVideo-ai/pull/...`，
+   而不是 `chatfire-AI/huobao-drama`。发到上游会打扰原作者，也不会被合并。
 
 3. **勾选 `Allow edits by maintainers`** —— 方便 owner 直接帮你修小问题，不用反复来回
 4. 标题与描述按 PR 模板填写，说清楚「改了什么 / 为什么 / 怎么自测的」
