@@ -55,7 +55,7 @@
 
 | 编号 | 迭代 | 状态 | 详细日志 |
 |---|---|---|---|
-| HB-20260904-01 | UI P2-B2 试点——episode 拼接导出面板下沉 `EpisodeExportPanel` + `useExportMergesList` 并发令牌 | 完成（PR #45，merge `b11be06`）；经三轮评审（受控勾选提升/最新请求获胜），episode.vue 7069→6759 行，测试 106/106 通过 | [查看归档](../pr-records/2026-09-03-ui-b2-episode-export-panel.md) |
+| HB-20260904-01 | UI P2-B2 试点——episode 拼接导出面板下沉 `EpisodeExportPanel` + `useExportMergesList` 并发令牌 | 完成（PR #45，merge `b11be06`）；共 7 文件 5 提交，经 4 次正式 review（3 Request changes + 1 Approved）；episode.vue 非空行 7069→6802（物理 7422→7150），EpisodeExportPanel 354 非空行/365 物理行；测试 116/116 通过 | [查看归档](../pr-records/2026-09-03-ui-b2-episode-export-panel.md) |
 
 ## 记录规范
 

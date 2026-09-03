@@ -3,9 +3,9 @@
 > 分支：`feat/ui-b2-episode-export-panel`
 > 基准：master（最新 PR #44 `363e3d6`）
 > 日期：2026-09-03（创建）
-> 变更：5 文件 2 提交——`b616b73`（迁移：episode.vue +26/−318、新增 EpisodeExportPanel.vue +361、结构测试两处）+ 自查修复提交（episode.vue +24/−4、组件 25/25、three-state 测试 +11）
+> 变更：7 文件 5 提交——`b616b73`（迁移：episode.vue +26/−318、新增 EpisodeExportPanel.vue +361、结构测试两处）、`d5be58a`（自查修复：镜头勾选提升为页面级受控 + 错误清除）、`37b26f0`（P1 修复：latest-request-wins 并发守卫）、`806553f`（复审修复：竞态处理重构——episodeId getter 校验 + silent 失败不覆盖 initial）、`2f3a357`（复审修复：initial 决策屏障 + resetForEpisode）
 > 关联方案：`docs/ui-optimization-plan.md`（P2-B2「巨型页面拆分」）——先以风险最高、约 7400 行的 `episode.vue` 拆分试点，试点面板为「拼接导出面板」
-> PR：#45（merge commit `b11be06`，2026-09-04）
+> PR：#45（merge commit `b11be06`，2026-09-04）——正式 review 4 次（3 Request changes + 1 Approved），最终测试 116/116
 
 ---
 
@@ -65,15 +65,15 @@ emits:  update:selectedIds(ids)  // 勾选/全选交互新集合 → 主壳 onEx
 
 ## 回归测试
 
-- `npm test`：tests 100 / pass 100 / fail 0 / skipped 0（含自查修复新增的受控选择/错误清除断言）。
+- `npm test`：自查修复后 100/100 → P1 修复（`37b26f0`）后 106/106 → 复审修复（`806553f` + `2f3a357`）后 **116/116**（行为用例 16 条：P1 并发 6、复审第 2 轮 4、复审第 3 轮决策屏障/episode 重置 6）。
 - `npm run build`：通过（Client + Server 均成功）。
-- 拆分后 episode.vue 由 7069 行降至 6802 行（净 −267 行，含修复回增 ~20 行页面级选择状态）；EpisodeExportPanel.vue 350 行，远低于面板 ≤1200 行目标。
+- 拆分后 episode.vue 非空行 7069→6802（物理 7422→7150，净 −267 非空行，含修复回增 ~20 行页面级选择状态）；EpisodeExportPanel.vue 354 非空行 / 365 物理行，远低于面板 ≤1200 行目标。
 
 ## 对后续迭代的影响
 
 - **B2 拆分模式成型**：巨型面板拆分的可复用裁决规则——① 与主壳全局状态（顶栏/侧栏/弹窗共用）纠缠的逻辑留主壳、以令牌/事件协作；② 用户可见的页面级状态（跨面板切换需保留，如本面板勾选集合）同样留主壳受控，仅纯 UI 状态（列表三态）与面板独有样式整体下沉；③ scoped 共享类（空态/布局壳）不复制进子组件；④ 结构测试守卫随 CSS/模板迁移同步改目标文件，保证迁移后仍被断言覆盖。
 - 后续 script/production 巨型面板拆分沿用同一模式；EpisodeExportPanel 为 `components/` 下 episode 专用面板组件（命名带 Episode 前缀防误用），后续面板若跨页面复用再提升为通用组件。
-- 主壳仍约 6759 行，B2 剩余拆分按 plan 继续排期（script 面板为下一个候选）。
+- 主壳仍约 6802 行（非空行口径），B2 剩余拆分按 plan 继续排期（script 面板拆分经 plan v2.8 顺序决策更新提前启动，见 `docs/ui-optimization-plan.md` 修订记录 v2.8）。
 
 ## 注意事项
 
@@ -83,7 +83,9 @@ emits:  update:selectedIds(ids)  // 勾选/全选交互新集合 → 主壳 onEx
 
 ---
 
-## 评审回复（2026-09-03，PR #45 P1 修复）
+## 评审回复（2026-09-03，PR #45 共 4 次正式 review：3 Request changes + 1 Approved）
+
+### 第 1 轮 Request changes（→ `37b26f0`）
 
 Reviewer（Aibrother258）结论：**暂不建议合并**，需先修复 1 个 P1 状态一致性问题后复审；组件边界、受控 `selected-ids`、`mergeData`/轮询留主壳等均确认保留，其余不构成阻塞。
 
@@ -93,4 +95,35 @@ Reviewer（Aibrother258）结论：**暂不建议合并**，需先修复 1 个 P
 - **旧实现缺陷**（组件 `EpisodeExportPanel.vue` 内裸写三态）：请求无取消/序列号/有效性校验。网络返回乱序时：后发请求已拿到最新成片、先发请求随后返回旧列表覆盖（新成片暂时「消失」）；旧 initial 请求在新请求成功后失败会把 `exportListError` 错误横幅写回一份已成功刷新的列表；旧 initial 的 `finally` 还会关闭较新 initial 请求仍在进行的 loading。
 - **修复**：把成片列表三态抽为 `composables/useExportMergesList.ts`（复用 B3/PR #43 paged-hook 的「最新请求获胜」模式）——每次读取递增本地 request revision 并捕获当次 `episodeId`，仅当 `seq === reqSeq`、组件仍挂载（`active`）、`episodeId` 未变化时才允许写 `exportMerges`/`exportListError`/loading；loading 收尾统一由全局最新请求承担（旧请求 `finally` 不得关闭较新 initial 的 loading，被静默刷新超越的旧 initial 也不悬挂）。组件改为消费该 composable：`onMounted` 先 `setActive(true)` 再走 initial 三态，`onUnmounted` `setActive(false)` 使卸载/剧集切换后的迟到响应一律作废。
 - **回归测试**：新增 `tests/episode-export-panel-behavior.test.mjs`（受控 Promise，同 paged-hook-behavior 模式）覆盖：① A（挂载 initial）后发起 B（listRev 静默刷新），B 先成功、A 后成功 → 保持 B 列表；② A 后失败（晚于 B 成功）→ 不写错误横幅；③ 手动刷新（新 initial）先成功、旧 initial 后完成 → 保持新列表且 loading 由最新请求收尾；④ 卸载后迟到响应（成功与失败）不写状态；⑤ episodeId 变更后旧剧集迟到响应丢弃；⑥ 无并发时 initial 失败仍内联错误 + 重试成功清错。结构测试同步更新为断言三态收敛 composable 的解构与约束（`seq !== reqSeq` 丢弃 / `seq === reqSeq && active` 收尾）。
-- **验证**：`npm test` 106/106 通过（此前 100/100）；`npm run build` 通过（停容器后于完整依赖环境复跑，未污染共享 dev 缓存）；dev 容器重启后 3013 页面恢复 dev 资源正常渲染（`@vite/client`、API 200）。
+- **验证（第 1 轮修复后）**：`npm test` 106/106 通过（此前 100/100）；`npm run build` 通过（停容器后于完整依赖环境复跑，未污染共享 dev 缓存）；dev 容器重启后 3013 页面恢复 dev 资源正常渲染（`@vite/client`、API 200）。
+
+### 第 2 轮 Request changes（→ `806553f`）
+
+Reviewer 复审结论：`37b26f0` 已修复「旧成功/旧失败覆盖新成功」主路径，仍有 1 个阻塞边界和 1 个剧集切换校验缺口：
+
+1. **[P1] 后发 silent 请求失败，会作废仍在途 initial 的有效结果**——silent 刷新失败直接落错/收尾，会连仍在途的最新 initial 一起覆盖，最终误显示「暂无成片」；
+2. **[P1] episodeId 校验实为函数参数自比（恒假）**——读不到「当前」剧集 id，切集后的迟到响应无法拦截。
+
+修复（`806553f`，行为用例新增 4 条）：
+- composable 改为读取**当前剧集 id 的 getter**（组件 props 变化即可校验，避免恒假比较）；剧集已切换（含置 0）的迟到响应（成功/失败）一律作废；
+- silent（非 initial）失败只在仍是最新决定者时呈现错误，否则保持旧列表不打扰——**silent 失败不覆盖有效 initial 结果**；loading 收尾只由最新决定者承担，防骨架悬挂。
+
+### 第 3 轮 Request changes（→ `2f3a357`）
+
+Reviewer 复审结论：`806553f` 已修复上轮两个复现用例，新状态机仍有 2 个未覆盖的旧状态回写问题：
+
+1. **[P1] 较新的显式刷新已经失败后，较早的成功响应仍会回写旧列表并清掉新错误**——成功分支只比较 committed（成功者），较新的 initial/手动刷新失败不构成「决定屏障」；
+2. **[P1] 剧集切换只拦截迟到响应、不清理已提交的上一集列表**——切集等待期误显示/误操作上一集成片。
+
+修复（`2f3a357`，行为用例新增 6 条）——最终状态机语义（代码注释同步，master 现状）：
+
+- `issued`：最新发起序号（每次读取自增并捕获）；
+- `committed`：最新成功提交序号——只有更晚的成功结果才淘汰较早成功（最新成功获胜）；
+- `lastInitialSeq`：最新 initial 序号——更新的 initial（含手动刷新）出现后即接管 UI 决策，早于它的成功/失败一律不得回写；**成败决策屏障 = max(committed, lastInitialSeq)**，成功与失败分支同样拒绝 `seq < 屏障`；
+- `resetForEpisode`：剧集切换（含 episodeId=0）时先抬高决策 epoch（`issued/committed/lastInitialSeq` 同步推进）、清空三态（列表/错误/loading）并作废在途请求——旧响应即使绕过 episodeId 校验也无法回写；随后组件按新 id initial（有效 id）或保持空闲空态（id=0 不发请求）。
+
+### 最终 Approved（2026-09-03）
+
+对 `2f3a357` 复核：此前阻塞项（latest-request-wins 主路径、silent 失败不覆盖 initial、episodeId getter 校验、initial 决策屏障、resetForEpisode）全部闭环，未发现新阻塞项。
+
+最终验证：`npm test` **116/116** 通过；`npm run build` 通过；dev 容器重启后 3013 页面恢复 dev 资源正常渲染。
