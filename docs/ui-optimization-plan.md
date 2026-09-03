@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v2.3
+> 版本：v2.4
 > 日期：2026-09-03
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）、StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）与 EmptyState（PR #36，index/detail 三处「虚线框卡片空态」迁移）均随五批 PR 合入，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；B1 余 Skeleton/LoadingButton/Field 与 B2/B3 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）、StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）、EmptyState（PR #36，index/detail 三处「虚线框卡片空态」迁移）与 LoadingButton（PR #38，settings Loader2 图标族 9 处按钮迁移）均随六批 PR 合入，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；B1 余 Field 与 B2/B3 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -25,6 +25,7 @@
 | v2.1 | 2026-09-03 | P2 推进记录（续，**P2-B1 起步收口**）：B1 通用弹窗/抽屉组件抽取经三批 PR 全部合入——PR #30 `c9be4df`（新增 `AppDialog`：`.overlay>.dialog` 骨架 + head/body/foot 三段 + form 开关 + `width` prop 内联宽度 + Esc/遮罩统一关闭；settings 四个配置/风格弹窗迁移，归档见 `docs/pr-records/2026-09-03-ui-b1-dialog-batch1.md`）、PR #31 `04b128a`（detail 创建新集 + episode 新增资产/参考资产选择三处标准弹窗迁移，AppDialog 增 `dialogStyle` 多维尺寸 prop 与 `:style` 数组合并，`ref-asset-picker-overlay` 经组件根透传保留 z-index:120，归档见 `docs/pr-records/2026-09-03-ui-b1-dialog-batch2.md`）、PR #32 `e23ec12`（新增 `AppDrawer`：右侧滑出骨架 + `z-index:118` + `appDrawerIn` 复用 A3 动效 token + 关闭协议对齐；episode 任务抽屉迁移，Esc 经 `esc-close=false` 显式交还页面级 imageViewer→assetDetail→taskDrawer 优先级协议，归档见 `docs/pr-records/2026-09-03-ui-b1-dialog-batch3.md`，索引 HB-20260903-08/09/10）。**边界**：仅标准 head/body/foot 弹窗与标准右侧抽屉迁入组件，素材详情/viewer/多步创建等深度定制界面保留手写（结构测试守卫）；评审建议「最上层弹窗独占 Esc + 焦点返回」记录在案转深度定制界面专项；B1 余 StatusBadge/EmptyState/Skeleton/LoadingButton/Field 与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
 | v2.2 | 2026-09-03 | P2 推进记录（续，**B1 组件再收一子**）：PR #34 合入 `d61683f`（新增 `StatusBadge`：cover 封面玻璃角标 / pill 行内胶囊双形态 + `state` 三态语义 token 映射；detail/episode 共 8 处手写 `.asset-cover-badge`/`.mat-detail-state`/`.asset-detail-state` 迁移，样式逐字节下沉、状态判断与文案留在调用页；原 A1 batch5/A2 batch1 断言改指组件 `.sb-cover`，新增 batch4 断言组，归档见 `docs/pr-records/2026-09-03-ui-b1-badge-batch4.md`，索引 HB-20260903-11）。**边界**：组件只收「形态+状态样式」，中文文案与业务条件不外提；cover 态定位上下文依赖调用页父容器 `position:relative`；B1 余 EmptyState/Skeleton/LoadingButton/Field 与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
 | v2.3 | 2026-09-03 | P2 推进记录（续，**B1 组件再收一子**）：PR #36 合入 `c4cf9eb`（新增 `EmptyState`：props `title`/`desc` + `#icon`/默认插槽，收敛 index/detail 三处「虚线框卡片空态」（项目列表空态 / 素材库全空 / 分类为空），`.empty-desc` max-width 240 vs 260 笔头漂移统一 260px（index 侧 desc 均单行短句不触发换行，视觉零变化）；episode 展示体空态 `.step-empty`、detail 可点击 `.ep-empty` CTA 卡等特殊形态保留手写并测试守卫；归档见 `docs/pr-records/2026-09-03-ui-b1-empty-batch5.md`，索引 HB-20260903-12）。**边界**：组件只收骨架结构，图标/文案/按钮动作留在调用页（`#icon` + 默认插槽）；空态盘点结论：Skeleton 骨架屏全为内联 style 深度定制（`app-skeleton-line` 已全局、`skeleton-card` 仅 index 单点）不适合抽取；LoadingButton（30+ 处跨 4 文件、已分化 3 种 spinner：Loader2/`ring-spinner`/`spinner-sm`）与 FormField（4 文件各自重复 `.field` CSS，gap 5-8/weight 500-600 微差）复用面成立待排期；B1 余 LoadingButton/Field 与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
+| v2.4 | 2026-09-03 | P2 推进记录（续，**B1 组件再收一子**）：PR #38 合入 `bec885a`（新增 `LoadingButton`：props `loading`/`disabled`/`spinnerSize`，模板收敛「busy 时 disabled + `<Loader2>` 前置 + `#icon` 插槽替换 + 默认插槽文案恒渲染」，class/type/@click 经 attrs 透传视觉由调用页决定，`Loader2` 组件内自包含 import——经一轮复核指出父级同名导入不传递给子组件后补入；settings.vue Loader2 图标族 9 处 busy 按钮迁移（`styleExpanding`/`styleSaving`/`agentSaving`/skill 重试与保存/`cfgFetchingModels`/`cfgTesting` 等），非 loading 图标入 `#icon` 插槽、文案三元留默认插槽；settings 内 Loader2 仅剩非按钮「行内加载占位」保留，归档见 `docs/pr-records/2026-09-03-ui-b1-loading-batch6.md`，索引 HB-20260903-13）。**边界**：仅收敛 Loader2 图标族（标准面）；detail/index CSS 环族（`.ring-spinner.sm`/`.spinner-sm`）与 episode 整块加载态（`.step-loading` 24px）视觉不同不迁入，留后续以 settings 为样板逐面推进；B1 余 Field（FormRow）与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
 
 ---
 
@@ -151,7 +152,7 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 
 | 条目 | 说明 | 工作量 | 价值 |
 | --- | --- | --- | --- |
-| B1 通用组件抽取 | `AppDialog`（吸收各页手写 `.overlay>.dialog`）、`AppDrawer`（吸收任务抽屉）、`StatusBadge`、`EmptyState`、`Skeleton`、`LoadingButton`、`Field/FormRow`；先抽后改，视觉不变 | L | 高 |
+| B1 通用组件抽取 | `AppDialog`（吸收各页手写 `.overlay>.dialog`）、`AppDrawer`（吸收任务抽屉）、`StatusBadge`、`EmptyState`、`LoadingButton`、`Field/FormRow`；先抽后改，视觉不变（前五件已收口，余 `Field` 待排期） | L | 高 |
 | B2 巨型页面拆分 | `episode.vue`（296KB）按业务面板拆：storyboard / video-tasks / export / assets / task-drawer；`detail.vue` 拆 ep-list / asset-grid / planner。纯搬移不改行为，复用 Nuxt 自动注册 | L | 高（风险最大项，需分批） |
 | B3 列表分页能力封装 | `usePagedList` hook，供后续分页/虚拟滚动统一接入 | M | 中 |
 

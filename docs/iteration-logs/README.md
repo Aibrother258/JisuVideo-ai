@@ -46,6 +46,7 @@
 | HB-20260903-10 | UI P2-B1 批次三——AppDrawer 右侧抽屉组件 + episode 任务抽屉迁移（Esc 交还页面优先级） | 完成（PR #32，merge `e23ec12`）；结构测试 86/86 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch3.md) |
 | HB-20260903-11 | UI P2-B1 批次四——StatusBadge 状态徽标组件 + detail/episode 封面角标/胶囊迁移 | 完成（PR #34，merge `d61683f`）；结构测试 87/87 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-badge-batch4.md) |
 | HB-20260903-12 | UI P2-B1 批次五——EmptyState 通用空态组件 + index/detail 卡片空态迁移 | 完成（PR #36，merge `c4cf9eb`）；结构测试 88/88 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-empty-batch5.md) |
+| HB-20260903-13 | UI P2-B1 批次六——LoadingButton 通用加载按钮组件 + settings Loader2 图标族按钮迁移 | 完成（PR #38，merge `bec885a`）；经一轮复核修正（Loader2 组件内自包含 import），结构测试 89/89 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-loading-batch6.md) |
 
 ## 记录规范
 
