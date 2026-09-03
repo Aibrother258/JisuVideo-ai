@@ -2,18 +2,35 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 // 真实运行时行为测试：直接加载 usePagedList.ts（含 vue 依赖）。
-// 需 Node ≥22.6 并启用类型剥离运行（npm test 脚本已带 --experimental-strip-types）：
-//   node --experimental-strip-types --test tests/paged-list-hook-behavior.test.mjs
-// 未启用类型剥离时（老命令直接 node --test）无法加载 .ts，此处整体 skip 而非报错。
+// 默认命令 npm test 经 tsx 加载 TS（node --import tsx/esm，Node ≥18，与 backend
+// 既有测试模式一致，不依赖 Node 22 的 --experimental-strip-types，保持项目
+// Node 20 Docker 基线可运行）。运行：
+//   cd frontend && npm test
+// 或指定文件：node --import tsx/esm --test tests/paged-list-hook-behavior.test.mjs
+// 仅当未显式启用任何 TS 加载器（老命令直接 node --test）且加载失败时整体 skip
+// 并提示；默认/显式加载器下加载失败属于真实失败：打印 FATAL 并置退出码非 0。
 let mod = null
 let loadHint = ''
+const tsLoaderEnabled = process.execArgv
+  .concat(process.argv)
+  .some((a) => a.includes('tsx') || a.includes('strip-types'))
 try {
   mod = await import('../app/composables/usePagedList.ts')
 } catch (err) {
   loadHint = String(err?.message || err)
 }
 const { usePagedList } = mod ?? {}
-const skip = loadHint ? `usePagedList.ts 加载失败（需 node --experimental-strip-types）：${loadHint}` : false
+let skip = false
+if (loadHint) {
+  if (tsLoaderEnabled) {
+    // TS 加载器已启用仍加载失败 = 源码/依赖真实错误，必须失败而非跳过
+    console.error(`FATAL: usePagedList.ts 加载失败（TS 加载器已启用）：\n${loadHint}`)
+    process.exitCode = 1
+    skip = `usePagedList.ts 加载失败（见上方 FATAL，本组按失败计，退出码非 0）`
+  } else {
+    skip = `usePagedList.ts 加载失败。请用默认命令 npm test（tsx 加载 TS，Node ≥18）运行本文件；老命令直接 node --test 无法加载 .ts。原始错误：${loadHint}`
+  }
+}
 
 function makeDeferredFetcher() {
   const calls = [] // { query, resolve, reject }
