@@ -3,7 +3,7 @@
 > 分支：`feat/ui-a2-semantic-batch2`
 > 基准：master（含 PR #25 `1c090e1`）
 > 日期：2026-09-03（合入）
-> 变更：9 文件（+190/−88）
+> 变更：9 文件（+197/−91，基准 `1c090e1` 至 merge `5b9ae75` 最终差异）
 > 关联方案：`docs/ui-optimization-plan.md`（v1.8）P1-A2 + `docs/ui-semantic-color-spec.md`（升 v2）
 > PR：#26（merge commit `5b9ae75`，提交 `dfe826b` + 评审补漏 `c06f7af`/`ecdb02b`）
 
@@ -44,7 +44,7 @@
 
 ## 回归测试
 
-- 结构测试 82/82 通过（本机 node v22 实跑）；全仓扫描确认仅余运行时动态 fallback（`--studio-sidebar-width`）。
+- 结构测试 82/82 通过（本机 node v22 实跑）；全仓扫描确认静态 fallback 清零，仅余 7 处运行时动态布局 fallback（`--studio-sidebar-width`、`--storyboard-list-width`、`--storyboard-reference-width`、`--storyboard-description-width`、`--storyboard-video-prompt-height`、`--video-task-list-width`、`--video-preview-height`，均为拖拽/记忆布局的初值兜底，保留）。
 - 值不变改引用为主；全部归一（scrim 并档、画布近黑、accent ring 0.18、success 两处、`#d9534f`）记录于规范 §6。
 
 ## 对后续迭代的影响
