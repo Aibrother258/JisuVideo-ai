@@ -138,10 +138,12 @@ test('residual silent loads get inline error + retry (drawer/picker/models/histo
   assert.match(ep, /v-if="taskListError" class="task-drawer-body"/)
   assert.match(ep, /taskListLoading && !genTaskRows\.length/)
   // 参考素材选择器：失败内联错误 + 重试，不再回落误导空态
-  assert.match(ep, /const refAssetLibraryError = ref\(''\)/)
-  assert.match(ep, /refAssetLibraryError\.value = error\.message \|\| '素材库加载失败'/)
+  // （素材库已接入 usePagedList：loading/loadError 由 hook 统一管理，仍以同名状态驱动内联错误与重试）
+  assert.match(ep, /items: mediaLibraryAssets/)
+  assert.match(ep, /loadError: refAssetLibraryError/)
+  assert.match(ep, /reload: reloadRefAssetLibrary/)
   assert.match(ep, /v-else-if="refAssetLibraryError" class="app-state app-state-error compact-state"/)
-  assert.match(ep, /@click="loadRefAssetLibrary"/)
+  assert.match(ep, /@click="reloadRefAssetLibrary"/)
   // 顶栏模型配置：不再 console 静默，内联提示 + 重试
   assert.match(ep, /const configsLoading = ref\(false\)/)
   assert.match(ep, /const configsError = ref\(''\)/)

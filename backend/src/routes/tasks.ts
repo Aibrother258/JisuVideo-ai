@@ -196,21 +196,37 @@ app.get('/:id', async (c) => {
 })
 
 // GET /tasks — 按 type / storyboard_id / drama_id 过滤（条件下推 SQL，避免全表内存过滤）
+// 过滤/排序/分页全部 SQL 下推；返回 { items, pagination }，items 字段沿用 camelCase（与 GET /tasks/:id 一致）
 app.get('/', async (c) => {
   const type = c.req.query('type')
   const storyboardId = c.req.query('storyboard_id')
   const dramaId = c.req.query('drama_id')
+  const page = Math.max(1, Number(c.req.query('page') || 1))
+  const pageSize = Math.min(100, Math.max(1, Number(c.req.query('page_size') || 20)))
 
   const conds = []
   if (type) conds.push(eq(schema.sysTask.type, type))
   if (storyboardId) conds.push(eq(schema.sysTask.storyboardId, Number(storyboardId)))
   if (dramaId) conds.push(eq(schema.sysTask.dramaId, Number(dramaId)))
 
+  const total = conds.length
+    ? (await db.select({ value: count() }).from(schema.sysTask).where(and(...conds)))[0]?.value ?? 0
+    : (await db.select({ value: count() }).from(schema.sysTask))[0]?.value ?? 0
   const rows = conds.length
-    ? await db.select().from(schema.sysTask).where(and(...conds)).orderBy(desc(schema.sysTask.createdAt))
-    : await db.select().from(schema.sysTask).orderBy(desc(schema.sysTask.createdAt))
+    ? await db.select().from(schema.sysTask)
+        .where(and(...conds))
+        .orderBy(desc(schema.sysTask.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize)
+    : await db.select().from(schema.sysTask)
+        .orderBy(desc(schema.sysTask.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize)
 
-  return success(c, rows)
+  return success(c, {
+    items: rows,
+    pagination: { page, page_size: pageSize, total, total_pages: Math.ceil(total / pageSize) },
+  })
 })
 
 // DELETE /tasks/:id

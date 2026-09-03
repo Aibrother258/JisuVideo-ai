@@ -122,12 +122,15 @@ export const taskAPI = {
   generate: (d: any) => api.post('/tasks', d),
   get: (id: number) => api.get(`/tasks/${id}`),
   del: (id: number) => api.del(`/tasks/${id}`),
-  list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number }) => {
+  list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number; page?: number; page_size?: number }) => {
     const query = new URLSearchParams()
     if (params?.type) query.set('type', params.type)
     if (params?.drama_id) query.set('drama_id', String(params.drama_id))
     if (params?.storyboard_id) query.set('storyboard_id', String(params.storyboard_id))
-    return api.get(`/tasks${query.size ? `?${query.toString()}` : ''}`)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.page_size) query.set('page_size', String(params.page_size))
+    // GET /tasks：items 字段为 camelCase（与 GET /tasks/:id 一致）
+    return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } }>(`/tasks${query.size ? `?${query.toString()}` : ''}`)
   },
   // 按集聚合生成任务（sys_task + video_merges）
   listByEpisode: (episodeId: number) => api.get<{ tasks: any[]; merges: any[] }>(`/episodes/${episodeId}/generation-tasks`),
@@ -155,12 +158,15 @@ export const uploadAPI = {
   audio: (f: File, meta?: Record<string, any>) => uploadReq<{ url: string; path: string; asset_id?: number }>('/upload/audio', f, meta),
 }
 export const assetLibraryAPI = {
-  list: (params?: { drama_id?: number; episode_id?: number; type?: 'image' | 'video' | 'audio' }) => {
+  list: (params?: { drama_id?: number; episode_id?: number; type?: 'image' | 'video' | 'audio'; page?: number; page_size?: number }) => {
     const query = new URLSearchParams()
     if (params?.drama_id) query.set('drama_id', String(params.drama_id))
     if (params?.episode_id) query.set('episode_id', String(params.episode_id))
     if (params?.type) query.set('type', params.type)
-    return api.get(`/assets${query.size ? `?${query.toString()}` : ''}`)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.page_size) query.set('page_size', String(params.page_size))
+    // GET /assets：items 字段为 snake_case（toSnakeCase 输出，与原全量数组元素一致）
+    return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } }>(`/assets${query.size ? `?${query.toString()}` : ''}`)
   },
 }
 export const mergeAPI = {
