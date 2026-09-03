@@ -178,78 +178,55 @@
     <!-- ========== MAIN CONTENT ========== -->
     <main class="main">
       <!-- ===== SCRIPT PANEL ===== -->
+      <!-- P2-B2：剧本编辑面板下沉 EpisodeScriptPanel（编辑器工具条 + 全文文本域受控渲染在组件内）。
+           改写引导空态与改写进行中整块加载态留主壳：.step-empty/.step-loading 与 production guard /
+           assets 提取 / 分镜拆分共用共享态样式，不复制进子组件（与 EpisodeExportPanel 空态同裁决）；
+           编辑缓冲 localRaw/localScript、scriptStep、doRewrite/saveRaw/skipRewrite 与 rn/rt 均为主壳
+           页面级状态（跨面板保留 + 底部气泡/侧栏导航共用），组件经 props/事件通信 -->
       <div v-if="panel === 'script'" class="content-panel">
-        <!-- Step 0: Raw Content -->
-        <div v-if="scriptStep === 0" class="step-editor">
-          <div class="step-toolbar">
-            <div class="toolbar-left">
-              <div class="step-indicator">
-                <span class="step-num">01</span>
-                <span class="step-name">原始内容</span>
-              </div>
-            </div>
-            <div class="toolbar-right">
-              <span v-if="rawLen" class="char-count">{{ rawLen }} 字</span>
-              <button class="btn btn-sm" @click="saveRaw(); toast.success('已保存')">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                保存
-              </button>
-            </div>
+        <!-- Step1 分支由 resolveScriptPanelState 纯函数裁决（utils/episode-script-state.mjs + 行为测试）。
+             回归守卫：无已保存剧本但其他 Agent 运行 -> editor（仍可手工编辑，改写按钮经 running/taskType
+             在组件内 disabled），不得落入本空态 -->
+        <div v-if="scriptPanelState === 'empty-guide'" class="step-empty">
+          <div class="empty-visual">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
           </div>
-          <textarea
-            class="fill-textarea"
-            v-model="localRaw"
-            placeholder="粘贴小说原文、故事大纲或分镜描述..."
-          />
+          <div class="empty-title">AI 改写为格式化剧本</div>
+          <div class="empty-desc">你可以先用 AI 把原始内容整理成格式化剧本，也可以跳过这一步，直接进入资产制作。</div>
+          <div class="step-empty-actions">
+            <button class="btn btn-primary" @click="doRewrite">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              开始改写
+            </button>
+            <button class="btn" @click="skipRewrite">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
+              跳过改写
+            </button>
+          </div>
         </div>
-
-        <!-- Step 1: Rewrite -->
-        <div v-else-if="scriptStep === 1" class="step-editor">
-          <div class="step-toolbar">
-            <div class="toolbar-left">
-              <div class="step-indicator">
-                <span class="step-num">02</span>
-                <span class="step-name">AI 改写</span>
-              </div>
-            </div>
-            <div class="toolbar-right">
-              <span v-if="scriptLen" class="char-count">{{ scriptLen }} 字</span>
-              <button v-if="rawContent" class="btn btn-sm" @click="skipRewrite">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
-                跳过改写
-              </button>
-              <LoadingButton v-if="scriptContent" :loading="rn && rt === 'script_rewriter'" :disabled="rn && rt !== 'script_rewriter'" class="btn btn-sm" spinner-size="11" @click="doRewrite">
-                <template #icon><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></template>
-                重新改写
-              </LoadingButton>
-            </div>
-          </div>
-
-          <div v-if="!scriptContent && !rn" class="step-empty">
-            <div class="empty-visual">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-              </svg>
-            </div>
-            <div class="empty-title">AI 改写为格式化剧本</div>
-            <div class="empty-desc">你可以先用 AI 把原始内容整理成格式化剧本，也可以跳过这一步，直接进入资产制作。</div>
-            <div class="step-empty-actions">
-              <button class="btn btn-primary" @click="doRewrite">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                开始改写
-              </button>
-              <button class="btn" @click="skipRewrite">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
-                跳过改写
-              </button>
-            </div>
-          </div>
-          <div v-else-if="rn && rt === 'script_rewriter'" class="step-loading">
-            <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
-            <div class="loading-text">正在改写剧本...</div>
-          </div>
-          <textarea v-else class="fill-textarea" v-model="localScript" placeholder="格式化剧本内容..." />
+        <!-- 改写进行中：整块加载态（LoadingButton 的改写中 spinner 同样收敛于此态） -->
+        <div v-else-if="scriptPanelState === 'rewriting'" class="step-loading">
+          <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
+          <div class="loading-text">正在改写剧本...</div>
         </div>
+        <!-- 编辑器主体：Step0 原始内容 / Step1 改写编辑 -->
+        <EpisodeScriptPanel
+          v-else
+          :step="scriptStep"
+          :raw="localRaw"
+          :script="localScript"
+          :has-raw="!!rawContent"
+          :has-script="!!scriptContent"
+          :running="rn"
+          :task-type="rt"
+          @save-raw="saveRaw(); toast.success('已保存')"
+          @rewrite="doRewrite"
+          @skip-rewrite="skipRewrite"
+          @update:raw="localRaw = $event"
+          @update:script="localScript = $event"
+        />
       </div>
 
       <!-- ===== PRODUCTION PANEL ===== -->
@@ -1767,6 +1744,8 @@ import AppDrawer from '~/components/AppDrawer.vue'
 import StatusBadge from '~/components/StatusBadge.vue'
 import LoadingButton from '~/components/LoadingButton.vue'
 import EpisodeExportPanel from '~/components/EpisodeExportPanel.vue'
+import EpisodeScriptPanel from '~/components/EpisodeScriptPanel.vue'
+import { resolveScriptPanelState } from '~/utils/episode-script-state.mjs'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
@@ -2058,8 +2037,6 @@ const localRaw = ref(''), localScript = ref('')
 const rawContent = computed(() => episode.value?.content || '')
 const scriptContent = computed(() => episode.value?.script_content || episode.value?.scriptContent || '')
 const epId = computed(() => episode.value?.id || 0)
-const rawLen = computed(() => localRaw.value.replace(/\s/g, '').length || 0)
-const scriptLen = computed(() => localScript.value.replace(/\s/g, '').length || 0)
 const mergeUrl = computed(() => mergeData.value?.merged_url || mergeData.value?.mergedUrl || null)
 
 // ===== 拼接导出（P2-B2）：面板 UI 已下沉 EpisodeExportPanel =====
@@ -2087,6 +2064,14 @@ function onExportSelectedChange(ids) {
 }
 
 const scriptStep = ref(storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)
+// SCRIPT 面板 Step1 分支状态（纯函数裁决，见 utils/episode-script-state.mjs 与行为测试；
+// 修复点：无剧本但其他 Agent 运行时保持 editor——可手工编辑，不得落入改写引导空态）
+const scriptPanelState = computed(() => resolveScriptPanelState({
+  step: scriptStep.value,
+  hasContent: !!scriptContent.value,
+  running: !!rn.value,
+  taskType: rt.value || '',
+}))
 const prodTab = ref(['assets', 'storyboard', 'videos'].includes(storedPanel?.prodTab) ? storedPanel.prodTab : 'assets')
 // 面板位置变化即持久化
 watch([panel, scriptStep, prodTab], ([p, s, t]) => {
@@ -4840,33 +4825,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 }
 
 /* Toolbar */
-.step-toolbar {
-  display: flex; align-items: center; gap: 10px;
-  min-height: 44px;
-  padding: 8px 12px; border-bottom: 1px solid var(--border);
-  background: var(--surface-raised); flex-shrink: 0;
-}
 .prod-toolbar { background: var(--surface-raised); }
-.toolbar-left { display: flex; align-items: center; gap: 8px; flex: 1; }
-.toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.step-indicator { display: flex; align-items: center; gap: 8px; }
-.step-num {
-  width: 26px; height: 26px; border-radius: 10px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--accent-bg);
-  font-family: var(--font-mono); font-size: 10px; font-weight: 800; color: var(--accent-text); letter-spacing: 0.05em;
-}
-.step-name { font-size: 12.5px; font-weight: 700; color: var(--text-1); font-family: var(--font-display); }
-.char-count { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
-
-/* Editor Area */
-.step-editor { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.fill-textarea {
-  flex: 1; border: none; border-radius: 0; padding: 26px 28px;
-  font-size: 13.5px; line-height: 1.9; resize: none; outline: none;
-  font-family: var(--font-body); background: var(--bg-input); color: var(--text-0);
-}
-.fill-textarea:focus { box-shadow: none; }
 
 /* Step Empty State */
 .step-empty {
@@ -7046,7 +7005,6 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
     flex-wrap: wrap;
   }
 
-  .toolbar-right,
   .step-bubble,
   .export-bar {
     flex-wrap: wrap;
