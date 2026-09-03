@@ -388,6 +388,8 @@ test('B1 batch6: LoadingButton owns busy-disabled button with spinner, settings 
   assert.match(lb, /class="animate-spin"/)
   assert.match(lb, /<slot v-else name="icon" \/>/)
   assert.match(lb, /<slot \/>/)
+  // 组件自包含：Loader2 需在组件内 import（父级 settings.vue 的导入不传递给子组件）
+  assert.match(lb, /import \{ Loader2 \} from 'lucide-vue-next'/)
   // settings 模板迁移：9 处按钮内 Loader2 均改 <LoadingButton>，图标入 #icon 插槽，文案三元留默认插槽
   assert.match(settings, /<LoadingButton/)
   assert.match(settings, /:loading="styleExpanding"/)

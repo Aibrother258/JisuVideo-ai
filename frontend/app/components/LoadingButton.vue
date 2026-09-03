@@ -7,6 +7,7 @@
 </template>
 
 <script setup lang="ts">
+import { Loader2 } from 'lucide-vue-next'
 // P2-B1 通用加载按钮：收敛「按钮 + busy 时 disabled + spinner 替换图标」标准结构（先抽后改、视觉零变化）。
 //
 // 用法（busy 判断留在调用页，文案切换经默认插槽三元保留在调用页）：
