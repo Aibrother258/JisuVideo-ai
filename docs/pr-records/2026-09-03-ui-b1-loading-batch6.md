@@ -21,7 +21,7 @@ B1「先抽后改 + 标准面先迁」序列继续。v2.3（empty batch5）归�
 | settings.vue | 9 处 Loader2 图标族按钮（styleExpanding「AI 一键完善」/ styleSaving「保存修改」/ agentSaving「保存」/ skill 重试 + skillSaving「保存」/ cfgFetchingModels「拉取模型」/ cfgTesting「测试连接」/ 弹窗内 styleExpanding 与 styleSaving「保存并切换」）→ `<LoadingButton :loading>`；非 loading 态原图标（Sparkles/RefreshCw 等）入 `#icon` 插槽；文案三元保留默认插槽；手写 `<Loader2 v-if>` spinner 清零 |
 | 测试 | 新增 B1 batch6 断言组：组件 props 三件套 + 自包含 Loader2 import（review 补断言）+ settings 9 处 `:loading` 绑定与 `#icon`/import 迁移 + settings 内 Loader2 仅剩非按钮「行内加载占位」（首次读取 SKILL.md，保留手写）+ 边界守卫（detail `.ring-spinner`/index `.spinner-sm`/episode `.step-loading` 不同视觉族不迁） |
 
-## 评审处理（一轮 CHANGES_REQUESTED → 修正后待复核）
+## 评审处理（一轮 CHANGES_REQUESTED → 修正后通过，merge `bec885a`）
 
 | 反馈 | 处理 |
 |---|---|
@@ -39,8 +39,9 @@ B1「先抽后改 + 标准面先迁」序列继续。v2.3（empty batch5）归�
 
 ## 回归测试
 
-- 结构测试 89/89 通过（本机 node v22 实跑；batch5 后 88/88 + 本批断言组，含 review 补的 import 断言）。
-- `npm run build` 通过（Vue 模板编译含 9 处新组件用法无错误）；lint 0 错误。
+- 结构测试 89/89 通过（`node --test tests/*.test.mjs` 本机 node v22 实跑；batch5 后 88/88 + 本批断言组，含 review 补的 import 断言）。
+- `npm run build` 通过（Vue 模板编译含 9 处新组件用法无错误）。
+- 说明：`frontend/package.json` 无 `lint` 脚本，未执行命令行 lint；类型/模板诊断经 IDE 语言服务（read_lints）检查无 error 级问题。
 
 ## 对后续迭代的影响
 
