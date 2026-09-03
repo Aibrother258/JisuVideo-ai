@@ -13,8 +13,9 @@ app.get('/', async (c) => {
   const dramaId = Number(c.req.query('drama_id') || 0)
   const episodeId = Number(c.req.query('episode_id') || 0)
   const type = String(c.req.query('type') || '').trim().toLowerCase()
-  const page = Math.max(1, Number(c.req.query('page') || 1))
-  const pageSize = Math.min(100, Math.max(1, Number(c.req.query('page_size') || 20)))
+  // parseInt + `|| 默认值` 兜底：Number('abc') 得 NaN，Math.max(1, NaN) 会传播 NaN 进 SQL
+  const page = Math.max(1, Number.parseInt(c.req.query('page') || '1', 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(c.req.query('page_size') || '20', 10) || 20))
 
   // drizzle 的 and/or 在入参为空时返回 undefined，此处条件恒定非空，用 ! 断言收窄为 SQL
   const conds: SQL[] = [isNull(schema.assets.deletedAt)]

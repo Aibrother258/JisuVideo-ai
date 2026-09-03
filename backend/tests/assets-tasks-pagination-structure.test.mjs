@@ -7,12 +7,14 @@ const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
 test('GET /assets: SQL-pushed pagination with drama/episode reuse semantics preserved', () => {
   const src = read('src/routes/assets.ts')
-  // 分页参数解析（page_size clamp 1-100，对齐 GET /dramas）
-  assert.match(src, /const page = Math\.max\(1, Number\(c\.req\.query\('page'\) \|\| 1\)\)/)
-  assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\(c\.req\.query\('page_size'\) \|\| 20\)\)\)/)
+  // 分页参数解析：parseInt + `|| 默认值` 兜底 NaN（page_size clamp 1-100，对齐 GET /dramas）
+  assert.match(src, /const page = Math\.max\(1, Number\.parseInt\(c\.req\.query\('page'\) \|\| '1', 10\) \|\| 1\)/)
+  assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\.parseInt\(c\.req\.query\('page_size'\) \|\| '20', 10\) \|\| 20\)\)/)
   // 过滤条件 SQL 下推：未删除 + 短剧归属（公共素材保留）+ 跨集排除 + type
-  assert.match(src, /const conds = \[isNull\(schema\.assets\.deletedAt\)\]/)
-  assert.match(src, /if \(dramaId\) conds\.push\(or\(isNull\(schema\.assets\.dramaId\), eq\(schema\.assets\.dramaId, dramaId\)\)\)/)
+  // （conds 带 `: SQL[]` 类型注解为类型收窄所需，用可选组匹配避免类型标注改动使测试误挂）
+  assert.match(src, /const conds(?:: SQL\[\])? = \[isNull\(schema\.assets\.deletedAt\)\]/)
+  // `!` 为非空断言（drizzle or/and 入参空时返回 undefined，dramaId 分支恒定非空）；可选组匹配容忍类型收窄写法变化
+  assert.match(src, /if \(dramaId\) conds\.push\(or\(isNull\(schema\.assets\.dramaId\), eq\(schema\.assets\.dramaId, dramaId\)\)!?\)/)
   assert.match(src, /isNotNull\(schema\.assets\.episodeId\)/)
   assert.match(src, /ne\(schema\.assets\.episodeId, episodeId\)/)
   assert.match(src, /if \(type\) conds\.push\(eq\(schema\.assets\.type, type\)\)/)
@@ -27,15 +29,16 @@ test('GET /assets: SQL-pushed pagination with drama/episode reuse semantics pres
 
 test('GET /tasks: existing SQL filters gain page/page_size and { items, pagination } envelope', () => {
   const src = read('src/routes/tasks.ts')
-  // 分页参数解析（clamp 与 GET /assets / GET /dramas 一致）
-  assert.match(src, /const page = Math\.max\(1, Number\(c\.req\.query\('page'\) \|\| 1\)\)/)
-  assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\(c\.req\.query\('page_size'\) \|\| 20\)\)\)/)
+  // 分页参数解析：parseInt + `|| 默认值` 兜底 NaN（clamp 与 GET /assets / GET /dramas 一致）
+  assert.match(src, /const page = Math\.max\(1, Number\.parseInt\(c\.req\.query\('page'\) \|\| '1', 10\) \|\| 1\)/)
+  assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\.parseInt\(c\.req\.query\('page_size'\) \|\| '20', 10\) \|\| 20\)\)/)
   // 既有 type/storyboard_id/drama_id 条件下推保持
   assert.match(src, /if \(type\) conds\.push\(eq\(schema\.sysTask\.type, type\)\)/)
   assert.match(src, /if \(storyboardId\) conds\.push\(eq\(schema\.sysTask\.storyboardId, Number\(storyboardId\)\)\)/)
   assert.match(src, /if \(dramaId\) conds\.push\(eq\(schema\.sysTask\.dramaId, Number\(dramaId\)\)\)/)
-  // count + limit/offset 下推
-  assert.match(src, /db\.select\(\{ value: count\(\) \}\)\.from\(schema\.sysTask\)/)
+  // count + limit/offset 下推：count 与 rows 共用同一 where（条件为空时 .where(undefined) 合法）
+  assert.match(src, /const where = conds\.length \? and\(\.\.\.conds\) : undefined/)
+  assert.match(src, /db\.select\(\{ value: count\(\) \}\)\.from\(schema\.sysTask\)\.where\(where\)/)
   assert.match(src, /\.limit\(pageSize\)\s*\.offset\(\(page - 1\) \* pageSize\)/)
   // 返回 { items: camelCase rows（与 GET /tasks/:id 一致）, pagination }
   assert.match(src, /items: rows,/)

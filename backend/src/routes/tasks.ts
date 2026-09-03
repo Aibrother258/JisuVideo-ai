@@ -201,27 +201,22 @@ app.get('/', async (c) => {
   const type = c.req.query('type')
   const storyboardId = c.req.query('storyboard_id')
   const dramaId = c.req.query('drama_id')
-  const page = Math.max(1, Number(c.req.query('page') || 1))
-  const pageSize = Math.min(100, Math.max(1, Number(c.req.query('page_size') || 20)))
+  // parseInt + `|| 默认值` 兜底：Number('abc') 得 NaN，Math.max(1, NaN) 会传播 NaN 进 SQL
+  const page = Math.max(1, Number.parseInt(c.req.query('page') || '1', 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(c.req.query('page_size') || '20', 10) || 20))
 
   const conds = []
   if (type) conds.push(eq(schema.sysTask.type, type))
   if (storyboardId) conds.push(eq(schema.sysTask.storyboardId, Number(storyboardId)))
   if (dramaId) conds.push(eq(schema.sysTask.dramaId, Number(dramaId)))
-
-  const total = conds.length
-    ? (await db.select({ value: count() }).from(schema.sysTask).where(and(...conds)))[0]?.value ?? 0
-    : (await db.select({ value: count() }).from(schema.sysTask))[0]?.value ?? 0
-  const rows = conds.length
-    ? await db.select().from(schema.sysTask)
-        .where(and(...conds))
-        .orderBy(desc(schema.sysTask.createdAt))
-        .limit(pageSize)
-        .offset((page - 1) * pageSize)
-    : await db.select().from(schema.sysTask)
-        .orderBy(desc(schema.sysTask.createdAt))
-        .limit(pageSize)
-        .offset((page - 1) * pageSize)
+  // 条件为空时 .where(undefined) 合法（条件被忽略），count 与 rows 共用同一 where，与 assets.ts 风格统一
+  const where = conds.length ? and(...conds) : undefined
+  const total = (await db.select({ value: count() }).from(schema.sysTask).where(where))[0]?.value ?? 0
+  const rows = await db.select().from(schema.sysTask)
+    .where(where)
+    .orderBy(desc(schema.sysTask.createdAt))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
 
   return success(c, {
     items: rows,
