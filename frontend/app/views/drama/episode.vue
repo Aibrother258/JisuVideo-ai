@@ -360,9 +360,9 @@
                       <div v-else class="character-portrait-empty">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                       </div>
-                      <span class="asset-cover-badge" :class="(c.image_url || c.imageUrl) ? 'is-ready' : (isPendingCharImage(c.id) ? 'is-pending' : '')">
+                      <StatusBadge variant="cover" :state="(c.image_url || c.imageUrl) ? 'ready' : (isPendingCharImage(c.id) ? 'pending' : '')">
                         {{ (c.image_url || c.imageUrl) ? '形象已生成' : (isPendingCharImage(c.id) ? '形象生成中' : '形象待生成') }}
-                      </span>
+                      </StatusBadge>
                     </div>
 
                     <div class="character-asset-head">
@@ -425,7 +425,7 @@
                   <div v-else class="asset-cover-empty">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
-                  <span class="asset-cover-badge" :class="(s.image_url || s.imageUrl) ? 'is-ready' : (isPendingSceneImage(s.id) ? 'is-pending' : '')">{{ (s.image_url || s.imageUrl) ? '已生成' : (isPendingSceneImage(s.id) ? '生成中' : '待生成') }}</span>
+                  <StatusBadge variant="cover" :state="(s.image_url || s.imageUrl) ? 'ready' : (isPendingSceneImage(s.id) ? 'pending' : '')">{{ (s.image_url || s.imageUrl) ? '已生成' : (isPendingSceneImage(s.id) ? '生成中' : '待生成') }}</StatusBadge>
                 </div>
                 <div class="asset-body">
                   <div class="asset-name" :title="s.location">{{ s.location }}</div>
@@ -480,7 +480,7 @@
                   <div v-else class="asset-cover-empty">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                   </div>
-                  <span class="asset-cover-badge" :class="(p.image_url || p.imageUrl) ? 'is-ready' : (isPendingPropImage(p.id) ? 'is-pending' : '')">{{ (p.image_url || p.imageUrl) ? '已生成' : (isPendingPropImage(p.id) ? '生成中' : '待生成') }}</span>
+                  <StatusBadge variant="cover" :state="(p.image_url || p.imageUrl) ? 'ready' : (isPendingPropImage(p.id) ? 'pending' : '')">{{ (p.image_url || p.imageUrl) ? '已生成' : (isPendingPropImage(p.id) ? '生成中' : '待生成') }}</StatusBadge>
                 </div>
                 <div class="asset-body">
                   <div class="prop-name-row">
@@ -1561,9 +1561,9 @@
               <aside class="asset-detail-preview-panel">
                 <div class="asset-detail-section-title">
                   <span>视觉预览</span>
-                  <span :class="['asset-detail-state', assetImageSrc(assetDetail.item) ? 'is-ready' : '']">
+                  <StatusBadge :state="assetImageSrc(assetDetail.item) ? 'ready' : ''">
                     {{ assetImageSrc(assetDetail.item) ? '已生成' : '待生成' }}
-                  </span>
+                  </StatusBadge>
                 </div>
 
                 <button
@@ -1669,9 +1669,9 @@
                     <Loader2 v-if="isGeneratingPrompt(assetDetail.type, assetDetail.item.id)" :size="11" class="animate-spin" />
                     {{ isGeneratingPrompt(assetDetail.type, assetDetail.item.id) ? '生成中' : (assetFinalPrompt ? '重新生成' : '生成提示词') }}
                   </button>
-                  <span :class="['asset-detail-state', assetFinalPrompt && 'is-ready']">
+                  <StatusBadge :state="assetFinalPrompt ? 'ready' : ''">
                     {{ assetFinalPrompt ? '已生成' : '待生成' }}
-                  </span>
+                  </StatusBadge>
                   <button
                     v-if="assetPromptDraft"
                     class="btn btn-ghost btn-sm asset-detail-copy-btn"
@@ -1900,6 +1900,7 @@ import {
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, assetLibraryAPI } from '~/composables/useApi'
 import AppDialog from '~/components/AppDialog.vue'
 import AppDrawer from '~/components/AppDrawer.vue'
+import StatusBadge from '~/components/StatusBadge.vue'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
@@ -5944,30 +5945,6 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .asset-cover img { width: 100%; height: 100%; object-fit: cover; }
 .previewable-image { cursor: zoom-in; transition: transform var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
 .previewable-image:hover { transform: scale(1.015); filter: saturate(1.04); }
-.asset-cover-badge {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--surface-glass);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-float);
-  color: var(--text-2);
-  font-size: 9.5px;
-  font-weight: 700;
-}
-.asset-cover-badge.is-ready {
-  background: var(--success-bg);
-  color: var(--success-strong);
-}
-.asset-cover-badge.is-pending {
-  background: var(--accent-bg);
-  color: var(--accent-text);
-}
 .asset-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .asset-body {
   flex: 1;
@@ -6732,22 +6709,6 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   font-weight: 560;
   letter-spacing: 0;
   text-align: right;
-}
-.asset-detail-state {
-  min-height: 20px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--fill-subtle);
-  color: var(--text-3);
-  font-size: 10px;
-  font-weight: 760;
-  white-space: nowrap;
-}
-.asset-detail-state.is-ready {
-  color: var(--success);
-  background: var(--success-bg);
 }
 .asset-detail-media-frame {
   position: relative;

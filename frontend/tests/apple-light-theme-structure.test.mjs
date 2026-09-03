@@ -55,6 +55,7 @@ test('A1 token batch4: badge/on-dark/panel whites resolve to tokens across core 
 
 test('A1 token batch5: episode player dark stage / on-media whites / status outlines resolve to tokens', () => {
   const episode = read('../app/views/drama/episode.vue')
+  const statusBadge = read('../app/components/StatusBadge.vue')
   // 媒体深色台面 token（letterbox 底 #0b0d10×4：历史缩略图 / 播放舞台 / merge 卡视频 / exp 缩略图）
   assert.match(studioCss, /--media-stage-bg: #0b0d10;/)
   assert.match(episode, /\.video-history-item[\s\S]*?background: var\(--media-stage-bg\)/)
@@ -74,10 +75,10 @@ test('A1 token batch5: episode player dark stage / on-media whites / status outl
   assert.match(episode, /\.video-history-time[\s\S]*?color: var\(--text-invert\)/)
   assert.match(episode, /\.prod-overlay-badge[\s\S]*?color: var\(--text-invert\)/)
   assert.match(episode, /\.exp-thumb-duration[\s\S]*?color: var\(--text-invert\)/)
-  // 白底卡/激活块 → 表面 token；玻璃徽标/浮层 → 既有 glass/float token
+  // 白底卡/激活块 → 表面 token；玻璃徽标/浮层 → 既有 glass/float token（B1 batch4 起徽标样式下沉组件）
   assert.match(episode, /\.stage-subnav-item\.active[\s\S]*?background: var\(--surface-raised\)/)
   assert.match(episode, /\.merge-card[\s\S]*?background: var\(--surface-raised\)/)
-  assert.match(episode, /\.asset-cover-badge[\s\S]*?background: var\(--surface-glass\)/)
+  assert.match(statusBadge, /\.sb-cover[\s\S]*?background: var\(--surface-glass\)/)
   // 批次内 #fff 白字白底与深色台面字面量清零（#000/#111/半透明白等单次低价值字面量留待 A2 色板）
   assert.doesNotMatch(episode, /color: #fff/)
   assert.doesNotMatch(episode, /background: #fff/)
@@ -87,6 +88,7 @@ test('A1 token batch5: episode player dark stage / on-media whites / status outl
 test('A2 batch1: detail asset-kind/status semantic colors and amber notice banner resolve to tokens', () => {
   const detail = read('../app/views/drama/detail.vue')
   const layout = read('../app/layouts/default.vue')
+  const statusBadge = read('../app/components/StatusBadge.vue')
   // 资产类别语义 token（scene 绿 / prop 琥珀；character 沿用 accent）
   assert.match(studioCss, /--kind-scene:\s*#16a34a;/)
   assert.match(studioCss, /--kind-scene-strong:\s*#15803d;/)
@@ -107,8 +109,8 @@ test('A2 batch1: detail asset-kind/status semantic colors and amber notice banne
   // 「制作中」状态归入 success 家族（原 scene 同值绿 #16a34a 属状态语义）
   assert.match(detail, /\.ep-status-active[\s\S]*?background: var\(--success-bg\)[\s\S]*?color: var\(--success-strong\)/)
   assert.match(detail, /\.dot-active[\s\S]*?box-shadow: 0 0 4px var\(--success-border-strong\)/)
-  // detail 素材封面玻璃徽标 → 既有 glass/float token（同值）
-  assert.match(detail, /\.asset-cover-badge[\s\S]*?background: var\(--surface-glass\)[\s\S]*?box-shadow: var\(--shadow-float\)/)
+  // 素材封面玻璃徽标 → 既有 glass/float token（同值；B1 batch4 起样式下沉 StatusBadge 组件）
+  assert.match(statusBadge, /\.sb-cover[\s\S]*?background: var\(--surface-glass\)[\s\S]*?box-shadow: var\(--shadow-float\)/)
   // 布局 amber 横幅字面量清零、改引用
   assert.match(layout, /\.config-banner[\s\S]*?color: var\(--notice-text\)[\s\S]*?background: var\(--notice-bg\)[\s\S]*?border-bottom: 1px solid var\(--notice-border\)/)
   assert.match(layout, /\.config-banner-link[\s\S]*?color: var\(--notice-link\)[\s\S]*?border: 1px solid var\(--notice-link-border\)/)
@@ -311,4 +313,29 @@ test('B1 batch3: AppDrawer owns right-drawer shell, episode task drawer migrated
   assert.match(episode, /\.task-drawer-head-actions \{/)
   assert.match(episode, /\.task-drawer-metrics \{/)
   assert.match(episode, /\.task-drawer-body \{/)
+})
+
+test('B1 batch4: StatusBadge owns cover glass badge + state pill, detail/episode migrated', () => {
+  const badge = read('../app/components/StatusBadge.vue')
+  const detail = read('../app/views/drama/detail.vue')
+  const episode = read('../app/views/drama/episode.vue')
+  // 组件收敛两类状态徽标：variant=cover 封面玻璃角标 / pill 行内胶囊（默认）；state 三态
+  assert.match(badge, /variant\?: 'cover' \| 'pill'/)
+  assert.match(badge, /state\?: '' \| 'ready' \| 'pending'/)
+  assert.match(badge, /class="status-badge"/)
+  // 玻璃角标 / 胶囊配色随状态映射语义 token（原 .asset-cover-badge.is-* / .*-detail-state.is-ready）
+  assert.match(badge, /\.sb-cover\.is-ready[\s\S]*?background: var\(--success-bg\)/)
+  assert.match(badge, /\.sb-cover\.is-pending[\s\S]*?background: var\(--accent-bg\)/)
+  assert.match(badge, /\.sb-pill[\s\S]*?background: var\(--fill-subtle\)/)
+  assert.match(badge, /\.sb-pill\.is-ready[\s\S]*?color: var\(--success\)/)
+  // detail/episode 模板迁移：cover 角标 + pill 状态均改 <StatusBadge>，状态判断/文案保留在调用页
+  assert.match(detail, /<StatusBadge variant="cover"/)
+  assert.match(detail, /<StatusBadge :state="matHasImage\(editTarget\)/)
+  assert.match(episode, /<StatusBadge variant="cover"/)
+  assert.match(episode, /<StatusBadge :state="assetImageSrc\(assetDetail\.item\)/)
+  // 页面手写徽标样式清零（视觉零变化，样式下沉组件内；scoped 页面类对组件内部不可见）
+  assert.doesNotMatch(detail, /\.asset-cover-badge/)
+  assert.doesNotMatch(detail, /\.asset-detail-state/)
+  assert.doesNotMatch(episode, /\.asset-cover-badge/)
+  assert.doesNotMatch(episode, /\.asset-detail-state/)
 })
