@@ -38,6 +38,8 @@
 | HB-20260903-02 | UI P1 Token 收敛 A1 第四批——白字白底语义化与徽标投影 token | 完成（PR #20，merge `e2f6f42`）；结构测试 77/77 通过 | [查看归档](../pr-records/2026-09-03-ui-token-a1-batch4.md) |
 | HB-20260903-03 | UI P1 Token 收敛 A1 第五批——episode 播放器深色与状态色 token | 完成（PR #22，merge `cf3a301`）；结构测试 78/78 通过 | [查看归档](../pr-records/2026-09-03-ui-token-a1-batch5.md) |
 | HB-20260903-04 | 设置页「音频服务」配置板块与 AutoDL IndexTTS2 预设（配音/旁白前置配置层） | 完成（PR #21，merge `e3c0724`）；经两轮评审边界收敛，前端结构测试 80/80、后端相关 18/18 通过 | [查看归档](../pr-records/2026-09-03-audio-service-config-settings-board.md) |
+| HB-20260903-05 | UI A2 语义色板规范批次一——资产类别/状态语义色与 amber 提示横幅 token 化 | 完成（PR #25，merge `1c090e1`）；结构测试 81/81 通过 | [查看归档](../pr-records/2026-09-03-ui-semantic-a2-batch1.md) |
+| HB-20260903-06 | UI A2 语义色板规范批次二——episode 媒体遮罩/白字、R5/R6 全仓清理、new-style 家族 | 完成（PR #26，merge `5b9ae75`）；经两轮 R5 补漏评审，结构测试 82/82 通过 | [查看归档](../pr-records/2026-09-03-ui-semantic-a2-batch2.md) |
 
 ## 记录规范
 
