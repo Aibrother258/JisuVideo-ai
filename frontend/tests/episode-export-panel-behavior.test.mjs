@@ -34,9 +34,17 @@ function makeDeferred() {
   return { fetchMerges, calls }
 }
 
+// P2 复审：composable 以 getter 读「当前」episodeId。测试内用 setEp 模拟剧集切换
+// （含“已切换但尚未发出第二次请求”与“置 0”场景，旧实现无法覆盖）。
+function makeCtl(fetchMerges, initialEp = 7) {
+  let currentEp = initialEp
+  const ctl = useExportMergesList(fetchMerges, () => currentEp)
+  return { ctl, setEp: (v) => { currentEp = v } }
+}
+
 test('P1 #45 behavior: B(listRev silent) 先成功、A(挂载 initial) 后成功 -> 保持 B 列表', { skip }, async () => {
   const { fetchMerges, calls } = makeDeferred()
-  const ctl = useExportMergesList(fetchMerges)
+  const { ctl } = makeCtl(fetchMerges)
 
   const a = ctl.loadExportMerges(7, true) // A: 面板挂载 initial
   assert.equal(calls.length, 1)
@@ -61,7 +69,7 @@ test('P1 #45 behavior: B(listRev silent) 先成功、A(挂载 initial) 后成功
 
 test('P1 #45 behavior: A 后失败（晚于 B 成功）-> 不写错误横幅，保持 B 列表', { skip }, async () => {
   const { fetchMerges, calls } = makeDeferred()
-  const ctl = useExportMergesList(fetchMerges)
+  const { ctl } = makeCtl(fetchMerges)
 
   const a = ctl.loadExportMerges(7, true) // A: initial，随后将失败
   const b = ctl.loadExportMerges(7)       // B: silent，先成功
@@ -79,7 +87,7 @@ test('P1 #45 behavior: A 后失败（晚于 B 成功）-> 不写错误横幅，�
 
 test('P1 #45 behavior: 手动刷新(initial2)先成功、旧 initial1 后完成 -> 保持新列表且 loading 由最新请求收尾', { skip }, async () => {
   const { fetchMerges, calls } = makeDeferred()
-  const ctl = useExportMergesList(fetchMerges)
+  const { ctl } = makeCtl(fetchMerges)
 
   const a = ctl.loadExportMerges(7, true)  // A: 挂载 initial（慢）
   assert.equal(ctl.exportListLoading.value, true)
@@ -101,7 +109,7 @@ test('P1 #45 behavior: 手动刷新(initial2)先成功、旧 initial1 后完成 
 
 test('P1 #45 behavior: 卸载后迟到响应一律丢弃（成功与失败均不写状态）', { skip }, async () => {
   const { fetchMerges, calls } = makeDeferred()
-  const ctl = useExportMergesList(fetchMerges)
+  const { ctl } = makeCtl(fetchMerges)
 
   const a = ctl.loadExportMerges(7, true)
   const b = ctl.loadExportMerges(7) // silent，在途
@@ -119,15 +127,16 @@ test('P1 #45 behavior: 卸载后迟到响应一律丢弃（成功与失败均不
 
 test('P1 #45 behavior: episodeId 变更后旧剧集迟到响应被丢弃（不污染新剧集列表）', { skip }, async () => {
   const { fetchMerges, calls } = makeDeferred()
-  const ctl = useExportMergesList(fetchMerges)
+  const { ctl, setEp } = makeCtl(fetchMerges, 1) // 初始当前剧集 = 1
 
   const old = ctl.loadExportMerges(1, true) // 剧集 1 initial（慢）
+  setEp(2)                                  // 当前剧集切到 2
   const now = ctl.loadExportMerges(2, true) // 剧集 2 initial（快）
   calls[1].resolve([{ id: 'ep2-new' }])
   await now
   assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['ep2-new'])
 
-  // 剧集 1 的旧响应迟到：不得覆盖剧集 2 的列表或写错误
+  // 剧集 1 的旧响应迟到：经 getter 校验当前剧集已是 2，不得覆盖剧集 2 的列表或写错误
   calls[0].resolve([{ id: 'ep1-old' }])
   await old
   assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['ep2-new'])
@@ -135,9 +144,76 @@ test('P1 #45 behavior: episodeId 变更后旧剧集迟到响应被丢弃（不�
   assert.equal(ctl.exportListLoading.value, false)
 })
 
+test('P1 #45 复审: A(initial) 在途、B(silent) 先失败 -> A 后成功仍落盘（不得误显“暂无成片”）', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl } = makeCtl(fetchMerges)
+
+  const a = ctl.loadExportMerges(7, true) // A: 挂载 initial（慢，随后成功）
+  assert.equal(ctl.exportListLoading.value, true)
+  const b = ctl.loadExportMerges(7)       // B: listRev silent（后发、先失败）
+  calls[1].reject(new Error('silent boom'))
+  await b
+  // B 失败：不得作废在途 A，也不得提前关闭其 loading（骨架应保留到 A 落定）
+  assert.equal(ctl.exportListLoading.value, true)
+  assert.equal(ctl.exportListError.value, '')
+
+  calls[0].resolve([{ id: 'A-list' }])
+  await a
+  // 最终必须展示 A 的列表，不能是无错误空态
+  assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['A-list'])
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P1 #45 复审: A/B 都失败 -> initial 呈现错误、silent 不写错误、loading 收尾', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl } = makeCtl(fetchMerges)
+
+  const a = ctl.loadExportMerges(7, true) // A: initial
+  const b = ctl.loadExportMerges(7)       // B: silent（先失败）
+  calls[1].reject(new Error('silent boom'))
+  await b
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, true) // silent 失败不关闭 initial 的 loading
+
+  calls[0].reject(new Error('initial boom'))
+  await a
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, 'initial boom')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P2 #45 复审: 当前剧集已切换但第二次请求未发出 -> 旧响应必须被丢弃', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl, setEp } = makeCtl(fetchMerges, 7)
+
+  const a = ctl.loadExportMerges(7, true) // 剧集 7 initial（慢）
+  assert.equal(ctl.exportListLoading.value, true)
+  setEp(9)                                // 剧集已切到 9，但尚未发起第二次请求
+  calls[0].resolve([{ id: 'ep7-old' }])
+  await a
+  // 旧剧集响应作废：不写列表、不写错误；作为被抛弃的最新 initial 回收 loading 防骨架悬挂
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P2 #45 复审: episodeId 置 0 后旧响应同样不能写回', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl, setEp } = makeCtl(fetchMerges, 7)
+
+  const a = ctl.loadExportMerges(7, true) // 剧集 7 initial（慢）
+  setEp(0)                                // 剧集被清空（删除/切离），load 会提前 return 不递增序号
+  calls[0].resolve([{ id: 'ep7-old' }])
+  await a
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
 test('P1 #45 behavior: 无并发时 initial 失败仍正常呈现内联错误并可重试', { skip }, async () => {
   const { fetchMerges, calls } = makeDeferred()
-  const ctl = useExportMergesList(fetchMerges)
+  const { ctl } = makeCtl(fetchMerges)
 
   const a = ctl.loadExportMerges(7, true)
   calls[0].reject(new Error('boom'))

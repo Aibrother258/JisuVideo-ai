@@ -106,8 +106,18 @@ test('export panel shows inline merge error with retry and list load states', ()
   // 该清理与“最新请求获胜/卸载作废”约束位于 useExportMergesList composable 内
   const hook = read('app/composables/useExportMergesList.ts')
   assert.match(hook, /if \(exportListError\.value\) exportListError\.value = ''/)
-  assert.match(hook, /seq !== reqSeq/)
-  assert.match(hook, /if \(seq === reqSeq && active\) exportListLoading\.value = false/)
+  // P1/P2 复审：分开维护「最新发起序号」与「最新成功提交序号」——只有更晚的成功才淘汰较早成功，
+  // 失败的 silent 不得作废在途 initial（其成功照常落盘），错误/loading 只由最新 initial 决定者收尾
+  assert.match(hook, /let issued = 0/)
+  assert.match(hook, /let committed = 0/)
+  assert.match(hook, /if \(seq < committed\) return/)
+  assert.match(hook, /committed = seq/)
+  assert.match(hook, /seq === lastInitialSeq/)
+  // episodeId 以 getter 读「当前」值（P2：消除函数参数自比的恒假校验）
+  assert.match(hook, /getEpisodeId: \(\) => number/)
+  // 组件传当前 episodeId getter，并监听剧集切换重新 initial（面板未重挂载时按新 id 加载）
+  assert.match(panel, /useExportMergesList\([\s\S]*?, \(\) => props\.episodeId\)/)
+  assert.match(panel, /watch\(\(\) => props\.episodeId,/)
 })
 
 test('residual silent loads get inline error + retry (drawer/picker/models/history)', () => {

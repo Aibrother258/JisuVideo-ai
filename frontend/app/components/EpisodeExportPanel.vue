@@ -181,8 +181,10 @@ function formatHistoryTime(iso) {
 // 成片列表加载三态（P0-C3 + P1 评审修复）：抽取为 useExportMergesList —— 以“最新请求获胜”
 // （request revision + 挂载态 + episodeId 校验）处理 挂载 initial / listRev 静默刷新 / 手动刷新
 // 三路并发读取，防止旧响应覆盖新列表、旧失败写回错误横幅、旧 finally 关闭新 initial 的 loading。
+// 第二个参数为「当前 episodeId」getter：响应回来时 composable 比对 props 的最新值，
+// 剧集切换/置 0 后迟到的旧剧集响应经此作废（P2 复审，消除函数参数自比的恒假校验）
 const { exportMerges, exportListLoading, exportListError, loadExportMerges: runLoadMerges, setActive } =
-  useExportMergesList((ep) => mergeAPI.list(ep))
+  useExportMergesList((ep) => mergeAPI.list(ep), () => props.episodeId)
 
 // 组件内包装：episodeId 来自 props；模板/事件仍以 (initial?) 签名调用
 function loadExportMerges(initial = false) {
@@ -208,6 +210,9 @@ function toggleSelectAllExport() {
 
 // 主壳 refresh / 拼接完成 -> 静默刷新（初始三态由 onMounted 承担，避免面板未挂载时空转）
 watch(() => props.listRev, () => loadExportMerges())
+// 剧集切换（prop 变化但面板未重挂载）：按新 id 立即重新 initial，并让 composable 的
+// episodeId getter 作废在途旧剧集响应；切至 0 时不发起（loadExportMerges 内 !episodeId 提前返回）
+watch(() => props.episodeId, () => { if (props.episodeId) loadExportMerges(true) })
 onMounted(() => { setActive(true); loadExportMerges(true) })
 // 卸载后迟到的响应（网络乱序 / 剧集切换）一律作废，不得再写列表或错误态
 onUnmounted(() => setActive(false))
