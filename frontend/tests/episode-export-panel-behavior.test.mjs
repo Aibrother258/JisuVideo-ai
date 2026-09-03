@@ -230,3 +230,119 @@ test('P1 #45 behavior: 无并发时 initial 失败仍正常呈现内联错误并
   assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['R1'])
   assert.equal(ctl.exportListLoading.value, false)
 })
+
+// ===== P1/P2 #45 复审 2（commit 806553f 之后）：决策屏障 + 剧集切换清理 =====
+
+test('P1 #45 复审2: 较新 initial 先失败、较早 initial 后成功 -> 旧成功不得清除新错误', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl } = makeCtl(fetchMerges)
+
+  const a = ctl.loadExportMerges(7, true) // A: 较早 initial（慢）
+  const c = ctl.loadExportMerges(7, true) // C: 较新手动刷新 initial
+  calls[1].reject(new Error('newer refresh failed'))
+  await c
+  assert.equal(ctl.exportListError.value, 'newer refresh failed')
+  assert.equal(ctl.exportListLoading.value, false)
+
+  // A 后成功返回旧列表：不得落盘，也不得清除 C 已呈现的错误
+  calls[0].resolve([{ id: 'older-success' }])
+  await a
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, 'newer refresh failed')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P1 #45 复审2: 较新 initial 先失败、较早 silent 后成功 -> 同样不得回写旧列表', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl } = makeCtl(fetchMerges)
+
+  const a = ctl.loadExportMerges(7)       // A: 较早 silent（慢）
+  const c = ctl.loadExportMerges(7, true) // C: 较新手动刷新 initial
+  calls[1].reject(new Error('newer refresh failed'))
+  await c
+  assert.equal(ctl.exportListError.value, 'newer refresh failed')
+  assert.equal(ctl.exportListLoading.value, false)
+
+  calls[0].resolve([{ id: 'older-silent-success' }])
+  await a
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, 'newer refresh failed')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P1 #45 复审2: 列表已有数据时较新 initial 失败，较早成功也不得回退列表并清错误', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl } = makeCtl(fetchMerges)
+
+  const base = ctl.loadExportMerges(7, true) // 基线列表（成功后展示）
+  calls[0].resolve([{ id: 'base-list' }])
+  await base
+  assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['base-list'])
+
+  const a = ctl.loadExportMerges(7, true) // A: 较早刷新（慢）
+  const c = ctl.loadExportMerges(7, true) // C: 较新刷新（先失败 -> 错误横幅）
+  calls[2].reject(new Error('newer refresh failed'))
+  await c
+  assert.equal(ctl.exportListError.value, 'newer refresh failed')
+  assert.equal(ctl.exportListLoading.value, false)
+
+  // A 后成功返回旧列表：不得覆盖 base 展示、不得清除错误
+  calls[1].resolve([{ id: 'stale-rollback' }])
+  await a
+  assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['base-list'])
+  assert.equal(ctl.exportListError.value, 'newer refresh failed')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P1/P2 #45 复审2: 已有 ep1 列表 -> 切 ep2，ep2 响应前不得展示 ep1', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl, setEp } = makeCtl(fetchMerges, 1)
+
+  const p1 = ctl.loadExportMerges(1, true)
+  calls[0].resolve([{ id: 'ep1' }])
+  await p1
+  assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['ep1'])
+
+  setEp(2)
+  ctl.resetForEpisode() // 组件 watch(props.episodeId) 先调 reset 再 initial
+  // ep2 响应回来前：不得误显示上一集 ep1 成片
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, false)
+
+  const p2 = ctl.loadExportMerges(2, true)
+  calls[1].resolve([{ id: 'ep2' }])
+  await p2
+  assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['ep2'])
+})
+
+test('P1/P2 #45 复审2: 已有列表 -> id=0，reset 后必须立即清空', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl, setEp } = makeCtl(fetchMerges, 1)
+
+  const p1 = ctl.loadExportMerges(1, true)
+  calls[0].resolve([{ id: 'ep1' }])
+  await p1
+  assert.deepEqual(ctl.exportMerges.value.map((x) => x.id), ['ep1'])
+
+  setEp(0)
+  ctl.resetForEpisode() // 切到 0：收敛为空闲空态（组件不再发请求）
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, false)
+})
+
+test('P1/P2 #45 复审2: id=0 后 ep2 迟到响应不得恢复任何旧数据', { skip }, async () => {
+  const { fetchMerges, calls } = makeDeferred()
+  const { ctl, setEp } = makeCtl(fetchMerges, 2)
+
+  const late = ctl.loadExportMerges(2, true) // ep2 initial（慢，在途）
+  setEp(0)                                   // 切到 0：组件 reset 并停发新请求
+  ctl.resetForEpisode()
+  calls[0].resolve([{ id: 'ep2-late' }])
+  await late
+  // ep2 迟到响应不得恢复任何旧数据（getter 校验 + 抬高的决策 epoch 双重作废）
+  assert.deepEqual(ctl.exportMerges.value, [])
+  assert.equal(ctl.exportListError.value, '')
+  assert.equal(ctl.exportListLoading.value, false)
+})

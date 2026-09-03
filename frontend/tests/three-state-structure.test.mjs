@@ -110,14 +110,21 @@ test('export panel shows inline merge error with retry and list load states', ()
   // 失败的 silent 不得作废在途 initial（其成功照常落盘），错误/loading 只由最新 initial 决定者收尾
   assert.match(hook, /let issued = 0/)
   assert.match(hook, /let committed = 0/)
-  assert.match(hook, /if \(seq < committed\) return/)
+  assert.match(hook, /let lastInitialSeq = 0/)
+  // P1/P2 复审2：最新 initial 也是决策屏障——更新的 initial 失败后，早于它的成功不得回写旧列表
+  // 或清除新错误（success 与 catch 均拒绝 seq < committed 或 seq < lastInitialSeq）
+  assert.match(hook, /if \(seq < committed \|\| seq < lastInitialSeq\) return/)
   assert.match(hook, /committed = seq/)
   assert.match(hook, /seq === lastInitialSeq/)
   // episodeId 以 getter 读「当前」值（P2：消除函数参数自比的恒假校验）
   assert.match(hook, /getEpisodeId: \(\) => number/)
-  // 组件传当前 episodeId getter，并监听剧集切换重新 initial（面板未重挂载时按新 id 加载）
+  // P1/P2 复审2：剧集切换需清空上一集已展示数据——resetForEpisode 作废在途请求并清三态
+  assert.match(hook, /function resetForEpisode\(\)/)
+  assert.match(hook, /return \{ exportMerges, exportListLoading, exportListError, loadExportMerges, setActive, resetForEpisode \}/)
+  // 组件传当前 episodeId getter，监听剧集切换：先 reset 清空上一集数据，id 有效再按新集 initial
+  // （id=0 收敛为空闲空态），避免 ep2 响应前误显示/误操作 ep1 成片
   assert.match(panel, /useExportMergesList\([\s\S]*?, \(\) => props\.episodeId\)/)
-  assert.match(panel, /watch\(\(\) => props\.episodeId,/)
+  assert.match(panel, /watch\(\(\) => props\.episodeId, \(\) => \{[\s\S]*?resetForEpisode\(\)[\s\S]*?if \(props\.episodeId\) loadExportMerges\(true\)/)
 })
 
 test('residual silent loads get inline error + retry (drawer/picker/models/history)', () => {
