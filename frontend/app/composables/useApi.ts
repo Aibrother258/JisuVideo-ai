@@ -48,7 +48,15 @@ export const api = {
 }
 
 export const dramaAPI = {
-  list: () => api.get<{ items: any[] }>('/dramas'),
+  // GET /dramas：后端支持 page/page_size/keyword/status（列表分页契约见 usePagedList.ts）；缺省等价 page=1&page_size=20
+  list: (params?: { page?: number; page_size?: number; keyword?: string; status?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.page_size) query.set('page_size', String(params.page_size))
+    if (params?.keyword) query.set('keyword', params.keyword)
+    if (params?.status) query.set('status', params.status)
+    return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } }>(`/dramas${query.size ? `?${query.toString()}` : ''}`)
+  },
   get: (id: number) => api.get(`/dramas/${id}`),
   importSource: (url: string) => api.post('/dramas/import-source', { url }),
   analyzeSource: (content: string) => api.post('/dramas/analyze-source', { content }),
