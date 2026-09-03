@@ -264,8 +264,7 @@
             </div>
 
             <div v-else-if="sourceMode === 'url'" class="source-url-panel">
-              <label class="field">
-                <span class="field-label">公开小说链接</span>
+              <Field label="公开小说链接" hint="仅读取公开网页正文；需要登录、动态加载或有反爬限制的页面请改用文件导入。">
                 <div class="source-url-row">
                   <input v-model.trim="sourceUrl" class="input" type="url" placeholder="https://example.com/novel/chapter" @keydown.enter.prevent="importSourceUrl" />
                   <button type="button" class="btn" :disabled="!sourceUrl || importingUrl" @click="importSourceUrl">
@@ -274,15 +273,13 @@
                     {{ importingUrl ? '读取中…' : '读取正文' }}
                   </button>
                 </div>
-                <span class="field-hint">仅读取公开网页正文；需要登录、动态加载或有反爬限制的页面请改用文件导入。</span>
-              </label>
+              </Field>
             </div>
 
-            <label class="field source-field">
-              <span class="field-label">
+            <Field class="source-field" required>
+              <template #label>
                 {{ sourceMode === 'paste' ? '小说、短文或故事内容' : '导入后的全文内容（可继续修改）' }}
-                <span class="required">*</span>
-              </span>
+              </template>
               <textarea
                 v-model="sourceContent"
                 class="input source-textarea"
@@ -293,7 +290,7 @@
               <span class="source-count" :class="{ ready: sourceContent.trim().length >= 20 }">
                 {{ sourceContent.trim().length.toLocaleString() }} 字<span v-if="sourceContent.trim().length < 20"> · 至少 20 字</span>
               </span>
-            </label>
+            </Field>
             <div class="analysis-note">
               <Sparkles :size="14" :stroke-width="1.8" />
               AI 将生成 4 个名称候选、3 个全文匹配风格，并推荐适合的画面比例。
@@ -335,10 +332,9 @@
                   <span>{{ item.reason || '贴合原文主题' }}</span>
                 </button>
               </div>
-              <label class="field compact-field">
-                <span class="field-label">最终项目名称</span>
+              <Field class="compact-field" label="最终项目名称">
                 <input v-model.trim="form.title" class="input" placeholder="输入或修改项目名称" required />
-              </label>
+              </Field>
             </section>
 
             <section class="plan-section">
@@ -381,14 +377,12 @@
               </div>
               <div v-if="customStyleActive" class="custom-style-panel">
                 <div class="custom-style-grid">
-                  <label class="field">
-                    <span class="field-label">自定义风格名称</span>
+                  <Field label="自定义风格名称">
                     <input v-model.trim="customStyle.name" class="input" placeholder="例如：冷峻都市纪实" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">风格描述 / 提示词</span>
+                  </Field>
+                  <Field label="风格描述 / 提示词">
                     <input v-model.trim="customStyle.prompt" class="input" placeholder="描述色彩、光线、材质、镜头与时代感" />
-                  </label>
+                  </Field>
                 </div>
                 <span class="field-hint">创建项目时会同时保存为新的风格预设，后续项目可直接复用。</span>
               </div>
@@ -459,6 +453,7 @@ import { toast } from 'vue-sonner'
 import { Film, Clock, Sparkles, FileText, Monitor, Smartphone, Square, Check, RefreshCw, Palette, Upload, Link, ClipboardPaste } from 'lucide-vue-next'
 import { dramaAPI, stylePresetAPI } from '~/composables/useApi'
 import BaseSelect from '~/components/BaseSelect.vue'
+import Field from '~/components/Field.vue'
 
 const dramas = ref([])
 const loading = ref(false)
@@ -1433,11 +1428,9 @@ onMounted(load)
   min-height: 0;
 }
 .dialog-body { display: flex; flex-direction: column; gap: 16px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
-.required { color: var(--error); }
+/* 字段骨架样式（.field/.field-label/.required）已随 P2-B1 下沉 Field 组件或提升为 studio.css 全局类；
+   .field-hint 保留仅因 custom-style-panel 面板级独立提示（非字段内 hint，Field 组件内同名类不覆盖此场景） */
 .field-hint { font-size: 11px; color: var(--text-3); line-height: 1.5; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .source-step { min-height: 430px; }
 .source-intro {
   display: flex;
@@ -1630,7 +1623,7 @@ onMounted(load)
   .toolbar { flex-wrap: wrap; }
   .search-box { width: 100%; flex: 1 1 100%; }
   .sort-select { margin-left: 0; flex: 1; }
-  .field-row { grid-template-columns: 1fr; }
+
   .create-dialog { max-height: calc(100vh - 24px); }
   .dialog-head { align-items: flex-start; }
   .step-indicator { display: none; }

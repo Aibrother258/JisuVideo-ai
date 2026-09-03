@@ -280,26 +280,22 @@
                 </LoadingButton>
               </div>
               <div class="style-detail-grid">
-                <label class="field">
-                  <span class="field-label">风格名称 <span class="required">*</span></span>
+                <Field label="风格名称" required>
                   <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
-                </label>
-                <label class="field">
-                  <span class="field-label">风格 key <span class="required">*</span> <span class="dim">(创建后不可修改)</span></span>
+                </Field>
+                <Field>
+                  <template #label>风格 key <span class="required">*</span> <span class="dim">(创建后不可修改)</span></template>
                   <input v-model="styleForm.value" class="input mono" :disabled="!!styleEditId" placeholder="如 3d、anime（小写字母/数字/中划线）" />
-                </label>
-                <label class="field field-wide">
-                  <span class="field-label">提示词片段（英文） <span class="required">*</span></span>
+                </Field>
+                <Field class="field-wide" label="提示词片段（英文）" required>
                   <textarea v-model="styleForm.prompt" class="textarea" rows="4" placeholder="如 anime style, cel shading, vibrant colors, clean line art"></textarea>
-                </label>
-                <label class="field">
-                  <span class="field-label">描述</span>
+                </Field>
+                <Field label="描述">
                   <input v-model="styleForm.description" class="input" placeholder="一句话说明该风格的适用场景" />
-                </label>
-                <label class="field">
-                  <span class="field-label">排序</span>
+                </Field>
+                <Field label="排序">
                   <input v-model.number="styleForm.sort_order" class="input" type="number" min="0" max="999" />
-                </label>
+                </Field>
               </div>
               <div class="style-detail-foot">
                 <span v-if="styleDirty" class="tag" style="border-color:var(--unsaved-border);color:var(--unsaved-text);background:var(--unsaved-bg)">
@@ -361,14 +357,14 @@
                 <ChevronDown :size="14" :style="{ transform: editingAgent === a.type ? 'rotate(180deg)' : '', transition: 'transform var(--dur-med) var(--ease-out)' }" />
               </div>
               <div v-if="editingAgent === a.type" class="agent-card-body">
-                <label class="field">
-                  <span class="field-label">模型 <span class="dim">(留空使用 AI 服务默认)</span></span>
+                <Field>
+                  <template #label>模型 <span class="dim">(留空使用 AI 服务默认)</span></template>
                   <BaseSelect v-model="agentForm.model" :options="textModelSelectOptions" placeholder="— 使用 AI 服务默认 —" searchable />
-                </label>
-                <label class="field">
-                  <span class="field-label">System Prompt <span class="dim">(保存为 workspace/prompts/{{ a.type }}.md)</span></span>
+                </Field>
+                <Field>
+                  <template #label>System Prompt <span class="dim">(保存为 workspace/prompts/{{ a.type }}.md)</span></template>
                   <textarea v-model="agentForm.system_prompt" class="textarea" rows="12" placeholder="Agent 系统提示词..." />
-                </label>
+                </Field>
                 <div class="agent-card-foot">
                   <button class="btn btn-ghost btn-sm" @click="resetAgentPrompt(a.type)">恢复默认</button>
                   <span v-if="agentSaved === a.type" class="tag tag-success" style="margin-left:8px">
@@ -501,23 +497,29 @@
               {{ preset.label }}
             </button>
           </div>
-          <label class="field">
-            <span class="field-label">配置名称</span>
+          <Field label="配置名称">
             <input v-model="cfgForm.name" class="input" placeholder="如 火宝默认图像服务" />
-          </label>
-          <label class="field"><span class="field-label">服务商</span>
+          </Field>
+          <Field label="服务商">
             <BaseSelect v-model="cfgForm.provider" :options="providerSelectOptions" placeholder="选择服务商" searchable />
-          </label>
-          <label class="field">
-            <span class="field-label">优先级</span>
+          </Field>
+          <Field label="优先级">
             <input v-model.number="cfgForm.priority" class="input" type="number" min="0" max="999" />
-            <span v-if="cfgForm.service_type === 'audio'" class="field-hint">仅保存配置；优先级与自动采用待音频工作流接入后生效。</span>
-            <span v-else class="field-hint">数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。</span>
-          </label>
-          <label class="field"><span class="field-label">API Key</span><input v-model="cfgForm.api_key" class="input" type="password" placeholder="sk-..." /></label>
-          <label class="field"><span class="field-label">Base URL</span><input v-model="cfgForm.base_url" class="input" placeholder="https://..." /></label>
-          <label class="field">
-            <span class="field-label">模型（逗号分隔）</span>
+            <template #hint>
+              <template v-if="cfgForm.service_type === 'audio'">仅保存配置；优先级与自动采用待音频工作流接入后生效。</template>
+              <template v-else>数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。</template>
+            </template>
+          </Field>
+          <Field label="API Key">
+            <input v-model="cfgForm.api_key" class="input" type="password" placeholder="sk-..." />
+          </Field>
+          <Field label="Base URL">
+            <input v-model="cfgForm.base_url" class="input" placeholder="https://..." />
+          </Field>
+          <Field
+            label="模型（逗号分隔）"
+            :hint="fetchedModels.length ? '勾选模型后点击「加入当前配置」写入下方字段（去重）；「配置为生图模型」可将所选预填为图片服务草稿。' : ''"
+          >
             <div class="model-input-row">
               <input v-model="cfgForm.modelStr" class="input" placeholder="model-name" />
               <LoadingButton :loading="cfgFetchingModels" type="button" class="btn btn-ghost btn-sm model-fetch-btn" spinner-size="13" @click="fetchModels">
@@ -545,13 +547,11 @@
                 :disabled="!selectedFetchedCount" @click="startImageDraftFromSelection"
               >配置为生图模型</button>
             </div>
-            <span v-if="fetchedModels.length" class="field-hint">勾选模型后点击「加入当前配置」写入下方字段（去重）；「配置为生图模型」可将所选预填为图片服务草稿。</span>
-          </label>
-          <label v-if="cfgForm.service_type === 'text'" class="field">
-            <span class="field-label">Temperature <span class="dim">(留空跟随服务商默认)</span></span>
+          </Field>
+          <Field v-if="cfgForm.service_type === 'text'" hint="部分模型强制固定温度（如 kimi-k2 系只允许 0.6），报 invalid temperature 错误时在此填入对应值。">
+            <template #label>Temperature <span class="dim">(留空跟随服务商默认)</span></template>
             <input v-model="cfgForm.temperature" class="input" type="number" step="0.1" min="0" max="2" placeholder="如 0.6" />
-            <span class="field-hint">部分模型强制固定温度（如 kimi-k2 系只允许 0.6），报 invalid temperature 错误时在此填入对应值。</span>
-          </label>
+          </Field>
           <div v-if="cfgTestResult" class="test-result" :class="{ ok: cfgTestResult.reachable, bad: !cfgTestResult.reachable }">
             <div class="test-result-head">
               <span class="tag" :class="cfgTestResult.reachable ? 'tag-success' : 'tag-error'">{{ cfgTestResult.status || 'ERROR' }}</span>
@@ -576,18 +576,16 @@
         <div class="dialog-title">新增 Skill — {{ selectedAgentLabel }}</div>
       </template>
       <div class="skill-dialog-body">
-        <label class="field">
-          <span class="field-label">Skill 目录名 <span class="dim">(英文，唯一)</span></span>
+        <Field>
+          <template #label>Skill 目录名 <span class="dim">(英文，唯一)</span></template>
           <input v-model="newSkillForm.id" class="input" placeholder="如 custom-extraction" />
-        </label>
-        <label class="field">
-          <span class="field-label">名称</span>
+        </Field>
+        <Field label="名称">
           <input v-model="newSkillForm.name" class="input" placeholder="如 自定义提取规则" />
-        </label>
-        <label class="field">
-          <span class="field-label">描述</span>
+        </Field>
+        <Field label="描述">
           <input v-model="newSkillForm.description" class="input" placeholder="简短描述此 Skill 的用途" />
-        </label>
+        </Field>
       </div>
       <template #foot>
         <button type="button" class="btn" @click="addSkillDialog = false">取消</button>
@@ -615,27 +613,21 @@
             {{ styleExpanding ? '完善中…' : 'AI 完善' }}
           </LoadingButton>
         </div>
-        <label class="field">
-          <span class="field-label">风格名称 <span class="required">*</span></span>
+        <Field label="风格名称" required>
           <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
-        </label>
-        <label class="field">
-          <span class="field-label">风格 key <span class="required">*</span></span>
+        </Field>
+        <Field label="风格 key" required hint="存入项目的风格标识，创建后不可修改。">
           <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" />
-          <span class="field-hint">存入项目的风格标识，创建后不可修改。</span>
-        </label>
-        <label class="field">
-          <span class="field-label">提示词片段（英文） <span class="required">*</span></span>
+        </Field>
+        <Field label="提示词片段（英文）" required>
           <textarea v-model="styleForm.prompt" class="textarea" rows="3" placeholder="如 anime style, cel shading, vibrant colors, clean line art"></textarea>
-        </label>
-        <label class="field">
-          <span class="field-label">描述</span>
+        </Field>
+        <Field label="描述">
           <input v-model="styleForm.description" class="input" placeholder="一句话说明该风格的适用场景" />
-        </label>
-        <label class="field">
-          <span class="field-label">排序</span>
+        </Field>
+        <Field label="排序">
           <input v-model.number="styleForm.sort_order" class="input" type="number" min="0" max="999" />
-        </label>
+        </Field>
       </div>
       <template #foot>
         <button type="button" class="btn" @click="cancelStyleDialog">取消</button>
@@ -682,6 +674,7 @@
 <script setup>
 import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
+import Field from '~/components/Field.vue'
 import AppDialog from '~/components/AppDialog.vue'
 import LoadingButton from '~/components/LoadingButton.vue'
 import { toast } from 'vue-sonner'
@@ -2039,12 +2032,7 @@ onMounted(() => {
   padding: 26px 0; color: var(--text-3); font-size: 12.5px;
 }
 
-/* Shared */
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: 12px; font-weight: 550; color: var(--text-1); }
-.field-hint { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.required { color: var(--error); }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* Shared（.field 骨架样式已随 P2-B1 下沉 Field 组件，.required 提升为 studio.css 全局类） */
 
 /* Dialogs（弹窗宽度改由 <AppDialog width> 提供，仅保留 body 内部布局类） */
 .config-dialog-body { display: flex; flex-direction: column; gap: 14px; }
