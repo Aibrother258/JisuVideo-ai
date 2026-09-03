@@ -184,8 +184,10 @@
            编辑缓冲 localRaw/localScript、scriptStep、doRewrite/saveRaw/skipRewrite 与 rn/rt 均为主壳
            页面级状态（跨面板保留 + 底部气泡/侧栏导航共用），组件经 props/事件通信 -->
       <div v-if="panel === 'script'" class="content-panel">
-        <!-- Step 1 无剧本内容且非改写运行：改写引导空态 -->
-        <div v-if="scriptStep === 1 && !scriptContent && !(rn && rt === 'script_rewriter')" class="step-empty">
+        <!-- Step1 分支由 resolveScriptPanelState 纯函数裁决（utils/episode-script-state.mjs + 行为测试）。
+             回归守卫：无已保存剧本但其他 Agent 运行 -> editor（仍可手工编辑，改写按钮经 running/taskType
+             在组件内 disabled），不得落入本空态 -->
+        <div v-if="scriptPanelState === 'empty-guide'" class="step-empty">
           <div class="empty-visual">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
               <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
@@ -205,7 +207,7 @@
           </div>
         </div>
         <!-- 改写进行中：整块加载态（LoadingButton 的改写中 spinner 同样收敛于此态） -->
-        <div v-else-if="scriptStep === 1 && rn && rt === 'script_rewriter'" class="step-loading">
+        <div v-else-if="scriptPanelState === 'rewriting'" class="step-loading">
           <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
           <div class="loading-text">正在改写剧本...</div>
         </div>
@@ -1743,6 +1745,7 @@ import StatusBadge from '~/components/StatusBadge.vue'
 import LoadingButton from '~/components/LoadingButton.vue'
 import EpisodeExportPanel from '~/components/EpisodeExportPanel.vue'
 import EpisodeScriptPanel from '~/components/EpisodeScriptPanel.vue'
+import { resolveScriptPanelState } from '~/utils/episode-script-state.mjs'
 import { useAgent } from '~/composables/useAgent'
 
 definePageMeta({ layout: 'studio' })
@@ -2061,6 +2064,14 @@ function onExportSelectedChange(ids) {
 }
 
 const scriptStep = ref(storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)
+// SCRIPT 面板 Step1 分支状态（纯函数裁决，见 utils/episode-script-state.mjs 与行为测试；
+// 修复点：无剧本但其他 Agent 运行时保持 editor——可手工编辑，不得落入改写引导空态）
+const scriptPanelState = computed(() => resolveScriptPanelState({
+  step: scriptStep.value,
+  hasContent: !!scriptContent.value,
+  running: !!rn.value,
+  taskType: rt.value || '',
+}))
 const prodTab = ref(['assets', 'storyboard', 'videos'].includes(storedPanel?.prodTab) ? storedPanel.prodTab : 'assets')
 // 面板位置变化即持久化
 watch([panel, scriptStep, prodTab], ([p, s, t]) => {

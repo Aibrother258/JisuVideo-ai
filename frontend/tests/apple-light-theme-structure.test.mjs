@@ -448,6 +448,23 @@ test('B1 batch7: episode Loader2 icon buttons migrated to LoadingButton, page ke
   // 分镜拆分按钮仍在主壳 storyboard 区
   assert.match(episodeScriptPanel, /:loading="running && taskType === 'script_rewriter'"/)
   assert.match(episode, /:loading="rt === 'storyboard_breaker'"/)
+  // P2 复审（#47）：父子接线双向守卫——父壳受控下发 + 事件回写/触发，组件端 emit 对应事件；
+  // 分支状态矩阵由 utils/episode-script-state.mjs 纯函数裁决并经行为测试覆盖（见
+  // tests/episode-script-state-behavior.test.mjs），本文件仅验证两端接线符号存在
+  assert.match(episode, /<EpisodeScriptPanel[\s\S]*?:step="scriptStep"[\s\S]*?:raw="localRaw"[\s\S]*?:script="localScript"/)
+  assert.match(episode, /@save-raw="saveRaw\(\); toast\.success\('已保存'\)"/)
+  assert.match(episode, /@rewrite="doRewrite"/)
+  assert.match(episode, /@skip-rewrite="skipRewrite"/)
+  assert.match(episode, /@update:raw="localRaw = \$event"/)
+  assert.match(episode, /@update:script="localScript = \$event"/)
+  assert.match(episodeScriptPanel, /emit\('save-raw'\)/)
+  assert.match(episodeScriptPanel, /emit\('rewrite'\)/)
+  assert.match(episodeScriptPanel, /emit\('skip-rewrite'\)/)
+  assert.match(episodeScriptPanel, /emit\('update:raw'/)
+  assert.match(episodeScriptPanel, /emit\('update:script'/)
+  // Step0/Step1 编辑器仍分别渲染原始内容/剧本文本域（受控 :value 输入上报）
+  assert.match(episodeScriptPanel, /v-if="step === 0"[\s\S]*?:value="raw"/)
+  assert.match(episodeScriptPanel, /:value="script"/)
   assert.match(episode, /:loading="videoPromptBatch\.running"/)
   assert.match(episode, /:loading="videoPromptGeneratingIds\.includes\(selectedSb\?\.id\)"/)
   assert.match(episode, /:loading="minimaxH3PromptGeneratingIds\.includes\(selectedSb\?\.id\)"/)

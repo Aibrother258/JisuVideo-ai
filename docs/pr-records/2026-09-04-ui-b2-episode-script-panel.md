@@ -4,6 +4,7 @@
 > PR：#47（merge commit 待回填）
 > 日期：2026-09-04
 > 版本：随本批迭代方案推进计划 v2.8（本批合入后由收尾文档提交统一归档）
+> 修订：2026-09-04 P2 评审（Request changes）修复：① 状态分支条件回归（「空内容 + 其他 Agent 运行」保持可编辑编辑器）+ 状态矩阵纯函数化与行为测试；② 父子接线双向结构守卫。详见 §7。
 
 ## 1. 迭代背景与触发
 
@@ -25,18 +26,21 @@
 
 | 文件 | 改动 |
 |---|---|
-| `frontend/app/views/drama/episode.vue` | SCRIPT PANEL 主体（约 90 行模板）替换为「空态 / 改写中 / EpisodeScriptPanel」三分支；脚本删除下沉的 `rawLen/scriptLen` computed、新增组件 import；scoped CSS 删除编辑器专属类 26 行（`.prod-toolbar` 单行保留）；860px 媒体删除 `.toolbar-right`。主壳净 -50 行 |
+| `frontend/app/views/drama/episode.vue` | SCRIPT PANEL 主体（约 90 行模板）替换为「空态 / 改写中 / EpisodeScriptPanel」三分支（P2 修复后分支引用 `scriptPanelState` computed，见 §7）；脚本删除下沉的 `rawLen/scriptLen` computed、新增组件与状态纯函数 import、`scriptPanelState` computed；scoped CSS 删除编辑器专属类 26 行（`.prod-toolbar` 单行保留）；860px 媒体删除 `.toolbar-right`。主壳净减约 42 行 |
 | `frontend/app/components/EpisodeScriptPanel.vue` | 新增（125 行）：Step0/Step1 工具条 + 全文文本域受控渲染；props `step/raw/script/hasRaw/hasScript/running/taskType`，emits `save-raw/rewrite/skip-rewrite/update:raw/update:script`；字数统计 derived；scoped CSS 含 860px flex-wrap |
-| `frontend/tests/apple-light-theme-structure.test.mjs` | 剧本改写按钮 `:loading="running && taskType === 'script_rewriter'"` 与 `:disabled` 断言目标由 episode.vue 改至 EpisodeScriptPanel.vue（B1 batch7 迁移守卫随拆分迁移，注释同步说明） |
+| `frontend/app/utils/episode-script-state.mjs` | 新增：Step1 分支状态矩阵纯函数 `resolveScriptPanelState`（P2 修复，自原模板内联条件提出，语义与拆分前 master 对齐） |
+| `frontend/tests/episode-script-state-behavior.test.mjs` | 新增：状态矩阵行为测试 8 用例（P2 修复，含「空内容 + 其他 Agent 运行 → editor」回归守卫） |
+| `frontend/tests/apple-light-theme-structure.test.mjs` | 剧本改写按钮 `:loading/:disabled` 断言目标由 episode.vue 改至 EpisodeScriptPanel.vue（B1 batch7 迁移守卫随拆分迁移）；P2 修复后补父子接线双向守卫与 Step0/1 受控 textarea 断言 |
 
 ## 4. 行为等价与回归验证
 
-- 结构测试 116/116 通过（含迁移守卫：episode.vue 空态/加载态共享样式断言仍在主壳；LoadingButton 表达式断言已指向新组件）。
+- 结构测试 124/124 通过（116 基线 + 8 条状态矩阵行为用例；含迁移守卫：episode.vue 空态/加载态共享样式断言仍在主壳；LoadingButton 表达式断言已指向新组件；接线双向守卫见 §7）。
 - `npm run build` 通过；`npm run generate` 通过。
 - 交互路径逐一核对：
   - Step0 输入 → 字数统计 → 保存（`save-raw` → `saveRaw() + toast`）；切 panel 再回内容不丢（主壳受控缓冲）。
   - Step1 有已生成剧本 → 文本域 + 字数 + 「重新改写」LoadingButton（`running && taskType !== 'script_rewriter'` 禁用）；他任务运行时按钮禁用。
-  - Step1 无剧本内容且非改写运行 → 改写引导空态（「开始改写/跳过改写」主壳直调 `doRewrite/skipRewrite`）。
+  - Step1 无剧本内容且全部 Agent 空闲 → 改写引导空态（「开始改写/跳过改写」主壳直调 `doRewrite/skipRewrite`）。
+  - Step1 无剧本内容但其他 Agent 运行 → 编辑器（可手工编辑；不落入空态，亦无误导性「开始改写」按钮）——P2 修复点，见 §7。
   - 改写运行中 → 整块加载态「正在改写剧本…」，完成后 refresh → 文本域态。
   - 底部气泡 prev/next、侧栏步骤导航、localStorage 持久化逻辑全部留主壳，未触碰。
 
@@ -50,3 +54,17 @@
 - episode.vue 主壳净减 50 行；SCRIPT PANEL 模板区从主壳剥离为三分支壳（约 40 行），编辑器细节进子组件。
 - B2 拆分模式新增一条实证：**「带工具栏的三态面板」在共享态样式与工具栏纠缠时，以『共享态（空态/进行中）留主壳整页渲染 + 编辑器态下沉组件 + 条件判定全部落在主壳可直接访问的页面级状态』为可复用的拆分形态**。
 - 剩余拆分候选：assets（角色/场景/道具，与全局生成/上传状态纠缠最深）、storyboard 工作台、video-tasks、task-drawer 内容；以及 C3（各页面接入 `usePagedList`）。
+
+## 7. P2 评审修复记录（2026-09-04，Request changes → 修订）
+
+评审 2 条意见与修复对照：
+
+1. **[P2] 行为回归：「无已保存剧本 + 其他 Agent 运行」从「可编辑」退化为改写引导空态**（原空态条件误写成 `!(rn && rt === 'script_rewriter')`，非拆分前 master 的 `!rn`；空态中「开始改写」又会命中 useAgent 运行中守卫，造成不可编辑 + 误导按钮双重问题）。
+   - 修复：状态矩阵提为纯函数 `resolveScriptPanelState`（`frontend/app/utils/episode-script-state.mjs`），语义与拆分前 master 逐一对齐——`empty-guide` 仅当 `step===1 && 无内容 && !running`；`script_rewriter` 运行中整块 `rewriting` 态；其余一律 `editor`（含其他 Agent 运行时的手工编辑场景）。episode.vue 经 `scriptPanelState` computed 渲染三分支，模板不再内联条件。
+   - 行为变更声明：**无**。本 PR 保持纯搬迁，master 状态矩阵未改。
+
+2. **[P2/Test] 新组件缺少真实父子通信与分支行为测试**。
+   - 采用评审给出的「纯函数 + 直接单测」路线（项目测试栈无 DOM/test-utils，沿用 `episode-plan-state` 既有纯函数先例）：
+     - `tests/episode-script-state-behavior.test.mjs`：8 条状态矩阵用例，重点覆盖回归守卫「空内容 + 其他 Agent 运行 → editor（仍可手工编辑）」及空态/加载态/编辑态归属；
+     - `apple-light-theme-structure.test.mjs`：补父子接线双向守卫（父壳 `:step/:raw/:script` 受控下发、`update:raw/update:script` 回写、`save-raw/rewrite/skip-rewrite` 事件；组件端对应 `emit(...)`），Step0/1 受控 textarea 断言。
+   - 说明：组件挂载级事件测试需引入 @vue/test-utils + DOM 运行环境（新依赖、新测试类别），超出本 PR 范围；以纯函数状态测试 + 接线双向守卫覆盖评审点，如需组件级 DOM 测试可单独立项。
