@@ -91,7 +91,7 @@ watch(() => route.path, checkAiConfigs)
   display: flex; align-items: center; gap: 11px;
   background: transparent; border: none; cursor: pointer; padding: 4px 8px 4px 4px;
   text-decoration: none; border-radius: var(--radius);
-  transition: background 0.18s var(--ease-out);
+  transition: background var(--dur-base) var(--ease-out);
 }
 .brand:hover { background: var(--bg-hover); }
 .brand:focus-visible {
@@ -141,7 +141,7 @@ watch(() => route.path, checkAiConfigs)
   padding: 0 16px; border-radius: var(--radius-pill);
   font-size: 13px; font-weight: 600;
   color: var(--text-2); text-decoration: none;
-  transition: all 0.18s var(--ease-out);
+  transition: all var(--dur-base) var(--ease-out);
   border: none;
   line-height: 1;
 }
@@ -171,7 +171,7 @@ watch(() => route.path, checkAiConfigs)
   color: var(--notice-link); text-decoration: none;
   padding: 2px 10px; border-radius: var(--radius-pill);
   border: 1px solid var(--notice-link-border);
-  transition: all 0.18s var(--ease-out);
+  transition: all var(--dur-base) var(--ease-out);
   line-height: 1.6;
 }
 .config-banner-link:hover { background: var(--notice-link-hover-bg); color: var(--notice-text); }

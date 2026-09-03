@@ -360,7 +360,7 @@
                 </div>
                 <span v-if="getAgentCfg(a.type) && !getAgentCfg(a.type).is_default" class="tag tag-success">自定义</span>
                 <span v-else class="tag">默认</span>
-                <ChevronDown :size="14" :style="{ transform: editingAgent === a.type ? 'rotate(180deg)' : '', transition: '0.2s' }" />
+                <ChevronDown :size="14" :style="{ transform: editingAgent === a.type ? 'rotate(180deg)' : '', transition: 'transform var(--dur-med) var(--ease-out)' }" />
               </div>
               <div v-if="editingAgent === a.type" class="agent-card-body">
                 <label class="field">
@@ -436,7 +436,7 @@
                   <button class="btn btn-danger btn-icon btn-sm" style="margin-right:4px" @click.stop="skillToDelete = s.id">
                     <Trash2 :size="13" />
                   </button>
-                  <ChevronDown :size="14" :style="{ transform: skillOpen.has(s.id) ? 'rotate(180deg)' : '', transition: '0.2s' }" />
+                  <ChevronDown :size="14" :style="{ transform: skillOpen.has(s.id) ? 'rotate(180deg)' : '', transition: 'transform var(--dur-med) var(--ease-out)' }" />
                 </div>
                 <div v-if="skillOpen.has(s.id)" class="skill-card-body">
                   <!-- 读取失败：内联错误 + 重试，禁止出现可保存的空编辑框 -->
@@ -1712,7 +1712,7 @@ onMounted(() => {
   width: 1px;
   height: 100%;
   background: transparent;
-  transition: width 0.15s var(--ease-out), background 0.15s var(--ease-out);
+  transition: width var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 .pane-resizer:hover::before,
 .pane-resizer:active::before,
@@ -1772,7 +1772,7 @@ onMounted(() => {
   background: transparent;
   color: var(--text-1);
   cursor: pointer;
-  transition: all 0.16s var(--ease-out);
+  transition: all var(--dur-fast) var(--ease-out);
   text-align: left;
 }
 .subnav-item:hover { background: var(--bg-hover); color: var(--text-0); }
@@ -1820,14 +1820,14 @@ onMounted(() => {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; font-size: 13px; font-weight: 550;
   border: none; border-radius: var(--radius); background: transparent; color: var(--text-1);
-  cursor: pointer; transition: all 0.16s var(--ease-out); text-align: left; width: 100%;
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out); text-align: left; width: 100%;
 }
 .nav-item:hover { background: var(--bg-hover); color: var(--text-0); }
 .nav-item.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
 .nav-item:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
 
 .settings-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
-.settings-scroll { height: 100%; overflow-y: auto; padding: 20px 32px 48px; max-width: 1180px; margin: 0 auto; animation: fadeUp 0.3s var(--ease-out); }
+.settings-scroll { height: 100%; overflow-y: auto; padding: 20px 32px 48px; max-width: 1180px; margin: 0 auto; animation: fadeUp var(--dur-slow) var(--ease-out); }
 .settings-head { margin-bottom: 16px; }
 .settings-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
 .settings-desc { font-size: 12px; color: var(--text-2); margin-top: 4px; }
@@ -1964,7 +1964,7 @@ onMounted(() => {
   color: var(--text-2);
   font-size: 10.5px;
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  transition: border-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out), background var(--dur-instant) var(--ease-out);
 }
 .cfg-model-chip:hover { border-color: var(--accent); color: var(--accent); }
 .cfg-model-chip.cfg-model-chip-ro,
@@ -2012,7 +2012,7 @@ onMounted(() => {
 /* Agent */
 .agent-list { display: flex; flex-direction: column; gap: 10px; }
 .agent-card { overflow: hidden; }
-.agent-card-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; transition: background 0.15s; }
+.agent-card-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; transition: background var(--dur-fast) var(--ease-out); }
 .agent-card-head:hover { background: var(--bg-hover); }
 .agent-type-badge {
   width: 36px; height: 36px; border-radius: 10px;
@@ -2042,7 +2042,7 @@ onMounted(() => {
 /* Skill */
 .skill-list { display: flex; flex-direction: column; gap: 10px; }
 .skill-card { overflow: hidden; }
-.skill-card-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; transition: background 0.15s; }
+.skill-card-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; transition: background var(--dur-fast) var(--ease-out); }
 .skill-card-head:hover { background: var(--bg-hover); }
 .skill-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); }
 .skill-card-foot { display: flex; align-items: center; gap: 8px; }
@@ -2097,7 +2097,7 @@ onMounted(() => {
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
-  transition: all 0.16s var(--ease-out);
+  transition: all var(--dur-fast) var(--ease-out);
 }
 .preset-pill:hover { background: var(--button-bg-hover); color: var(--text-0); }
 .preset-pill:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }

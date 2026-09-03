@@ -130,7 +130,7 @@ onBeforeUnmount(() => {
   color: var(--text-1);
   font: 11px var(--font-body);
   cursor: pointer;
-  transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 .model-select-trigger:hover { border-color: var(--border-hover); }
 .model-select-trigger.open,
@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
 .model-select-arrow {
   flex-shrink: 0;
   color: var(--text-3);
-  transition: transform 0.18s var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out);
 }
 .model-select-trigger.open .model-select-arrow { transform: rotate(180deg); }
 </style>
@@ -181,7 +181,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   box-shadow: 0 12px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06);
   overflow-y: auto;
-  animation: modelMenuIn 0.16s var(--ease-out);
+  animation: modelMenuIn var(--dur-fast) var(--ease-out);
 }
 @keyframes modelMenuIn {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
   font: 12px var(--font-body);
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background var(--dur-instant) var(--ease-out);
 }
 .model-select-option:hover { background: var(--accent-bg); }
 .model-select-option .opt-check {

@@ -170,6 +170,14 @@
   --sp-12: 48px;
   --sp-16: 64px;
 
+  /* A3 动效体系：时长档（值=现状众数，旧值归一见 docs/ui-motion-spec.md §3） */
+  --dur-instant: 0.12s;  /* 按压/瞬时反馈（btn press、chip/option 瞬时 hover） */
+  --dur-fast: 0.16s;     /* hover/描边等轻交互（原 0.14/0.15/0.16 归并） */
+  --dur-base: 0.18s;     /* 通用交互动画（悬停提拉/升格/通用过渡） */
+  --dur-med: 0.22s;      /* 浮层/面板/开关进入（原 0.2/0.22/0.24 归并） */
+  --dur-slow: 0.35s;     /* 页面/段落 fadeUp/fadeIn 进入（原 0.3/0.32/0.35 归并） */
+  --dur-stagger: 0.04s;  /* stagger 级联步进 */
+  /* A3 动效体系：缓动——Apple Light 仅一档出加速；linear/ease-in-out 仅限旋转与骨架循环例外 */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: var(--ease-out);
 }
@@ -219,7 +227,7 @@ p { line-height: 1.7; }
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
-  transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), transform 0.12s var(--ease-out);
+  transition: background var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-instant) var(--ease-out);
 }
 .btn:hover { background: var(--button-bg-hover); color: var(--button-text-hover); box-shadow: var(--button-shadow-hover); }
 .btn:active { transform: scale(0.97); }
@@ -245,7 +253,7 @@ p { line-height: 1.7; }
   color: var(--text-0);
   font: 13.5px var(--font-body);
   letter-spacing: -0.01em;
-  transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 .input:hover, .textarea:hover { border-color: var(--border-hover); }
 .input:focus, .textarea:focus, select.input:focus {
@@ -277,7 +285,7 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
   box-shadow: var(--shadow-card);
-  transition: box-shadow 0.2s var(--ease-out), transform 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+  transition: box-shadow var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out), border-color var(--dur-med) var(--ease-out);
 }
 .card:hover { border-color: var(--border-strong); }
 .card-active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--button-focus); }
@@ -291,7 +299,7 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
   background: var(--switch-track);
   border: none;
   cursor: pointer;
-  transition: background 0.22s var(--ease-out);
+  transition: background var(--dur-med) var(--ease-out);
   flex-shrink: 0;
   padding: 0;
 }
@@ -305,7 +313,7 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
   border-radius: 50%;
   background: var(--surface-raised);
   box-shadow: 0 2px 6px rgba(0,0,0,0.18), 0 0 1px rgba(0,0,0,0.1);
-  transition: transform 0.22s var(--ease-out);
+  transition: transform var(--dur-med) var(--ease-out);
 }
 .switch.on { background: var(--success); }
 .switch.on::after { transform: translateX(17px); }
@@ -333,7 +341,7 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
   border-radius: var(--radius-xl);
   background: var(--surface-raised);
   box-shadow: var(--shadow-elevated);
-  animation: scaleIn 0.24s var(--ease-out);
+  animation: scaleIn var(--dur-med) var(--ease-out);
   overflow: hidden;
 }
 .dialog-head {
@@ -371,7 +379,7 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
   color: var(--text-2);
   font: 600 12.5px var(--font-body);
   letter-spacing: -0.01em;
-  transition: all 0.18s var(--ease-out);
+  transition: all var(--dur-base) var(--ease-out);
 }
 .seg-item:hover { color: var(--text-0); }
 .seg-item.on { background: var(--surface-raised); color: var(--text-0); box-shadow: var(--shadow-xs); }
@@ -414,15 +422,16 @@ select.input { appearance: auto; cursor: pointer; padding-right: 14px; }
   background: var(--overlay-mask);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  animation: fadeIn 0.18s var(--ease-out);
+  animation: fadeIn var(--dur-base) var(--ease-out);
 }
 
-.page-enter { animation: fadeUp 0.24s var(--ease-out) both; }
-.stagger-1 { animation-delay: 0.04s; }
-.stagger-2 { animation-delay: 0.08s; }
-.stagger-3 { animation-delay: 0.12s; }
-.stagger-4 { animation-delay: 0.16s; }
-.stagger-5 { animation-delay: 0.2s; }
+/* 页面/区块首帧进入：fadeUp+slow；配合 .stagger-N 级联（N≤5，delay=calc(--dur-stagger*N)） */
+.page-enter { animation: fadeUp var(--dur-slow) var(--ease-out) both; }
+.stagger-1 { animation-delay: calc(var(--dur-stagger) * 1); }
+.stagger-2 { animation-delay: calc(var(--dur-stagger) * 2); }
+.stagger-3 { animation-delay: calc(var(--dur-stagger) * 3); }
+.stagger-4 { animation-delay: calc(var(--dur-stagger) * 4); }
+.stagger-5 { animation-delay: calc(var(--dur-stagger) * 5); }
 
 /* === UI 三态基础（P0-C1/C2）：骨架屏 / 空态 / 错误态 === */
 @keyframes app-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }

@@ -177,3 +177,48 @@ test('A2 batch2: media scrim/text layers, R5 fallback removal, settings/error an
   // ModelSelect：R5 fallback 清零
   assert.doesNotMatch(modelSelect, /var\(--(?:accent|accent-bg|bg-1|bg-3|ease-out),/)
 })
+
+test('A3 motion: duration tiers/easing tokens defined, component+page animations reference tokens, raw durations cleared', () => {
+  const episode = read('../app/views/drama/episode.vue')
+  const detail = read('../app/views/drama/detail.vue')
+  const settings = read('../app/pages/settings.vue')
+  const index = read('../app/pages/index.vue')
+  const layout = read('../app/layouts/default.vue')
+  const baseSelect = read('../app/components/BaseSelect.vue')
+  const modelSelect = read('../app/components/ModelSelect.vue')
+  // 时长档 token 定义
+  assert.match(studioCss, /--dur-instant: 0\.12s;/)
+  assert.match(studioCss, /--dur-fast: 0\.16s;/)
+  assert.match(studioCss, /--dur-base: 0\.18s;/)
+  assert.match(studioCss, /--dur-med: 0\.22s;/)
+  assert.match(studioCss, /--dur-slow: 0\.35s;/)
+  assert.match(studioCss, /--dur-stagger: 0\.04s;/)
+  // 组件层收敛（值不变改引用）
+  assert.match(studioCss, /transition: background var\(--dur-base\) var\(--ease-out\), color var\(--dur-base\) var\(--ease-out\), box-shadow var\(--dur-base\) var\(--ease-out\), transform var\(--dur-instant\) var\(--ease-out\);/)
+  assert.match(studioCss, /transition: border-color var\(--dur-fast\) var\(--ease-out\), box-shadow var\(--dur-fast\) var\(--ease-out\), background var\(--dur-fast\) var\(--ease-out\);/)
+  assert.match(studioCss, /transition: box-shadow var\(--dur-med\) var\(--ease-out\), transform var\(--dur-med\) var\(--ease-out\), border-color var\(--dur-med\) var\(--ease-out\);/)
+  assert.match(studioCss, /animation: scaleIn var\(--dur-med\) var\(--ease-out\);/)
+  assert.match(studioCss, /animation: fadeIn var\(--dur-base\) var\(--ease-out\);/)
+  assert.match(studioCss, /animation: fadeUp var\(--dur-slow\) var\(--ease-out\) both;/)
+  assert.match(studioCss, /\.stagger-5 \{ animation-delay: calc\(var\(--dur-stagger\) \* 5\); \}/)
+  // 进入动画按 slow 档；页面与菜单浮层引用档 token
+  assert.match(episode, /animation: fadeIn var\(--dur-slow\) var\(--ease-out\);/)
+  assert.match(episode, /animation: taskDrawerIn var\(--dur-med\) var\(--ease-out\);/)
+  assert.match(detail, /animation: fadeUp var\(--dur-slow\) var\(--ease-out\) both;/)
+  assert.match(modelSelect, /animation: modelMenuIn var\(--dur-fast\) var\(--ease-out\);/)
+  assert.match(baseSelect, /animation: baseSelectIn var\(--dur-fast\) var\(--ease-out\);/)
+  // 默认 ease 残留行已显式补缓动（选择器级抽查）
+  assert.match(modelSelect, /transition: background var\(--dur-instant\) var\(--ease-out\);/)
+  assert.match(settings, /transition: background var\(--dur-fast\) var\(--ease-out\);/)
+  assert.match(detail, /transition: transform var\(--dur-base\) var\(--ease-out\), color var\(--dur-base\) var\(--ease-out\);/)
+  // 内联 style 无效 transition('0.2s') 已修为有效属性 + token
+  assert.match(settings, /transition: 'transform var\(--dur-med\) var\(--ease-out\)'/)
+  // 重复 spin keyframes 收敛（studio.css 全局唯一）
+  assert.match(studioCss, /@keyframes spin \{ to \{ transform: rotate\(360deg\); \} \}/)
+  assert.doesNotMatch(detail, /@keyframes spin/)
+  assert.doesNotMatch(index, /@keyframes spin/)
+  // 归一档字面量清零（spin/skeleton/progress 等循环例外保留：0.7/0.8/0.9/1.4/1.6/0.4/0.28s）
+  for (const src of [episode, detail, settings, index, layout, baseSelect, modelSelect]) {
+    assert.doesNotMatch(src, /\b0\.(?:1[2456]|2[24]?|3[25]?)s\b/)
+  }
+})
