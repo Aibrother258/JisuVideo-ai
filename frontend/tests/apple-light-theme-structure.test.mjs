@@ -429,6 +429,7 @@ test('B1 batch6: LoadingButton owns busy-disabled button with spinner, settings 
 test('B1 batch7: episode Loader2 icon buttons migrated to LoadingButton, page keeps non-button load states', () => {
   const lb = read('../app/components/LoadingButton.vue')
   const episode = read('../app/views/drama/episode.vue')
+  const episodeScriptPanel = read('../app/components/EpisodeScriptPanel.vue')
   // import 自包含 + 组件内 Loader2 import（batch6 复核结论延续）
   assert.match(episode, /import LoadingButton from '~\/components\/LoadingButton\.vue'/)
   assert.match(lb, /import \{ Loader2 \} from 'lucide-vue-next'/)
@@ -443,7 +444,9 @@ test('B1 batch7: episode Loader2 icon buttons migrated to LoadingButton, page ke
   assert.match(episode, /:loading="isUploadingAsset\('scene', s\.id\)"/)
   assert.match(episode, /:loading="isPendingPropImage\(p\.id\)"/)
   assert.match(episode, /:loading="isUploadingAsset\('prop', p\.id\)"/)
-  assert.match(episode, /:loading="rn && rt === 'script_rewriter'"/)
+  // 剧本改写按钮随 B2 下沉 EpisodeScriptPanel（loading/disabled 沿用主壳 rn/rt 经 props 下发）；
+  // 分镜拆分按钮仍在主壳 storyboard 区
+  assert.match(episodeScriptPanel, /:loading="running && taskType === 'script_rewriter'"/)
   assert.match(episode, /:loading="rt === 'storyboard_breaker'"/)
   assert.match(episode, /:loading="videoPromptBatch\.running"/)
   assert.match(episode, /:loading="videoPromptGeneratingIds\.includes\(selectedSb\?\.id\)"/)
@@ -454,7 +457,7 @@ test('B1 batch7: episode Loader2 icon buttons migrated to LoadingButton, page ke
   assert.match(episode, /:loading="assetCreate\.saving"/)
   assert.match(episode, /#icon/)
   // busy 与 disabled 分离：组件 only 收敛 loading 恒禁用，其余额外禁用仍留在调用页
-  assert.match(episode, /:disabled="rn && rt !== 'script_rewriter'"/)
+  assert.match(episodeScriptPanel, /:disabled="running && taskType !== 'script_rewriter'"/)
   assert.match(episode, /:disabled="!selectedSbIds\.length"/)
   assert.match(episode, /:disabled="videoPromptBatch\.running"/)
   // 页面手写按钮内 Loader2 spinner 清零：episode 剩余 Loader2 仅限
