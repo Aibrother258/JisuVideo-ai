@@ -156,6 +156,41 @@ git push -u origin feat/我要做的东西
 4. 标题与描述按 PR 模板填写，说清楚「改了什么 / 为什么 / 怎么自测的」
 5. 指定至少一位 reviewer
 
+### 使用 gh CLI 时（又一个「默认指到上游」的坑）
+
+[GitHub CLI](https://cli.github.com/)（`gh`）很方便，但在 fork 仓库里它**默认操作父仓库**，
+也就是 `chatfire-AI/huobao-drama`。不加参数直接跑，列出的是上游的 PR/Issue，
+发错地方还不报错，很容易中招。
+
+```bash
+# ❌ 危险：在 fork 里这样跑，操作的是上游仓库
+gh pr list
+gh pr view 48
+gh pr review 48 --request-changes
+
+# ✅ 正确：始终显式指定 --repo
+gh pr list  --repo Aibrother258/JisuVideo-ai
+gh pr view 48 --repo Aibrother258/JisuVideo-ai
+gh pr review 48 --repo Aibrother258/JisuVideo-ai --request-changes
+```
+
+建议起个别名，一劳永逸：
+
+```bash
+# Bash / Zsh（写入 ~/.bashrc 或 ~/.zshrc）
+alias ghj='gh --repo Aibrother258/JisuVideo-ai'
+
+# PowerShell（写入 $PROFILE，可用 notepad $PROFILE 打开）
+function ghj { gh --repo Aibrother258/JisuVideo-ai @args }
+```
+
+> ⚠️ **已经发错了怎么办**：`gh` 提交的 review **无法删除**（GitHub 只允许删除 pending 状态的 review）。
+> 万一发到上游，去那条 PR 下补一条说明留言请对方忽略即可，不必反复尝试删除。
+
+> 💡 同类坑还有：GitHub 网页端创建 PR 时默认把 base 指到上游（见上一节），
+> 以及误用 `upstream` 地址执行 `git push`（会直接被权限拒绝，反而安全）。
+> **fork 模式下 GitHub 处处默认帮你往上游送，每个操作前都要确认一次目标仓库。**
+
 ### PR 合并后
 
 ```bash
@@ -259,3 +294,7 @@ cd frontend && npm run generate && cp -r .output/public dist
 
 **Q：提示「尚未配置模型」？**
 A：正常。去「设置 → AI 服务」用「手动模板」添加文本/图片/视频三类配置即可，配置存数据库，不进代码。
+
+**Q：我跑 `gh pr list` 看到的 PR 根本不是我们仓库的？**
+A：`gh` 在 fork 仓库里默认操作父仓库（`chatfire-AI/huobao-drama`）。所有 `gh` 命令都要加
+`--repo Aibrother258/JisuVideo-ai`，或按第四节的说明配一个别名。
