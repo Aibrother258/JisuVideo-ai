@@ -79,15 +79,18 @@ test('export panel shows inline merge error with retry and list load states', ()
   assert.match(ep, /catch \(e\) \{[\s\S]*?mergeError\.value = e\.message \|\| '拼接失败'/)
   assert.match(ep, /mergeError\.value = mergeData\.value\?\.error_msg \|\| mergeData\.value\?\.errorMsg \|\| '拼接失败'/)
   // 成片列表三态：骨架 / 内联错误 / 列表（随组件下沉）
-  assert.match(panel, /const exportListLoading = ref\(false\)/)
-  assert.match(panel, /const exportListError = ref\(''\)/)
+  // P1 评审修复（PR #45）：三态收敛到 useExportMergesList（“最新请求获胜”），组件解构消费，
+  // 不再在组件内裸 ref 直接写（避免并发旧响应覆盖新列表/旧失败写回错误）
+  assert.match(panel, /const \{ exportMerges, exportListLoading, exportListError, [\s\S]*?useExportMergesList\(/)
   assert.match(panel, /v-if="exportListError" class="app-state app-state-error compact-state"/)
   assert.match(panel, /v-else-if="exportListLoading && !exportMerges\.length"/)
   assert.match(panel, /@click="loadExportMerges\(true\)"/)
   // 段头“刷新”按钮是用户显式动作，必须走 initial=true（失败显示内联错误而非静默保留）
   assert.match(panel, /class="btn btn-sm ml-auto" @click="loadExportMerges\(true\)"/)
-  // 面板挂载即走 initial 三态；主壳 refresh/拼接完成后以 listRev 令牌通知静默刷新
-  assert.match(panel, /onMounted\(\(\) => loadExportMerges\(true\)\)/)
+  // 面板挂载即走 initial 三态；主壳 refresh/拼接完成后以 listRev 令牌通知静默刷新；
+  // 卸载置非激活，面板期间迟到响应不再写状态
+  assert.match(panel, /onMounted\(\(\) => \{ setActive\(true\); loadExportMerges\(true\) \}\)/)
+  assert.match(panel, /onUnmounted\(\(\) => setActive\(false\)\)/)
   assert.match(panel, /watch\(\(\) => props\.listRev, \(\) => loadExportMerges\(\)\)/)
   assert.match(ep, /exportListRev\.value\+\+/)
   // P2-B2 评审修复：勾选集合为页面级状态（切面板/重挂载不丢选择）——
@@ -99,8 +102,12 @@ test('export panel shows inline merge error with retry and list load states', ()
   assert.match(ep, /:selected-ids="exportSelectedIds"/)
   assert.match(panel, /selectedIds: \{ type: Array, default: \(\) => \[\] \}/)
   assert.match(panel, /emit\('update:selectedIds', next\)/)
-  // 列表成功刷新后清除过时加载错误（对齐迁移前 doMerge 完成调 initial 刷新的语义）
-  assert.match(panel, /if \(exportListError\.value\) exportListError\.value = ''/)
+  // 列表成功刷新后清除过时加载错误（对齐迁移前 doMerge 完成调 initial 刷新的语义）；
+  // 该清理与“最新请求获胜/卸载作废”约束位于 useExportMergesList composable 内
+  const hook = read('app/composables/useExportMergesList.ts')
+  assert.match(hook, /if \(exportListError\.value\) exportListError\.value = ''/)
+  assert.match(hook, /seq !== reqSeq/)
+  assert.match(hook, /if \(seq === reqSeq && active\) exportListLoading\.value = false/)
 })
 
 test('residual silent loads get inline error + retry (drawer/picker/models/history)', () => {

@@ -147,9 +147,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, watch, onMounted, onUnmounted } from 'vue'
 import { RefreshCw, CircleAlert } from 'lucide-vue-next'
 import { mergeAPI } from '~/composables/useApi'
+import { useExportMergesList } from '~/composables/useExportMergesList'
 
 const props = defineProps({
   sbs: { type: Array, required: true },
@@ -177,10 +178,16 @@ function formatHistoryTime(iso) {
 
 // ===== 拼接导出:成片列表三态 + 镜头勾选渲染 =====
 // 自动全选（sbs 就绪/变化时若用户未手动勾选则全选已生成）由主壳 watch 承担，本组件只上报交互结果
-const exportMerges = ref([])      // 成片(拼接记录)列表
-// 成片列表加载三态（P0-C3）：失败内联呈现而非静默空列表
-const exportListLoading = ref(false)
-const exportListError = ref('')
+// 成片列表加载三态（P0-C3 + P1 评审修复）：抽取为 useExportMergesList —— 以“最新请求获胜”
+// （request revision + 挂载态 + episodeId 校验）处理 挂载 initial / listRev 静默刷新 / 手动刷新
+// 三路并发读取，防止旧响应覆盖新列表、旧失败写回错误横幅、旧 finally 关闭新 initial 的 loading。
+const { exportMerges, exportListLoading, exportListError, loadExportMerges: runLoadMerges, setActive } =
+  useExportMergesList((ep) => mergeAPI.list(ep))
+
+// 组件内包装：episodeId 来自 props；模板/事件仍以 (initial?) 签名调用
+function loadExportMerges(initial = false) {
+  return runLoadMerges(props.episodeId, initial)
+}
 
 const exportReadyIds = computed(() => props.sbs.filter(s => hasVid(s)).map(s => s.id))
 const exportSelectedReadyIds = computed(() => props.selectedIds.filter(id => exportReadyIds.value.includes(id)))
@@ -199,24 +206,11 @@ function toggleSelectAllExport() {
   emit('update:selectedIds', next)
 }
 
-async function loadExportMerges(initial = false) {
-  if (!props.episodeId) return
-  if (initial) { exportListLoading.value = true; exportListError.value = '' }
-  try {
-    exportMerges.value = await mergeAPI.list(props.episodeId) || []
-    // 列表成功刷新后清除过时的加载错误横幅（对齐迁移前 doMerge 完成调 loadExportMerges(true) 的语义）
-    if (exportListError.value) exportListError.value = ''
-  } catch (e) {
-    // 初始加载失败 -> 内联错误 + 重试；后台刷新失败保持旧列表不打扰
-    if (initial) { exportListError.value = e.message || '成片列表加载失败'; return }
-  } finally {
-    if (initial) exportListLoading.value = false
-  }
-}
-
 // 主壳 refresh / 拼接完成 -> 静默刷新（初始三态由 onMounted 承担，避免面板未挂载时空转）
 watch(() => props.listRev, () => loadExportMerges())
-onMounted(() => loadExportMerges(true))
+onMounted(() => { setActive(true); loadExportMerges(true) })
+// 卸载后迟到的响应（网络乱序 / 剧集切换）一律作废，不得再写列表或错误态
+onUnmounted(() => setActive(false))
 </script>
 
 <style scoped>

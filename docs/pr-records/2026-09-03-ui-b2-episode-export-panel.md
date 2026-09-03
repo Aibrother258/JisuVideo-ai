@@ -80,3 +80,17 @@ emits:  update:selectedIds(ids)  // 勾选/全选交互新集合 → 主壳 onEx
 - 组件根节点为 `.export-split`，其父容器仍是主壳保留的 `<div class="content-panel">`（scoped flex 布局在主壳），勿在子组件内重复声明 `.content-panel`。
 - `mergeError` 显示依赖主壳 doMerge 写 ref、经 prop 下发；若后续把发起/轮询也下沉组件，需先解决「组件卸载后轮询与全局 mergeData 同步」问题（本试点刻意保留主壳，避免行为回归）。
 - 勾选集合是页面级受控状态：改勾选入口只须 `emit('update:selectedIds', next)`，主壳 `onExportSelectedChange` 置 `exportSelTouched = true` 后不再自动全选；自动全选仅发生在用户未手动操作且 sbs 集合变化时（与迁移前一致）。后续拆分面板若有跨面板保留的用户选择/输入，沿用本「受控提升」模式，勿放组件内一次性状态。
+
+---
+
+## 评审回复（2026-09-03，PR #45 P1 修复）
+
+Reviewer（Aibrother258）结论：**暂不建议合并**，需先修复 1 个 P1 状态一致性问题后复审；组件边界、受控 `selected-ids`、`mergeData`/轮询留主壳等均确认保留，其余不构成阻塞。
+
+### P1：成片列表并发请求无「最新请求获胜」保护
+
+- **入口**：面板挂载 `onMounted(() => loadExportMerges(true))`、主壳 `refresh()`/拼接轮询完成递增 `exportListRev` 触发的静默刷新 watch、用户点「刷新」`loadExportMerges(true)`；
+- **旧实现缺陷**（组件 `EpisodeExportPanel.vue` 内裸写三态）：请求无取消/序列号/有效性校验。网络返回乱序时：后发请求已拿到最新成片、先发请求随后返回旧列表覆盖（新成片暂时「消失」）；旧 initial 请求在新请求成功后失败会把 `exportListError` 错误横幅写回一份已成功刷新的列表；旧 initial 的 `finally` 还会关闭较新 initial 请求仍在进行的 loading。
+- **修复**：把成片列表三态抽为 `composables/useExportMergesList.ts`（复用 B3/PR #43 paged-hook 的「最新请求获胜」模式）——每次读取递增本地 request revision 并捕获当次 `episodeId`，仅当 `seq === reqSeq`、组件仍挂载（`active`）、`episodeId` 未变化时才允许写 `exportMerges`/`exportListError`/loading；loading 收尾统一由全局最新请求承担（旧请求 `finally` 不得关闭较新 initial 的 loading，被静默刷新超越的旧 initial 也不悬挂）。组件改为消费该 composable：`onMounted` 先 `setActive(true)` 再走 initial 三态，`onUnmounted` `setActive(false)` 使卸载/剧集切换后的迟到响应一律作废。
+- **回归测试**：新增 `tests/episode-export-panel-behavior.test.mjs`（受控 Promise，同 paged-hook-behavior 模式）覆盖：① A（挂载 initial）后发起 B（listRev 静默刷新），B 先成功、A 后成功 → 保持 B 列表；② A 后失败（晚于 B 成功）→ 不写错误横幅；③ 手动刷新（新 initial）先成功、旧 initial 后完成 → 保持新列表且 loading 由最新请求收尾；④ 卸载后迟到响应（成功与失败）不写状态；⑤ episodeId 变更后旧剧集迟到响应丢弃；⑥ 无并发时 initial 失败仍内联错误 + 重试成功清错。结构测试同步更新为断言三态收敛 composable 的解构与约束（`seq !== reqSeq` 丢弃 / `seq === reqSeq && active` 收尾）。
+- **验证**：`npm test` 106/106 通过（此前 100/100）；`npm run build` 通过（停容器后于完整依赖环境复跑，未污染共享 dev 缓存）；dev 容器重启后 3013 页面恢复 dev 资源正常渲染（`@vite/client`、API 200）。
