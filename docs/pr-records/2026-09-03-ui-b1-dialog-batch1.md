@@ -17,7 +17,7 @@ P2-B1 目标「AppDialog 吸收各页手写 `.overlay>.dialog`、AppDrawer 吸�
 
 | 层面 | 改动 |
 |---|---|
-| 新增 `frontend/app/components/AppDialog.vue` | 收敛 `.overlay > .dialog` 骨架与 head/body/foot 三段插槽；`form` 开关（渲染 `<form>` 且 `@submit.prevent`）；`width` / `dialogStyle` 内联尺寸（规避页面 scoped 类跨组件失效）；关闭协议统一：Esc（`escClose`）与遮罩点击（`maskClose`）均派发 `close`，与 ConfirmDialog 行为对齐 |
+| 新增 `frontend/app/components/AppDialog.vue` | 收敛 `.overlay > .dialog` 骨架与 head/body/foot 三段插槽；`form` 开关（渲染 `<form>` 且 `@submit.prevent`）；`width` prop 内联宽度（规避页面 scoped 类跨组件失效）；关闭协议统一：Esc（`escClose`）与遮罩点击（`maskClose`）均派发 `close`，与 ConfirmDialog 行为对齐（`dialogStyle` 多维尺寸 prop 为 batch2 新增，见 `2026-09-03-ui-b1-dialog-batch2.md`） |
 | settings.vue | 四个弹窗迁移至 `<AppDialog>`：`cfgDialog`/`styleDialog` 用 `form` + `width="min(720px, calc(100vw - 40px))"` 保留响应式宽度、`addSkillDialog` 用 `width="440px"`、`stylePromptOpen` 为纯展示弹窗；原 `.config-dialog`/`.skill-dialog` 宽度类删除，body 内部布局类保留页面 scoped；裸 `.overlay` / `@click.self` 清零 |
 | 测试 | `apple-light-theme-structure.test.mjs` 新增 B1 batch1 断言组：组件骨架四段与关闭协议、settings 四弹窗已迁移、`class="overlay"` 与 `@click.self` 清零、宽度类删除 |
 
@@ -32,7 +32,7 @@ P2-B1 目标「AppDialog 吸收各页手写 `.overlay>.dialog`、AppDrawer 吸�
 | 决策 | 背后逻辑 |
 |---|---|
 | **先抽后改、视觉零变化** | 组件骨架与既有页面结构逐像素同构，迁移只删页面重复骨架，不引入任何布局/交互变更，评审可独立核对差异 |
-| **尺寸走 prop 内联而非组件内部类** | 插槽内容在调用页作用域编译，页面 scoped 类无法命中组件内部 `.dialog`；`width`/`dialogStyle` 以 `:style` 内联是跨 scoped 边界的可靠通道 |
+| **宽度走 prop 内联而非组件内部类** | 插槽内容在调用页作用域编译，页面 scoped 类无法命中组件内部 `.dialog`；`width` 以 `:style` 内联是跨 scoped 边界的可靠通道（本批仅 `width` 单一维度；多维尺寸需求出现后由 batch2 增补 `dialogStyle`） |
 | **Esc/遮罩关闭协议统一派发 close** | 各弹窗原本仅支持遮罩关闭，统一后与 ConfirmDialog 行为一致；`escClose`/`maskClose` 提供关闭开关供后续深度定制界面禁用 |
 | **form 开关而非让调用方包 form** | settings 三个弹窗本就以 `<form>` 承载提交；组件内建 `@submit.prevent` + `emit('submit')` 使保存按钮保持 `type="submit"` 原生语义，调用方只监听 `@submit` |
 
@@ -44,7 +44,7 @@ P2-B1 目标「AppDialog 吸收各页手写 `.overlay>.dialog`、AppDrawer 吸�
 ## 对后续迭代的影响
 
 - **评审明确 B1 系列边界**：仅标准 head/body/foot 弹窗迁入 AppDialog；素材详情、viewer、多步创建页与任务抽屉等深度定制界面应单独设计后再迁移（该边界在 batch2 迁移对象筛选中生效）。
-- 评审建议（转后续约束）：继续迁移可能叠加的弹窗时，应让「最上层弹窗」独占 Esc，并补齐打开聚焦/关闭后焦点返回，避免通用组件在复杂弹窗链路产生键盘焦点问题——batch2/3 通过「叠加界面保留页面级关闭协议、组件显式关闭自身 Esc」落地（见 batch3 记录）。
+- 评审建议（转后续约束）：继续迁移可能叠加的弹窗时，应让「最上层弹窗」独占 Esc，并补齐打开聚焦/关闭后焦点返回，避免通用组件在复杂弹窗链路产生键盘焦点问题——落地归属见 batch2/batch3：batch2 三个弹窗互斥无叠加，保持默认 Esc 未做特殊处理；batch3 任务抽屉与 viewer/资产详情叠层，才经 AppDrawer `esc-close=false` 交还页面级优先级（见 batch3 记录「关键设计决策」）。
 
 ## 注意事项
 
