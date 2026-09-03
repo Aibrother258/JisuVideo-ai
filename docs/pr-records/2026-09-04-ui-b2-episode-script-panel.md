@@ -1,9 +1,9 @@
 # Episode UI B2（第二批）：剧本（script）面板下沉 `EpisodeScriptPanel`
 
 > 迭代：# 批 B2 · script 面板（#45 试点后第二块）
-> PR：#47（merge commit 待回填）
+> PR：#47（merge `58c1e96`，2026-09-04；3 提交：`5c52815`（feat）/`143d83d`（docs，本归档初稿）/`284e26c`（P2 评审修复）；2 次正式 review：1 Request changes + 1 Approved）
 > 日期：2026-09-04
-> 版本：随本批迭代方案推进计划 v2.8（本批合入后由收尾文档提交统一归档）
+> 版本：随本批迭代方案推进计划 v2.8；#47 合入后由文档收口 PR #46 统一回填归档（merge/评审/验证/行数口径），索引 HB-20260904-02
 > 修订：2026-09-04 P2 评审（Request changes）修复：① 状态分支条件回归（「空内容 + 其他 Agent 运行」保持可编辑编辑器）+ 状态矩阵纯函数化与行为测试；② 父子接线双向结构守卫。详见 §7。
 
 ## 1. 迭代背景与触发
@@ -26,7 +26,7 @@
 
 | 文件 | 改动 |
 |---|---|
-| `frontend/app/views/drama/episode.vue` | SCRIPT PANEL 主体（约 90 行模板）替换为「空态 / 改写中 / EpisodeScriptPanel」三分支（P2 修复后分支引用 `scriptPanelState` computed，见 §7）；脚本删除下沉的 `rawLen/scriptLen` computed、新增组件与状态纯函数 import、`scriptPanelState` computed；scoped CSS 删除编辑器专属类 26 行（`.prod-toolbar` 单行保留）；860px 媒体删除 `.toolbar-right`。主壳净减约 42 行 |
+| `frontend/app/views/drama/episode.vue` | SCRIPT PANEL 主体（约 90 行模板）替换为「空态 / 改写中 / EpisodeScriptPanel」三分支（P2 修复后分支引用 `scriptPanelState` computed，见 §7）；脚本删除下沉的 `rawLen/scriptLen` computed、新增组件与状态纯函数 import、`scriptPanelState` computed；scoped CSS 删除编辑器专属类 26 行（`.prod-toolbar` 单行保留）；860px 媒体删除 `.toolbar-right`。主壳净减 42 物理行 / 39 非空行（非空行口径 episode.vue 6802→6763，物理 7150→7108） |
 | `frontend/app/components/EpisodeScriptPanel.vue` | 新增（125 行）：Step0/Step1 工具条 + 全文文本域受控渲染；props `step/raw/script/hasRaw/hasScript/running/taskType`，emits `save-raw/rewrite/skip-rewrite/update:raw/update:script`；字数统计 derived；scoped CSS 含 860px flex-wrap |
 | `frontend/app/utils/episode-script-state.mjs` | 新增：Step1 分支状态矩阵纯函数 `resolveScriptPanelState`（P2 修复，自原模板内联条件提出，语义与拆分前 master 对齐） |
 | `frontend/tests/episode-script-state-behavior.test.mjs` | 新增：状态矩阵行为测试 8 用例（P2 修复，含「空内容 + 其他 Agent 运行 → editor」回归守卫） |
@@ -51,7 +51,7 @@
 
 ## 6. 对后续迭代的影响
 
-- episode.vue 主壳净减 50 行；SCRIPT PANEL 模板区从主壳剥离为三分支壳（约 40 行），编辑器细节进子组件。
+- episode.vue 主壳净减 42 物理行 / 39 非空行（以 #45 合入后为基线：非空行口径 6802→6763，物理 7150→7108）；SCRIPT PANEL 模板区从主壳剥离为三分支壳（约 40 行），编辑器细节进子组件。
 - B2 拆分模式新增一条实证：**「带工具栏的三态面板」在共享态样式与工具栏纠缠时，以『共享态（空态/进行中）留主壳整页渲染 + 编辑器态下沉组件 + 条件判定全部落在主壳可直接访问的页面级状态』为可复用的拆分形态**。
 - 剩余拆分候选：assets（角色/场景/道具，与全局生成/上传状态纠缠最深）、storyboard 工作台、video-tasks、task-drawer 内容；以及 C3（各页面接入 `usePagedList`）。
 
