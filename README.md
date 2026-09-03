@@ -493,13 +493,18 @@ A: 后端会在首次启动时自动创建所有表，检查日志确认初始�
 
 欢迎提交 Issue 和 Pull Request！
 
-1. Fork 本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交改动 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+本项目采用 **Fork + Pull Request** 协作模式。完整流程（remote 配置、分支命名规范、提交前自检、冲突处理、PR 模板）请见 **[CONTRIBUTING.md](CONTRIBUTING.md)**，首次参与请先读一遍。
 
-常用检查命令：
+快速版：
+
+1. Fork 本项目到自己账号
+2. 添加主仓库为 upstream：`git remote add upstream https://github.com/Aibrother258/JisuVideo-ai.git`
+3. 创建特性分支 (`git checkout -b feat/AmazingFeature`)
+4. 提交改动 (`git commit -m 'feat: add AmazingFeature'`)
+5. 推送到自己的 fork (`git push -u origin feat/AmazingFeature`)
+6. 发起 Pull Request 到本仓库的 `master`
+
+常用检查命令（提交前必跑，两项都要通过）：
 
 ```bash
 cd backend && npm run typecheck

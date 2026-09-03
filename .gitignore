@@ -3,6 +3,9 @@ node_modules/
 
 # Build output
 dist/
+.output/
+.nuxt/
+*.tsbuildinfo
 
 # IDE
 .idea/

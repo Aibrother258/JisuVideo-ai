@@ -1,0 +1,21 @@
+# CODEOWNERS —— 自动指定 PR 评审人
+#
+# 语法：<文件或目录模式>  <@用户名 或 @团队名>
+# 写法示例：
+#   *                   所有文件
+#   /backend/           backend 目录（含子目录）
+#   /frontend/app/      frontend/app 目录
+#   *.md                所有 Markdown 文件
+#
+# 注意：这里填写的用户必须是本仓库的协作者（有 write 权限），
+#       否则 GitHub 会在 PR 页面提示 "Unknown owner" 且该规则不生效。
+#       添加协作者路径：Settings → Collaborators → Add people。
+
+# 全局默认评审人
+*                   @Aibrother258
+
+# 按目录细分（第二位协作者加入后，在对应行末尾追加其用户名即可，用空格分隔）
+/backend/           @Aibrother258
+/frontend/          @Aibrother258
+/docs/              @Aibrother258
+/.github/           @Aibrother258
