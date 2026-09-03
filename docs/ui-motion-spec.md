@@ -28,7 +28,7 @@
 | `--dur-fast` | 0.16s | hover/描边等轻交互 | 0.14s / 0.15s / 0.16s |
 | `--dur-base` | 0.18s | 通用交互动画（悬停提拉/升格） | 0.18s |
 | `--dur-med` | 0.22s | 浮层/面板/开关进入 | 0.2s / 0.22s / 0.24s |
-| `--dur-slow` | 0.35s | 页面/段落 fadeUp/fadeIn 进入 | 0.3s / 0.32s / 0.35s |
+| `--dur-slow` | 0.32s | 页面/段落 fadeUp/fadeIn 进入 | 0.3s / 0.32s / 0.35s 取中值 0.32（最大偏差≤0.03s，0.35 原值偏差恰在边界） |
 | `--dur-stagger` | 0.04s | stagger 级联步进 | `.stagger-N { animation-delay: calc(var(--dur-stagger) * N) }` |
 
 > 归一原则与色板 R3 一致：**值不变改引用优先**；档内合并的旧值均为相邻档（绝对差 ≤0.03s），肉眼不可分，记录于此供复核。
@@ -57,5 +57,5 @@
 
 1. 新动效一律引用 `var(--dur-*)` + `var(--ease-out)`；新增时长值先归入最近档或更新本规范 §3。
 2. 新 keyframes 命名空间避免与全局（spin/fadeIn/fadeUp/scaleIn）冲突。
-3. 结构测试（apple-light-theme A3 组）守卫：归一档字面量（0.14–0.35s）不得出现在 vue 文件中；spin 仅 studio.css 定义。
+3. 结构测试（apple-light-theme A3 组）守卫：归一档字面量（0.14–0.32s）不得出现在 vue 文件中；spin 仅 studio.css 定义。
 4. 暗色主题 / 动效偏好（reduce-motion）批次：以本规范 token 为调节面，禁止继续散落字面量。

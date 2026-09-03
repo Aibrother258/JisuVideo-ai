@@ -191,7 +191,7 @@ test('A3 motion: duration tiers/easing tokens defined, component+page animations
   assert.match(studioCss, /--dur-fast: 0\.16s;/)
   assert.match(studioCss, /--dur-base: 0\.18s;/)
   assert.match(studioCss, /--dur-med: 0\.22s;/)
-  assert.match(studioCss, /--dur-slow: 0\.35s;/)
+  assert.match(studioCss, /--dur-slow: 0\.32s;/)
   assert.match(studioCss, /--dur-stagger: 0\.04s;/)
   // 组件层收敛（值不变改引用）
   assert.match(studioCss, /transition: background var\(--dur-base\) var\(--ease-out\), color var\(--dur-base\) var\(--ease-out\), box-shadow var\(--dur-base\) var\(--ease-out\), transform var\(--dur-instant\) var\(--ease-out\);/)

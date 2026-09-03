@@ -175,7 +175,7 @@
   --dur-fast: 0.16s;     /* hover/描边等轻交互（原 0.14/0.15/0.16 归并） */
   --dur-base: 0.18s;     /* 通用交互动画（悬停提拉/升格/通用过渡） */
   --dur-med: 0.22s;      /* 浮层/面板/开关进入（原 0.2/0.22/0.24 归并） */
-  --dur-slow: 0.35s;     /* 页面/段落 fadeUp/fadeIn 进入（原 0.3/0.32/0.35 归并） */
+  --dur-slow: 0.32s;     /* 页面/段落 fadeUp/fadeIn 进入（原 0.3/0.32/0.35 取中值 0.32，最大偏差≤0.03s） */
   --dur-stagger: 0.04s;  /* stagger 级联步进 */
   /* A3 动效体系：缓动——Apple Light 仅一档出加速；linear/ease-in-out 仅限旋转与骨架循环例外 */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
