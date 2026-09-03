@@ -527,9 +527,9 @@
                       <div v-else class="character-portrait-empty">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                       </div>
-                      <span class="asset-cover-badge" :class="matHasImage(m) ? 'is-ready' : (isPending(m) ? 'is-pending' : '')">
+                      <StatusBadge variant="cover" :state="matHasImage(m) ? 'ready' : (isPending(m) ? 'pending' : '')">
                         {{ matHasImage(m) ? '形象已生成' : (isPending(m) ? '形象生成中' : '形象待生成') }}
-                      </span>
+                      </StatusBadge>
                     </div>
                     <div class="character-asset-head">
                       <div class="character-title-block">
@@ -579,9 +579,9 @@
                     <svg v-if="g.kindKey === 'scene'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                   </div>
-                  <span class="asset-cover-badge" :class="matHasImage(m) ? 'is-ready' : (isPending(m) ? 'is-pending' : '')">
+                  <StatusBadge variant="cover" :state="matHasImage(m) ? 'ready' : (isPending(m) ? 'pending' : '')">
                     {{ matHasImage(m) ? '已生成' : (isPending(m) ? '生成中' : '待生成') }}
-                  </span>
+                  </StatusBadge>
                 </div>
                 <div class="asset-body">
                   <template v-if="g.kindKey === 'scene'">
@@ -654,9 +654,9 @@
               <aside class="mat-detail-preview-panel">
                 <div class="mat-detail-section-title">
                   <span>视觉预览</span>
-                  <span :class="['mat-detail-state', matHasImage(editTarget) ? 'is-ready' : '']">
+                  <StatusBadge :state="matHasImage(editTarget) ? 'ready' : ''">
                     {{ matHasImage(editTarget) ? '已生成' : '待生成' }}
-                  </span>
+                  </StatusBadge>
                 </div>
 
                 <button
@@ -864,6 +864,7 @@ import { toast } from 'vue-sonner'
 import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, stylePresetAPI } from '~/composables/useApi'
 import BaseSelect from '~/components/BaseSelect.vue'
 import AppDialog from '~/components/AppDialog.vue'
+import StatusBadge from '~/components/StatusBadge.vue'
 import { isServerPlanGenerated } from '~/utils/episode-plan-state.mjs'
 
 const route = useRoute()
@@ -2351,30 +2352,6 @@ onBeforeUnmount(() => {
 .asset-cover img { width: 100%; height: 100%; object-fit: cover; }
 .previewable-image { cursor: zoom-in; transition: transform var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
 .previewable-image:hover { transform: scale(1.015); filter: saturate(1.04); }
-.asset-cover-badge {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--surface-glass);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-float);
-  color: var(--text-2);
-  font-size: 9.5px;
-  font-weight: 700;
-}
-.asset-cover-badge.is-ready {
-  background: var(--success-bg);
-  color: var(--success-strong);
-}
-.asset-cover-badge.is-pending {
-  background: var(--accent-bg);
-  color: var(--accent-text);
-}
 .asset-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .asset-body {
   flex: 1;
@@ -2525,15 +2502,6 @@ onBeforeUnmount(() => {
 }
 .mat-detail-prompt-text:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
 .mat-detail-prompt-text::placeholder { color: var(--text-3); }
-
-/* 状态标签 */
-.mat-detail-state {
-  min-height: 20px; display: inline-flex; align-items: center;
-  padding: 0 7px; border-radius: 999px;
-  background: var(--fill-subtle); color: var(--text-3);
-  font-size: 10px; font-weight: 760; white-space: nowrap;
-}
-.mat-detail-state.is-ready { color: var(--success); background: var(--success-bg); }
 
 /* 图片预览框 */
 .mat-detail-media-frame {
