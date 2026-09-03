@@ -41,6 +41,9 @@
 | HB-20260903-05 | UI A2 语义色板规范批次一——资产类别/状态语义色与 amber 提示横幅 token 化 | 完成（PR #25，merge `1c090e1`）；结构测试 81/81 通过 | [查看归档](../pr-records/2026-09-03-ui-semantic-a2-batch1.md) |
 | HB-20260903-06 | UI A2 语义色板规范批次二——episode 媒体遮罩/白字、R5/R6 全仓清理、new-style 家族 | 完成（PR #26，merge `5b9ae75`）；经两轮 R5 补漏评审，结构测试 82/82 通过 | [查看归档](../pr-records/2026-09-03-ui-semantic-a2-batch2.md) |
 | HB-20260903-07 | UI A3 动效体系化——时长档 token、缓动统一、keyframes 收敛与进入动画规范 | 完成（PR #28，merge `72edeac`）；经一轮 dur-slow 偏差评审修正，结构测试 83/83 通过 | [查看归档](../pr-records/2026-09-03-ui-motion-a3.md) |
+| HB-20260903-08 | UI P2-B1 批次一——AppDialog 通用弹窗组件 + settings 四个配置弹窗迁移 | 完成（PR #30，merge `c9be4df`）；结构测试 84/84 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch1.md) |
+| HB-20260903-09 | UI P2-B1 批次二——detail/episode 标准弹窗迁移至 AppDialog + dialogStyle | 完成（PR #31，merge `04b128a`）；结构测试 85/85 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch2.md) |
+| HB-20260903-10 | UI P2-B1 批次三——AppDrawer 右侧抽屉组件 + episode 任务抽屉迁移（Esc 交还页面优先级） | 完成（PR #32，merge `e23ec12`）；结构测试 86/86 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-dialog-batch3.md) |
 
 ## 记录规范
 
