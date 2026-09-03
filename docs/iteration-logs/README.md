@@ -51,6 +51,12 @@
 | HB-20260903-15 | UI P2-B1 批次八——Field 表单字段组件抽取 + settings/index `.field` 骨架迁移 | 完成（PR #42，merge `43ee3e2`）；一轮复核通过，结构测试 91/91 通过 | [查看归档](../pr-records/2026-09-03-ui-b1-field-batch8.md) |
 | HB-20260903-16 | UI P2-B3 分页 hook——`usePagedList` + `dramaAPI.list` 分页参数扩展 | 完成（PR #43，merge `f93b287`）；经三轮评审（参数覆盖顺序/过期响应代次/Node 20 测试基线 tsx 化），测试 100/100 通过 | [查看归档](../pr-records/2026-09-03-ui-b3-paged-hook.md) |
 
+## 2026-09-04
+
+| 编号 | 迭代 | 状态 | 详细日志 |
+|---|---|---|---|
+| HB-20260904-01 | UI P2-B2 试点——episode 拼接导出面板下沉 `EpisodeExportPanel` + `useExportMergesList` 并发令牌 | 完成（PR #45，merge `b11be06`）；经三轮评审（受控勾选提升/最新请求获胜），episode.vue 7069→6759 行，测试 106/106 通过 | [查看归档](../pr-records/2026-09-03-ui-b2-episode-export-panel.md) |
+
 ## 记录规范
 
 每篇日志至少包含：

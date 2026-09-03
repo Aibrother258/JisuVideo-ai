@@ -5,7 +5,7 @@
 > 日期：2026-09-03（创建）
 > 变更：5 文件 2 提交——`b616b73`（迁移：episode.vue +26/−318、新增 EpisodeExportPanel.vue +361、结构测试两处）+ 自查修复提交（episode.vue +24/−4、组件 25/25、three-state 测试 +11）
 > 关联方案：`docs/ui-optimization-plan.md`（P2-B2「巨型页面拆分」）——先以风险最高、约 7400 行的 `episode.vue` 拆分试点，试点面板为「拼接导出面板」
-> PR：#45（merge commit 待回填）
+> PR：#45（merge commit `b11be06`，2026-09-04）
 
 ---
 
