@@ -486,16 +486,15 @@
     </div>
 
     <!-- AI Config Dialog -->
-    <div v-if="cfgDialog" class="overlay" @click.self="cfgDialog = false">
-      <form class="dialog config-dialog" @submit.prevent="saveCfg">
-        <div class="dialog-head">
-          <div>
-            <div class="dialog-title">{{ cfgEditId ? '编辑服务配置' : `添加${serviceMeta[cfgForm.service_type].label}服务` }}</div>
-            <div class="dialog-sub">推荐先选择模板，系统会自动填入更合理的 `Base URL` 与默认模型。</div>
-          </div>
-          <span class="tag tag-accent ml-auto">{{ serviceMeta[cfgForm.service_type].label }}</span>
+    <AppDialog v-if="cfgDialog" form width="min(720px, calc(100vw - 40px))" @close="cfgDialog = false" @submit="saveCfg">
+      <template #head>
+        <div>
+          <div class="dialog-title">{{ cfgEditId ? '编辑服务配置' : `添加${serviceMeta[cfgForm.service_type].label}服务` }}</div>
+          <div class="dialog-sub">推荐先选择模板，系统会自动填入更合理的 `Base URL` 与默认模型。</div>
         </div>
-        <div class="dialog-body config-dialog-body">
+        <span class="tag tag-accent ml-auto">{{ serviceMeta[cfgForm.service_type].label }}</span>
+      </template>
+      <div class="config-dialog-body">
           <div class="preset-picker">
             <button
               v-for="preset in presetsByType(cfgForm.service_type)"
@@ -567,118 +566,109 @@
             <div class="mono test-result-url">{{ cfgTestResult.method }} {{ cfgTestResult.url }}</div>
             <div v-if="cfgTestResult.response_preview" class="mono test-result-preview">{{ cfgTestResult.response_preview }}</div>
           </div>
-        </div>
-        <div class="dialog-foot">
-          <button type="button" class="btn btn-ghost test-draft-btn" :disabled="cfgTesting" @click="testDraftCfg">
-            <Loader2 v-if="cfgTesting" :size="12" class="animate-spin" />
-            <span v-else>测试配置</span>
-          </button>
-          <button type="button" class="btn" @click="cfgDialog = false">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
-        </div>
-      </form>
-    </div>
+      </div>
+      <template #foot>
+        <button type="button" class="btn btn-ghost test-draft-btn" :disabled="cfgTesting" @click="testDraftCfg">
+          <Loader2 v-if="cfgTesting" :size="12" class="animate-spin" />
+          <span v-else>测试配置</span>
+        </button>
+        <button type="button" class="btn" @click="cfgDialog = false">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </template>
+    </AppDialog>
 
     <!-- Add Skill Dialog -->
-    <div v-if="addSkillDialog" class="overlay" @click.self="addSkillDialog = false">
-      <form class="dialog skill-dialog" @submit.prevent="confirmAddSkill">
-        <div class="dialog-head">
-          <div class="dialog-title">新增 Skill — {{ selectedAgentLabel }}</div>
-        </div>
-        <div class="dialog-body skill-dialog-body">
-          <label class="field">
-            <span class="field-label">Skill 目录名 <span class="dim">(英文，唯一)</span></span>
-            <input v-model="newSkillForm.id" class="input" placeholder="如 custom-extraction" />
-          </label>
-          <label class="field">
-            <span class="field-label">名称</span>
-            <input v-model="newSkillForm.name" class="input" placeholder="如 自定义提取规则" />
-          </label>
-          <label class="field">
-            <span class="field-label">描述</span>
-            <input v-model="newSkillForm.description" class="input" placeholder="简短描述此 Skill 的用途" />
-          </label>
-        </div>
-        <div class="dialog-foot">
-          <button type="button" class="btn" @click="addSkillDialog = false">取消</button>
-          <button type="submit" class="btn btn-primary" :disabled="!newSkillForm.id">创建</button>
-        </div>
-      </form>
-    </div>
+    <AppDialog v-if="addSkillDialog" form width="440px" @close="addSkillDialog = false" @submit="confirmAddSkill">
+      <template #head>
+        <div class="dialog-title">新增 Skill — {{ selectedAgentLabel }}</div>
+      </template>
+      <div class="skill-dialog-body">
+        <label class="field">
+          <span class="field-label">Skill 目录名 <span class="dim">(英文，唯一)</span></span>
+          <input v-model="newSkillForm.id" class="input" placeholder="如 custom-extraction" />
+        </label>
+        <label class="field">
+          <span class="field-label">名称</span>
+          <input v-model="newSkillForm.name" class="input" placeholder="如 自定义提取规则" />
+        </label>
+        <label class="field">
+          <span class="field-label">描述</span>
+          <input v-model="newSkillForm.description" class="input" placeholder="简短描述此 Skill 的用途" />
+        </label>
+      </div>
+      <template #foot>
+        <button type="button" class="btn" @click="addSkillDialog = false">取消</button>
+        <button type="submit" class="btn btn-primary" :disabled="!newSkillForm.id">创建</button>
+      </template>
+    </AppDialog>
 
     <!-- Style Preset Dialog -->
-    <div v-if="styleDialog" class="overlay" @click.self="cancelStyleDialog">
-      <form class="dialog config-dialog" @submit.prevent="saveStyle">
-        <div class="dialog-head">
-          <div>
-            <div class="dialog-title">添加风格预设</div>
-            <div class="dialog-sub">提示词片段为英文，会在生成角色图与场景图时自动拼入提示词。</div>
+    <AppDialog v-if="styleDialog" form width="min(720px, calc(100vw - 40px))" @close="cancelStyleDialog" @submit="saveStyle">
+      <template #head>
+        <div>
+          <div class="dialog-title">添加风格预设</div>
+          <div class="dialog-sub">提示词片段为英文，会在生成角色图与场景图时自动拼入提示词。</div>
+        </div>
+        <span class="tag tag-accent ml-auto"><Palette :size="12" /> 风格</span>
+      </template>
+      <div class="config-dialog-body">
+        <div class="style-ai-bar">
+          <div class="style-ai-copy">
+            <span>AI 一键完善</span>
+            <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
           </div>
-          <span class="tag tag-accent ml-auto"><Palette :size="12" /> 风格</span>
-        </div>
-        <div class="dialog-body config-dialog-body">
-          <div class="style-ai-bar">
-            <div class="style-ai-copy">
-              <span>AI 一键完善</span>
-              <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
-              <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
-              <Sparkles v-else :size="13" />
-              {{ styleExpanding ? '完善中…' : 'AI 完善' }}
-            </button>
-          </div>
-          <label class="field">
-            <span class="field-label">风格名称 <span class="required">*</span></span>
-            <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
-          </label>
-          <label class="field">
-            <span class="field-label">风格 key <span class="required">*</span></span>
-            <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" />
-            <span class="field-hint">存入项目的风格标识，创建后不可修改。</span>
-          </label>
-          <label class="field">
-            <span class="field-label">提示词片段（英文） <span class="required">*</span></span>
-            <textarea v-model="styleForm.prompt" class="textarea" rows="3" placeholder="如 anime style, cel shading, vibrant colors, clean line art"></textarea>
-          </label>
-          <label class="field">
-            <span class="field-label">描述</span>
-            <input v-model="styleForm.description" class="input" placeholder="一句话说明该风格的适用场景" />
-          </label>
-          <label class="field">
-            <span class="field-label">排序</span>
-            <input v-model.number="styleForm.sort_order" class="input" type="number" min="0" max="999" />
-          </label>
-        </div>
-        <div class="dialog-foot">
-          <button type="button" class="btn" @click="cancelStyleDialog">取消</button>
-          <button type="submit" class="btn btn-primary" :disabled="styleSaving">保存</button>
-        </div>
-      </form>
-    </div>
-    <!-- 切换风格前：当前风格有未保存修改，让用户选择保存 / 放弃 / 取消 -->
-    <div v-if="stylePromptOpen" class="overlay" @click.self="cancelStylePrompt">
-      <div class="dialog unsaved-dialog">
-        <div class="dialog-head">
-          <div>
-            <div class="dialog-title">有未保存的修改</div>
-            <div class="dialog-sub">「{{ currentStyle?.name || '当前风格' }}」的表单已修改但尚未保存。</div>
-          </div>
-          <span class="tag" style="border-color:var(--unsaved-border);color:var(--unsaved-text);background:var(--unsaved-bg)"><TriangleAlert :size="12" /> 未保存</span>
-        </div>
-        <div class="dialog-body">
-          <p class="unsaved-dialog-copy">{{ stylePromptIsNew ? '新建风格会丢弃当前风格的未保存修改。' : '切换风格会丢弃这些修改。' }}「保存并{{ stylePromptIsNew ? '新建' : '切换' }}」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
-        </div>
-        <div class="dialog-foot">
-          <button type="button" class="btn" @click="cancelStylePrompt">取消</button>
-          <button type="button" class="btn btn-ghost" @click="discardStyleEdit">放弃更改</button>
-          <button type="button" class="btn btn-primary" :disabled="styleSaving" @click="keepStyleAndSwitch">
-            <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
-            保存并{{ stylePromptIsNew ? '新建' : '切换' }}
+          <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
+            <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
+            <Sparkles v-else :size="13" />
+            {{ styleExpanding ? '完善中…' : 'AI 完善' }}
           </button>
         </div>
+        <label class="field">
+          <span class="field-label">风格名称 <span class="required">*</span></span>
+          <input v-model="styleForm.name" class="input" placeholder="如 3D、动漫、写实电影" />
+        </label>
+        <label class="field">
+          <span class="field-label">风格 key <span class="required">*</span></span>
+          <input v-model="styleForm.value" class="input mono" placeholder="如 3d、anime（小写字母/数字/中划线）" />
+          <span class="field-hint">存入项目的风格标识，创建后不可修改。</span>
+        </label>
+        <label class="field">
+          <span class="field-label">提示词片段（英文） <span class="required">*</span></span>
+          <textarea v-model="styleForm.prompt" class="textarea" rows="3" placeholder="如 anime style, cel shading, vibrant colors, clean line art"></textarea>
+        </label>
+        <label class="field">
+          <span class="field-label">描述</span>
+          <input v-model="styleForm.description" class="input" placeholder="一句话说明该风格的适用场景" />
+        </label>
+        <label class="field">
+          <span class="field-label">排序</span>
+          <input v-model.number="styleForm.sort_order" class="input" type="number" min="0" max="999" />
+        </label>
       </div>
-    </div>
+      <template #foot>
+        <button type="button" class="btn" @click="cancelStyleDialog">取消</button>
+        <button type="submit" class="btn btn-primary" :disabled="styleSaving">保存</button>
+      </template>
+    </AppDialog>
+    <!-- 切换风格前：当前风格有未保存修改，让用户选择保存 / 放弃 / 取消 -->
+    <AppDialog v-if="stylePromptOpen" @close="cancelStylePrompt">
+      <template #head>
+        <div>
+          <div class="dialog-title">有未保存的修改</div>
+          <div class="dialog-sub">「{{ currentStyle?.name || '当前风格' }}」的表单已修改但尚未保存。</div>
+        </div>
+        <span class="tag" style="border-color:var(--unsaved-border);color:var(--unsaved-text);background:var(--unsaved-bg)"><TriangleAlert :size="12" /> 未保存</span>
+      </template>
+      <p class="unsaved-dialog-copy">{{ stylePromptIsNew ? '新建风格会丢弃当前风格的未保存修改。' : '切换风格会丢弃这些修改。' }}「保存并{{ stylePromptIsNew ? '新建' : '切换' }}」将先保存当前内容再继续；「放弃更改」将丢弃并继续。</p>
+      <template #foot>
+        <button type="button" class="btn" @click="cancelStylePrompt">取消</button>
+        <button type="button" class="btn btn-ghost" @click="discardStyleEdit">放弃更改</button>
+        <button type="button" class="btn btn-primary" :disabled="styleSaving" @click="keepStyleAndSwitch">
+          <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+          保存并{{ stylePromptIsNew ? '新建' : '切换' }}
+        </button>
+      </template>
+    </AppDialog>
     <ConfirmDialog
       :open="!!styleToDelete"
       title="删除风格预设"
@@ -701,6 +691,7 @@
 <script setup>
 import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
+import AppDialog from '~/components/AppDialog.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
 
@@ -2063,8 +2054,7 @@ onMounted(() => {
 .required { color: var(--error); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-/* Dialogs */
-.config-dialog { width: min(720px, calc(100vw - 40px)); }
+/* Dialogs（弹窗宽度改由 <AppDialog width> 提供，仅保留 body 内部布局类） */
 .config-dialog-body { display: flex; flex-direction: column; gap: 14px; }
 /* Style AI expand bar */
 .style-ai-bar {
@@ -2081,7 +2071,6 @@ onMounted(() => {
 .style-ai-copy span { font-size: 12px; font-weight: 650; color: var(--accent-text); }
 .style-ai-copy small { font-size: 10.5px; line-height: 1.5; color: var(--text-3); }
 .style-ai-bar .btn { flex-shrink: 0; }
-.skill-dialog { width: 440px; }
 .skill-dialog-body { display: flex; flex-direction: column; gap: 12px; }
 .dialog-sub { margin-top: 4px; font-size: 12px; color: var(--text-2); }
 .test-draft-btn { margin-right: auto; }
