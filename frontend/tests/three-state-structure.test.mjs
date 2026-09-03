@@ -69,23 +69,62 @@ test('detail/episode top-level loading shows skeleton and inline error instead o
 
 test('export panel shows inline merge error with retry and list load states', () => {
   const ep = read('app/views/drama/episode.vue')
-  // 拼接失败内联横幅（内联错误条 + 重试/关闭）
-  assert.match(ep, /v-if="mergeError" class="app-state-inline app-state-error"/)
-  assert.match(ep, /@click="doMerge\(lastMergeIds\)"/)
-  assert.match(ep, /@click="mergeError = ''"/)
-  // 发起失败与后台轮询失败都写入内联错误（不再只依赖 toast）
+  // P2-B2：拼接导出面板已下沉 EpisodeExportPanel.vue；面板 UI 三态在组件内，主壳保留 doMerge/轮询
+  const panel = read('app/components/EpisodeExportPanel.vue')
+  // 拼接失败内联横幅（内联错误条 + 重试/关闭）随 UI 下沉组件，重试/关闭经事件回主壳
+  assert.match(panel, /v-if="mergeError" class="app-state-inline app-state-error"/)
+  assert.match(panel, /@click="emit\('retry-merge'\)"/)
+  assert.match(panel, /@click="emit\('clear-merge-error'\)"/)
+  // 发起失败与后台轮询失败都写入内联错误（仍在主壳 doMerge 内，经 mergeError prop 呈现在组件）
   assert.match(ep, /catch \(e\) \{[\s\S]*?mergeError\.value = e\.message \|\| '拼接失败'/)
   assert.match(ep, /mergeError\.value = mergeData\.value\?\.error_msg \|\| mergeData\.value\?\.errorMsg \|\| '拼接失败'/)
-  // 成片列表三态：骨架 / 内联错误 / 列表
-  assert.match(ep, /const exportListLoading = ref\(false\)/)
-  assert.match(ep, /const exportListError = ref\(''\)/)
-  assert.match(ep, /v-if="exportListError" class="app-state app-state-error compact-state"/)
-  assert.match(ep, /v-else-if="exportListLoading && !exportMerges\.length"/)
-  assert.match(ep, /@click="loadExportMerges\(true\)"/)
+  // 成片列表三态：骨架 / 内联错误 / 列表（随组件下沉）
+  // P1 评审修复（PR #45）：三态收敛到 useExportMergesList（“最新请求获胜”），组件解构消费，
+  // 不再在组件内裸 ref 直接写（避免并发旧响应覆盖新列表/旧失败写回错误）
+  assert.match(panel, /const \{ exportMerges, exportListLoading, exportListError, [\s\S]*?useExportMergesList\(/)
+  assert.match(panel, /v-if="exportListError" class="app-state app-state-error compact-state"/)
+  assert.match(panel, /v-else-if="exportListLoading && !exportMerges\.length"/)
+  assert.match(panel, /@click="loadExportMerges\(true\)"/)
   // 段头“刷新”按钮是用户显式动作，必须走 initial=true（失败显示内联错误而非静默保留）
-  assert.match(ep, /class="btn btn-sm ml-auto" @click="loadExportMerges\(true\)"/)
-  // 页面初始刷新时成片列表同步走 initial 三态
-  assert.match(ep, /loadExportMerges\(initial\)/)
+  assert.match(panel, /class="btn btn-sm ml-auto" @click="loadExportMerges\(true\)"/)
+  // 面板挂载即走 initial 三态；主壳 refresh/拼接完成后以 listRev 令牌通知静默刷新；
+  // 卸载置非激活，面板期间迟到响应不再写状态
+  assert.match(panel, /onMounted\(\(\) => \{ setActive\(true\); loadExportMerges\(true\) \}\)/)
+  assert.match(panel, /onUnmounted\(\(\) => setActive\(false\)\)/)
+  assert.match(panel, /watch\(\(\) => props\.listRev, \(\) => loadExportMerges\(\)\)/)
+  assert.match(ep, /exportListRev\.value\+\+/)
+  // P2-B2 评审修复：勾选集合为页面级状态（切面板/重挂载不丢选择）——
+  // 主壳持 exportSelectedIds + watch sbs 自动全选，组件受控渲染并以 update:selectedIds 上报
+  assert.match(ep, /const exportSelectedIds = ref\(\[\]\)/)
+  assert.match(ep, /const exportReadyIds = computed\(\(\) => sbs\.value\.filter\(s => hasVid\(s\)\)\.map\(s => s\.id\)\)/)
+  assert.match(ep, /watch\(exportReadyIds, \(ids\) => \{/)
+  assert.match(ep, /@update:selected-ids="onExportSelectedChange"/)
+  assert.match(ep, /:selected-ids="exportSelectedIds"/)
+  assert.match(panel, /selectedIds: \{ type: Array, default: \(\) => \[\] \}/)
+  assert.match(panel, /emit\('update:selectedIds', next\)/)
+  // 列表成功刷新后清除过时加载错误（对齐迁移前 doMerge 完成调 initial 刷新的语义）；
+  // 该清理与“最新请求获胜/卸载作废”约束位于 useExportMergesList composable 内
+  const hook = read('app/composables/useExportMergesList.ts')
+  assert.match(hook, /if \(exportListError\.value\) exportListError\.value = ''/)
+  // P1/P2 复审：分开维护「最新发起序号」与「最新成功提交序号」——只有更晚的成功才淘汰较早成功，
+  // 失败的 silent 不得作废在途 initial（其成功照常落盘），错误/loading 只由最新 initial 决定者收尾
+  assert.match(hook, /let issued = 0/)
+  assert.match(hook, /let committed = 0/)
+  assert.match(hook, /let lastInitialSeq = 0/)
+  // P1/P2 复审2：最新 initial 也是决策屏障——更新的 initial 失败后，早于它的成功不得回写旧列表
+  // 或清除新错误（success 与 catch 均拒绝 seq < committed 或 seq < lastInitialSeq）
+  assert.match(hook, /if \(seq < committed \|\| seq < lastInitialSeq\) return/)
+  assert.match(hook, /committed = seq/)
+  assert.match(hook, /seq === lastInitialSeq/)
+  // episodeId 以 getter 读「当前」值（P2：消除函数参数自比的恒假校验）
+  assert.match(hook, /getEpisodeId: \(\) => number/)
+  // P1/P2 复审2：剧集切换需清空上一集已展示数据——resetForEpisode 作废在途请求并清三态
+  assert.match(hook, /function resetForEpisode\(\)/)
+  assert.match(hook, /return \{ exportMerges, exportListLoading, exportListError, loadExportMerges, setActive, resetForEpisode \}/)
+  // 组件传当前 episodeId getter，监听剧集切换：先 reset 清空上一集数据，id 有效再按新集 initial
+  // （id=0 收敛为空闲空态），避免 ep2 响应前误显示/误操作 ep1 成片
+  assert.match(panel, /useExportMergesList\([\s\S]*?, \(\) => props\.episodeId\)/)
+  assert.match(panel, /watch\(\(\) => props\.episodeId, \(\) => \{[\s\S]*?resetForEpisode\(\)[\s\S]*?if \(props\.episodeId\) loadExportMerges\(true\)/)
 })
 
 test('residual silent loads get inline error + retry (drawer/picker/models/history)', () => {
