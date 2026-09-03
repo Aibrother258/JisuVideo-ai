@@ -376,3 +376,39 @@ test('B1 batch5: EmptyState owns dashed-card empty state, index/detail migrated'
   assert.match(episode, /\.step-empty-actions \{/)
   assert.match(detail, /\.ep-empty[\s\S]*?hover/)
 })
+
+test('B1 batch6: LoadingButton owns busy-disabled button with spinner, settings migrated', () => {
+  const lb = read('../app/components/LoadingButton.vue')
+  const settings = read('../app/pages/settings.vue')
+  // 组件收敛「按钮 + busy 时 disabled + spinner 替换图标」标准结构
+  assert.match(lb, /loading\?: boolean/)
+  assert.match(lb, /disabled\?: boolean/)
+  assert.match(lb, /spinnerSize\?: number/)
+  assert.match(lb, /<Loader2 v-if="loading"/)
+  assert.match(lb, /class="animate-spin"/)
+  assert.match(lb, /<slot v-else name="icon" \/>/)
+  assert.match(lb, /<slot \/>/)
+  // settings 模板迁移：9 处按钮内 Loader2 均改 <LoadingButton>，图标入 #icon 插槽，文案三元留默认插槽
+  assert.match(settings, /<LoadingButton/)
+  assert.match(settings, /:loading="styleExpanding"/)
+  assert.match(settings, /:loading="styleSaving"/)
+  assert.match(settings, /:loading="agentSaving"/)
+  assert.match(settings, /:loading="skillLoadingIds\.has\(s\.id\)"/)
+  assert.match(settings, /:loading="skillSaving"/)
+  assert.match(settings, /:loading="cfgFetchingModels"/)
+  assert.match(settings, /:loading="cfgTesting"/)
+  assert.match(settings, /:loading="styleSaving"[^>]*@click="keepStyleAndSwitch"/)
+  assert.match(settings, /#icon/)
+  assert.match(settings, /import LoadingButton from '~\/components\/LoadingButton\.vue'/)
+  // 页面手写按钮内 Loader2 spinner 清零：settings 中 Loader2 仅剩非按钮「行内加载占位」（首次加载中）
+  assert.match(settings, /<Loader2/)
+  assert.match(settings, /正在读取 SKILL\.md/)
+  // 边界守卫：detail/index 的 CSS 环 spinner（.ring-spinner.sm/.spinner-sm）与 episode 的
+  // 「整块加载态」（.step-loading 24px Loader2）属不同视觉族，本轮不迁、保留手写
+  const detail = read('../app/views/drama/detail.vue')
+  const index = read('../app/pages/index.vue')
+  const episode = read('../app/views/drama/episode.vue')
+  assert.match(detail, /\.ring-spinner/)
+  assert.match(index, /\.spinner-sm/)
+  assert.match(episode, /\.step-loading/)
+})

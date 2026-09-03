@@ -274,11 +274,10 @@
                   <span>AI 一键完善</span>
                   <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
                 </div>
-                <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
-                  <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
-                  <Sparkles v-else :size="13" />
+                <LoadingButton :loading="styleExpanding" type="button" class="btn btn-ghost btn-sm" spinner-size="13" @click="expandStyle">
+                  <template #icon><Sparkles :size="13" /></template>
                   {{ styleExpanding ? '完善中…' : 'AI 完善' }}
-                </button>
+                </LoadingButton>
               </div>
               <div class="style-detail-grid">
                 <label class="field">
@@ -308,10 +307,9 @@
                 </span>
                 <span v-else class="dim" style="font-size:11px">修改后点击保存立即生效</span>
                 <button v-if="styleDirty" type="button" class="btn btn-ghost btn-sm" @click="discardStyleEdit">放弃修改</button>
-                <button type="button" class="btn btn-primary btn-sm ml-auto" :disabled="styleSaving || !styleDirty" @click="saveStyle">
-                  <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+                <LoadingButton :loading="styleSaving" :disabled="!styleDirty" type="button" class="btn btn-primary btn-sm ml-auto" spinner-size="12" @click="saveStyle">
                   {{ styleDirty ? '保存修改' : '已保存' }}
-                </button>
+                </LoadingButton>
               </div>
             </div>
           </section>
@@ -376,10 +374,9 @@
                   <span v-if="agentSaved === a.type" class="tag tag-success" style="margin-left:8px">
                     <Check :size="10" /> 已保存
                   </span>
-                  <button class="btn btn-primary btn-sm ml-auto" :disabled="agentSaving" @click="saveAgentCfg(a.type)">
-                    <Loader2 v-if="agentSaving" :size="12" class="animate-spin" />
+                  <LoadingButton :loading="agentSaving" class="btn btn-primary btn-sm ml-auto" spinner-size="12" @click="saveAgentCfg(a.type)">
                     保存
-                  </button>
+                  </LoadingButton>
                 </div>
               </div>
             </div>
@@ -446,11 +443,10 @@
                       <div style="font-weight:600;font-size:12.5px">SKILL.md 读取失败</div>
                       <div class="dim" style="font-size:11px">{{ skillLoadError[s.id] }}</div>
                     </div>
-                    <button class="btn btn-ghost btn-sm" :disabled="skillLoadingIds.has(s.id)" @click="loadSkillContent(s.id)">
-                      <Loader2 v-if="skillLoadingIds.has(s.id)" :size="11" class="animate-spin" />
-                      <RefreshCw v-else :size="11" />
+                    <LoadingButton :loading="skillLoadingIds.has(s.id)" class="btn btn-ghost btn-sm" spinner-size="11" @click="loadSkillContent(s.id)">
+                      <template #icon><RefreshCw :size="11" /></template>
                       重试
-                    </button>
+                    </LoadingButton>
                   </div>
                   <!-- 首次加载中 -->
                   <div v-else-if="skillContents[s.id] === undefined" class="skill-loading">
@@ -471,10 +467,9 @@
                       <span v-if="skillSaved === s.id" class="tag tag-success" style="margin-left:8px">
                         <Check :size="10" /> 已保存
                       </span>
-                      <button class="btn btn-primary btn-sm ml-auto" :disabled="skillSaving" @click="saveSkill(s.id)">
-                        <Loader2 v-if="skillSaving" :size="12" class="animate-spin" />
+                      <LoadingButton :loading="skillSaving" class="btn btn-primary btn-sm ml-auto" spinner-size="12" @click="saveSkill(s.id)">
                         保存
-                      </button>
+                      </LoadingButton>
                     </div>
                   </template>
                 </div>
@@ -525,11 +520,10 @@
             <span class="field-label">模型（逗号分隔）</span>
             <div class="model-input-row">
               <input v-model="cfgForm.modelStr" class="input" placeholder="model-name" />
-              <button type="button" class="btn btn-ghost btn-sm model-fetch-btn" :disabled="cfgFetchingModels" @click="fetchModels">
-                <Loader2 v-if="cfgFetchingModels" :size="13" class="animate-spin" />
-                <RefreshCw v-else :size="13" />
+              <LoadingButton :loading="cfgFetchingModels" type="button" class="btn btn-ghost btn-sm model-fetch-btn" spinner-size="13" @click="fetchModels">
+                <template #icon><RefreshCw :size="13" /></template>
                 拉取模型
-              </button>
+              </LoadingButton>
             </div>
             <div v-if="fetchedModels.length" class="model-fetch-list">
               <button
@@ -568,10 +562,9 @@
           </div>
       </div>
       <template #foot>
-        <button type="button" class="btn btn-ghost test-draft-btn" :disabled="cfgTesting" @click="testDraftCfg">
-          <Loader2 v-if="cfgTesting" :size="12" class="animate-spin" />
-          <span v-else>测试配置</span>
-        </button>
+        <LoadingButton :loading="cfgTesting" type="button" class="btn btn-ghost test-draft-btn" spinner-size="12" @click="testDraftCfg">
+          <template #icon><span>测试配置</span></template>
+        </LoadingButton>
         <button type="button" class="btn" @click="cfgDialog = false">取消</button>
         <button type="submit" class="btn btn-primary">保存</button>
       </template>
@@ -617,11 +610,10 @@
             <span>AI 一键完善</span>
             <small>基于已填的名称 / 描述 / 提示词一次完善三者，未填写的将自动补全。</small>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" :disabled="styleExpanding" @click="expandStyle">
-            <Loader2 v-if="styleExpanding" :size="13" class="animate-spin" />
-            <Sparkles v-else :size="13" />
+          <LoadingButton :loading="styleExpanding" type="button" class="btn btn-ghost btn-sm" spinner-size="13" @click="expandStyle">
+            <template #icon><Sparkles :size="13" /></template>
             {{ styleExpanding ? '完善中…' : 'AI 完善' }}
-          </button>
+          </LoadingButton>
         </div>
         <label class="field">
           <span class="field-label">风格名称 <span class="required">*</span></span>
@@ -663,10 +655,9 @@
       <template #foot>
         <button type="button" class="btn" @click="cancelStylePrompt">取消</button>
         <button type="button" class="btn btn-ghost" @click="discardStyleEdit">放弃更改</button>
-        <button type="button" class="btn btn-primary" :disabled="styleSaving" @click="keepStyleAndSwitch">
-          <Loader2 v-if="styleSaving" :size="12" class="animate-spin" />
+        <LoadingButton :loading="styleSaving" type="button" class="btn btn-primary" spinner-size="12" @click="keepStyleAndSwitch">
           保存并{{ stylePromptIsNew ? '新建' : '切换' }}
-        </button>
+        </LoadingButton>
       </template>
     </AppDialog>
     <ConfirmDialog
@@ -692,6 +683,7 @@
 import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import AppDialog from '~/components/AppDialog.vue'
+import LoadingButton from '~/components/LoadingButton.vue'
 import { toast } from 'vue-sonner'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
 
