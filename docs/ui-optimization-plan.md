@@ -2,7 +2,7 @@
 
 > 版本：v1.8
 > 日期：2026-09-03
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）、批次四 #20（白字白底语义化 + 徽标投影）、批次五 #22（episode 播放器深色与状态色）已合入，A1 全部收口；A2（语义色板规范，裁决 detail 资产类型 scene/prop/amber 系与单次低价值字面量）待做；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2–P4 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1（A1 Token 收敛）批次一 #15、批次二 #18、批次三 #19（封面占位/反色/毛玻璃）、批次四 #20（白字白底语义化 + 徽标投影）、批次五 #22（episode 播放器深色与状态色）已合入，A1 全部收口；A2（语义色板规范）批次一 #25、批次二 #26 已合入收口（规范 v2，裁决与遗留清单见 §5/§6）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P1 余 A3（动效体系化）待排期；P2–P4 待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -20,6 +20,7 @@
 | v1.6 | 2026-09-03 | P1 推进记录（续）：PR #20 合入 `e2f6f42`（A1 第四批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch4.md`，索引 HB-20260903-02）；A1 第五批在 `feat/ui-token-batch5` 提交待评审（episode 播放器深色体系新增 `--media-stage-bg`，成功/警告状态描边新增 `--success-border(-strong)`/`--warning-border-strong`，白字白底随 `--text-invert`/`--surface-raised`/`--surface-glass`/`--shadow-float` 清零；detail 资产类型色仍归 A2） |
 | v1.7 | 2026-09-03 | P1 推进记录（续，**A1 收口**）：PR #22 合入 `cf3a301`（A1 第五批收口，归档见 `docs/pr-records/2026-09-03-ui-token-a1-batch5.md`，索引 HB-20260903-03）；A1（首批 + 二/三/四/五批）全部合入 master；A2 语义色板规范待做（裁决 detail 资产类型 scene/prop/amber 系与 episode/detail 内 `#000`/`#111`/半透明白等单次字面量）；PR #21（设置页音频服务配置板块）独立于 token 线仍在评审 |
 | v1.8 | 2026-09-03 | 独立线收口记录：PR #21 合入 `e3c0724`（`feat/audio-service-config`，8 文件 +77/−26）——设置页新增「音频服务」配置板块（AutoDL IndexTTS2 预设、audio 服务商白名单仅 `autodl`、后端 `ServiceType`/`officialProviders` 扩展 audio、默认生效与优先级暗示按接入状态条件化），经两轮评审边界收敛，归档见 `docs/pr-records/2026-09-03-audio-service-config-settings-board.md`，索引 HB-20260903-04；音频生成链路与工作台接入待后续工作流立项；A2 语义色板规范仍待做 |
+| v1.9 | 2026-09-03 | P1 推进记录（续，**A2 收口**）：PR #25 合入 `1c090e1`（A2 批次一：detail 资产类别 scene/prop 与 amber 横幅收敛为语义 token + 语义色板规范 v1，归档见 `docs/pr-records/2026-09-03-ui-semantic-a2-batch1.md`，索引 HB-20260903-05）；PR #26 合入 `5b9ae75`（A2 批次二：episode 媒体遮罩/白字/焦点环收敛、R5/R6 全仓清理、`--new-style` 家族，规范升 v2，经两轮 R5 补漏评审收口，归档见 `docs/pr-records/2026-09-03-ui-semantic-a2-batch2.md`，索引 HB-20260903-06）。A2 全部收口，遗留字面量与 R3 归一记录归档于规范 §5/§6；P1 余 A3（动效体系化）待排期 |
 
 ---
 
