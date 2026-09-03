@@ -184,6 +184,9 @@ alias ghj='gh --repo Aibrother258/JisuVideo-ai'
 function ghj { gh --repo Aibrother258/JisuVideo-ai @args }
 ```
 
+> 在 **PowerShell** 里向 `gh` 传中文参数会直接报 `ParserError: 字符串缺少终止符`（编码问题，不只是乱码）。
+> 解决办法：标题用英文创建，正文用 `--body-file <文件>` 传递，需要中文标题的话去网页端点 Edit 改。
+
 > ⚠️ **已经发错了怎么办**：`gh` 提交的 review **无法删除**（GitHub 只允许删除 pending 状态的 review）。
 > 万一发到上游，去那条 PR 下补一条说明留言请对方忽略即可，不必反复尝试删除。
 

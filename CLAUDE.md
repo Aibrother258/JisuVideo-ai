@@ -57,8 +57,49 @@ Tables are created on startup from `src/db/mysql-schema.ts`.
 
 本机为 Windows PowerShell 环境。执行 `execute_command` 时注意以下**可验证**规则，减少中文乱码与解析问题（不是绝对禁令，PowerShell 本身支持中文）：
 
-1. **文本统一 UTF-8**：涉及中文文本的文件一律按 UTF-8 读写；命令行参数经 PowerShell 传给外部程序（git/gh 等）时可能按系统代码页（GBK）编码，需要精确传中文参数或读取中文输出时，优先写入脚本/JSON 文件后用 `--input` / `--body-file` 方式传递，或先设置 `[Console]::OutputEncoding`。
+1. **文本统一 UTF-8**：涉及中文文本的文件一律按 UTF-8 读写；命令行参数经 PowerShell 传给外部程序（git/gh 等）时可能按系统代码页（GBK）编码。
+   ⚠️ **实测必踩（2026-09-04 验证）**：向 `gh` 传递中文参数不是"可能乱码"，而是**直接导致 PowerShell 解析失败**：
+   - `gh pr create --title "中文标题"` → `ParserError: 字符串缺少终止符: "。`
+   - 多行中文字符串（如 `gh pr comment --body "第一行\n第二行"`）→ 同样 `ParserError`
+   - 失败时终端把中文回显为乱码（如 `琛ュ厖`），命令根本没有执行到 gh
+
+   **硬性规避（照做，不要再尝试直接传中文）**：
+   - `gh` / `git` 命令的**参数值一律用英文**（`--title`、`--body` 内联文本等）
+   - 长文本用 `--body-file <文件>` / `--body-file` 传递 —— 文件内容由 gh 自己读取，绕过 shell 编码，中文完全正常
+   - 确需中文标题时，先用英文创建，再让用户去网页端点 Edit 修改
 2. **涉及编码时显式指定**：PowerShell 读取/写出文件时显式加 `-Encoding UTF8`；核对命令输出时优先把结果重定向到文件，再用读取工具按 UTF-8 查看，避免控制台代码页错乱造成误判。
 3. **避免复杂嵌套引号**：多语句命令的引号在 PowerShell 中容易解析出错（真正原因是未闭合引号或参数含空格被拆开，`---`、全角标点本身不会导致 `ParserError`），优先拆分为多条简单命令，必要时用 `Select-String` 等代替 `head/grep`。
 4. **外部命令（git/docker/gh）的中文输出乱码**只影响控制台显示，不影响执行结果；精确核对时写入文件再读取。
 5. **PowerShell 原生命令可直接使用**（`Invoke-WebRequest`、`Get-NetTCPConnection`、`Get-Process`），提示文本可用中文，无需刻意转英文。
+
+## GitHub 操作规范（fork 仓库）
+
+本仓库 `Aibrother258/JisuVideo-ai` 是 `chatfire-AI/huobao-drama` 的 fork。
+**在 fork 里，GitHub 处处默认帮你往上游送**，以下两个坑都实际踩过，操作前必须确认目标仓库：
+
+### 1. `gh` 不指定 `--repo` 时默认操作父仓库
+
+在 fork 仓库目录下，`gh` 解析到的是 `chatfire-AI/huobao-drama` 而非 origin，且**不报错**。
+
+- ❌ `gh pr review 48 --request-changes`（发到了上游一个已合并的无关 PR）
+- ✅ 所有 `gh` 命令显式加 `--repo Aibrother258/JisuVideo-ai`：
+  ```bash
+  gh pr list   --repo Aibrother258/JisuVideo-ai
+  gh pr view 48 --repo Aibrother258/JisuVideo-ai
+  gh pr review 48 --repo Aibrother258/JisuVideo-ai --request-changes --body-file <文件>
+  gh pr create --repo Aibrother258/JisuVideo-ai --base master --head <分支> --title <英文> --body-file <文件>
+  ```
+- 误发后：`gh` 提交的 review **无法删除**（GitHub 只允许删 pending 状态，DELETE 会返回 422）。
+  补救方式是去那条 PR 下补一条说明留言请对方忽略。
+
+### 2. 网页端创建 PR 时 base repository 默认指向上游
+
+必须手动改回 `Aibrother258/JisuVideo-ai`。推荐用直链锁定 base 分支：
+
+```
+https://github.com/Aibrother258/JisuVideo-ai/compare/master...<分支名>
+```
+
+### 自检口诀
+
+**每个 GitHub 操作前确认一次：目标是 `Aibrother258/JisuVideo-ai`，不是 `chatfire-AI/huobao-drama`。**
