@@ -4675,7 +4675,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border-radius: 999px;
   background: var(--surface-outline-strong);
   opacity: 0.5;
-  transition: background 0.16s var(--ease-out), opacity 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .panel-resizer:hover::after,
 .panel-resizer:focus-visible::after {
@@ -4738,7 +4738,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 0 12px;
   border: none; border-radius: var(--radius-pill);
   background: var(--fill-subtle); color: var(--text-1);
-  cursor: pointer; transition: all 0.18s var(--ease-out);
+  cursor: pointer; transition: all var(--dur-base) var(--ease-out);
   font-size: 12px;
   font-weight: 650;
   line-height: 1;
@@ -4808,7 +4808,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border-radius: var(--radius);
   font-size: 12px; font-weight: 600;
   background: transparent; border: 1px solid transparent; color: var(--text-2); cursor: pointer;
-  transition: all 0.18s var(--ease-out); width: 100%; text-align: left;
+  transition: all var(--dur-base) var(--ease-out); width: 100%; text-align: left;
 }
 .pipe-item:hover {
   background: var(--button-bg);
@@ -4850,7 +4850,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   width: 16px; height: 16px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: var(--bg-2); border: 1px solid var(--border);
-  color: var(--text-3); flex-shrink: 0; transition: all 0.15s;
+  color: var(--text-3); flex-shrink: 0; transition: all var(--dur-fast) var(--ease-out);
   position: relative;
   z-index: 1;
 }
@@ -4901,7 +4901,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   padding: 0;
   background: rgba(0,0,0,0.14);
   cursor: pointer;
-  transition: all 0.2s var(--ease-out);
+  transition: all var(--dur-med) var(--ease-out);
 }
 .sidebar-jump-dot:hover {
   transform: scale(1.08);
@@ -4926,7 +4926,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   min-height: 28px;
   padding: 0 10px; font-size: 11.5px; font-weight: 650; color: var(--button-text);
   background: var(--button-bg); border: 1px solid var(--button-border); border-radius: var(--button-radius);
-  cursor: pointer; transition: all 0.18s var(--ease-out);
+  cursor: pointer; transition: all var(--dur-base) var(--ease-out);
   box-shadow: var(--button-shadow);
 }
 .refresh-btn:hover {
@@ -5011,7 +5011,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .step-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   flex: 1; min-height: 300px; gap: 10px; padding: 46px;
-  animation: fadeIn 0.3s var(--ease-out);
+  animation: fadeIn var(--dur-slow) var(--ease-out);
 }
 .empty-visual {
   width: 72px; height: 72px; border-radius: 22px;
@@ -5053,7 +5053,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   min-height: var(--button-height-sm);
   padding: 0 12px; border-radius: var(--radius-pill); font-size: 11.5px; font-weight: 650;
   border: none; background: var(--button-bg); color: var(--button-text); cursor: pointer;
-  transition: all 0.18s var(--ease-out); white-space: nowrap;
+  transition: all var(--dur-base) var(--ease-out); white-space: nowrap;
   line-height: 1;
 }
 .bubble-btn:hover:not(:disabled) {
@@ -5075,7 +5075,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .bubble-dots { display: flex; gap: 7px; padding: 0 4px; }
 .bubble-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: rgba(0,0,0,0.14); cursor: pointer; transition: all 0.15s;
+  background: rgba(0,0,0,0.14); cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
   border: none;
   padding: 0;
 }
@@ -5130,7 +5130,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   color: var(--text-1);
   cursor: pointer;
   text-align: left;
-  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .storyboard-shot-card + .storyboard-shot-card { margin-top: 7px; }
 .storyboard-shot-card:hover {
@@ -5362,7 +5362,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border: 1px solid var(--border);
   background: var(--surface-raised);
   cursor: pointer;
-  transition: border-color 0.15s var(--ease-out), opacity 0.15s var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .storyboard-ref-item:hover { border-color: var(--accent); }
 .storyboard-ref-item:not(.bound) {
@@ -5584,7 +5584,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .prod-tab {
   display: flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 10px; font-size: 11px;
   border: 1px solid transparent; background: transparent; color: var(--text-2); cursor: pointer;
-  border-radius: calc(var(--radius) - 2px); transition: all 0.18s var(--ease-out); font-weight: 650;
+  border-radius: calc(var(--radius) - 2px); transition: all var(--dur-base) var(--ease-out); font-weight: 650;
   line-height: 1;
 }
 .prod-tab:hover { color: var(--text-0); background: var(--button-bg); border-color: var(--button-border); }
@@ -5632,7 +5632,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .asset-add-btn:hover { color: var(--accent-text); border-color: var(--accent-text); }
 .character-asset-card, .asset-click-card { position: relative; }
@@ -5652,7 +5652,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   color: var(--text-invert);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 .asset-del-btn:hover { background: var(--action-danger); }
 .character-asset-card:hover .asset-del-btn,
@@ -5671,7 +5671,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   justify-content: center;
   color: var(--text-invert);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .shot-check:hover { border-color: var(--accent); }
 .shot-check.on { background: var(--accent); border-color: var(--accent); }
@@ -5701,7 +5701,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: var(--bg-2);
   color: var(--text-2);
   text-align: center;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .shot-quick-actions .shot-quick-btn:hover {
   background: var(--accent-soft);
@@ -5770,7 +5770,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 }
 .asset-card {
   display: flex; flex-direction: column; overflow: hidden;
-  transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
 }
 .asset-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
 .asset-click-card,
@@ -5788,7 +5788,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
 }
 .character-asset-card:hover {
   transform: translateY(-2px);
@@ -5928,7 +5928,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .asset-cover { position: relative; aspect-ratio: 1; background: var(--bg-2); overflow: hidden; }
 .asset-cover.wide { aspect-ratio: 16/9; }
 .asset-cover img { width: 100%; height: 100%; object-fit: cover; }
-.previewable-image { cursor: zoom-in; transition: transform 0.18s var(--ease-out), filter 0.18s var(--ease-out); }
+.previewable-image { cursor: zoom-in; transition: transform var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
 .previewable-image:hover { transform: scale(1.015); filter: saturate(1.04); }
 .asset-cover-badge {
   position: absolute;
@@ -5992,7 +5992,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   display: flex; align-items: center; gap: 14px;
   padding: 12px 14px; cursor: pointer;
   border-radius: var(--radius-lg);
-  transition: all 0.15s;
+  transition: all var(--dur-fast) var(--ease-out);
   border: 1.5px solid transparent;
 }
 .frame-row:hover { background: var(--bg-0); border-color: var(--border); }
@@ -6027,7 +6027,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   position: relative; width: 130px; aspect-ratio: 16/9;
   border-radius: 6px; overflow: hidden;
   background: var(--bg-2); cursor: pointer;
-  transition: all 0.15s; border: 1.5px solid var(--border);
+  transition: all var(--dur-fast) var(--ease-out); border: 1.5px solid var(--border);
 }
 .frame-thumb:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .frame-thumb img { width: 100%; height: 100%; object-fit: cover; }
@@ -6143,7 +6143,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border-radius: var(--radius);
   background: var(--media-stage-bg);
   cursor: pointer;
-  transition: border-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .video-history-item:hover { border-color: var(--border-strong); }
 .video-history-item video {
@@ -6337,7 +6337,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   gap: 10px;
   padding: 9px 12px;
   border-top: 1px solid var(--surface-outline);
-  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   cursor: pointer;
 }
 .video-task-row:first-child {
@@ -6607,7 +6607,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
 .prod-card {
   display: flex; flex-direction: column; overflow: hidden;
-  transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
   border-radius: 20px;
   background: var(--surface-raised);
   border: 1px solid var(--surface-outline);
@@ -7096,7 +7096,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: var(--media-scrim-soft);
   color: var(--text-invert);
   opacity: 0;
-  transition: opacity 0.15s var(--ease-out);
+  transition: opacity var(--dur-fast) var(--ease-out);
   pointer-events: none;
 }
 .merge-card.playable:hover .merge-card-play { opacity: 1; }
@@ -7310,7 +7310,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: var(--overlay-mask);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  animation: fadeIn 0.18s var(--ease-out);
+  animation: fadeIn var(--dur-base) var(--ease-out);
 }
 .task-drawer {
   width: min(560px, 100vw);
@@ -7320,7 +7320,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: var(--panel-bg);
   border-left: 1px solid var(--panel-border);
   box-shadow: var(--shadow-xl);
-  animation: taskDrawerIn 0.22s var(--ease-out);
+  animation: taskDrawerIn var(--dur-med) var(--ease-out);
 }
 @keyframes taskDrawerIn {
   from { transform: translateX(24px); opacity: 0; }

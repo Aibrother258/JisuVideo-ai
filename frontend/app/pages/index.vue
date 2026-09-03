@@ -919,7 +919,7 @@ onMounted(load)
   padding: 40px 48px 64px;
   overflow-y: auto;
   height: 100%;
-  animation: fadeUp 0.35s var(--ease-out) both;
+  animation: fadeUp var(--dur-slow) var(--ease-out) both;
   background: var(--surface-base);
 }
 
@@ -1107,7 +1107,7 @@ onMounted(load)
   cursor: pointer;
   color: var(--text-invert);
   box-shadow: var(--shadow-xs);
-  transition: transform 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .style-swatch:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .style-swatch:focus-visible {
@@ -1164,7 +1164,7 @@ onMounted(load)
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  transition: all 0.16s var(--ease-out);
+  transition: all var(--dur-fast) var(--ease-out);
 }
 .filter-chip:hover { color: var(--text-0); background: var(--fill-hover); }
 .filter-chip:focus-visible {
@@ -1193,7 +1193,7 @@ onMounted(load)
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  animation: fadeUp 0.32s var(--ease-out) both;
+  animation: fadeUp var(--dur-slow) var(--ease-out) both;
 }
 .project-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); }
 .project-card:focus-visible {
@@ -1282,7 +1282,7 @@ onMounted(load)
   color: var(--text-1);
   box-shadow: var(--shadow-float);
   opacity: 0;
-  transition: opacity 0.15s var(--ease-out), background 0.15s var(--ease-out);
+  transition: opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 .cover-more:hover { background: var(--surface-raised); }
 .project-card:hover .cover-more,
@@ -1313,7 +1313,7 @@ onMounted(load)
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.14s var(--ease-out);
+  transition: all var(--dur-fast) var(--ease-out);
 }
 .menu-item:hover { background: var(--bg-hover); color: var(--text-0); }
 .menu-item:focus-visible {
@@ -1550,7 +1550,6 @@ onMounted(load)
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 .plan-step { gap: 22px; }
 .plan-summary {
   padding: 14px 16px;
@@ -1583,7 +1582,7 @@ onMounted(load)
   color: var(--text-1);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s var(--ease-out), background 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .choice-card:hover { border-color: var(--border-strong); background: var(--bg-1); }
 .choice-card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--button-focus); }

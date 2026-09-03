@@ -1756,7 +1756,7 @@ onBeforeUnmount(() => {
   padding: 28px 48px 40px;
   overflow-y: auto;
   height: 100%;
-  animation: fadeUp 0.35s var(--ease-out) both;
+  animation: fadeUp var(--dur-slow) var(--ease-out) both;
 }
 
 /* Header card */
@@ -1778,7 +1778,7 @@ onBeforeUnmount(() => {
   border: none; border-radius: 50%;
   background: var(--fill-subtle); color: var(--text-1);
   cursor: pointer;
-  transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .back-btn:hover { background: rgba(0,0,0,0.09); color: var(--text-0); }
 .back-btn:focus-visible {
@@ -1819,7 +1819,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: var(--text-2);
   cursor: pointer;
-  transition: color 0.16s var(--ease-out);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 .tab-btn svg { opacity: 0.75; }
 .tab-btn::after {
@@ -1829,7 +1829,7 @@ onBeforeUnmount(() => {
   height: 2px;
   border-radius: 2px;
   background: transparent;
-  transition: background 0.16s var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out);
 }
 .tab-btn:hover { color: var(--text-0); }
 .tab-btn.on { color: var(--text-0); font-weight: 700; }
@@ -1935,7 +1935,7 @@ onBeforeUnmount(() => {
 .review-progress-track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--bg-3); }
 .review-progress-track i { display: block; height: 100%; border-radius: inherit; background: var(--success); transition: width 0.28s var(--ease-out); }
 .episode-draft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
-.episode-draft-card { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 13px; border: 1px solid var(--border); border-radius: var(--radius); background: #fbfbfd; cursor: pointer; transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s; }
+.episode-draft-card { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 13px; border: 1px solid var(--border); border-radius: var(--radius); background: #fbfbfd; cursor: pointer; transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
 .episode-draft-card:hover, .episode-draft-card:focus-visible { border-color: var(--border-strong); box-shadow: var(--shadow-lift); transform: translateY(-1px); outline: none; }
 .episode-draft-card.reviewed { border-color: color-mix(in srgb, var(--success) 40%, var(--border)); background: color-mix(in srgb, var(--success) 4%, white); }
 .episode-draft-topline, .episode-draft-footline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1962,7 +1962,7 @@ onBeforeUnmount(() => {
 .episode-inline-review-head h3 { margin: 2px 0 3px; color: var(--text-0); font-size: 15px; }
 .episode-inline-review-head p { margin: 0; color: var(--text-3); font-size: 10.5px; }
 .episode-detail-tabs { display: grid; grid-template-columns: repeat(var(--episode-tab-count), minmax(0, 1fr)); width: 100%; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-1); }
-.episode-detail-tab { position: relative; min-width: 0; padding: 11px 5px 10px; border: none; border-right: 1px solid var(--border); border-bottom: 2px solid transparent; background: none; color: var(--text-3); font-family: var(--font-mono); font-size: 9.5px; font-weight: 750; cursor: pointer; transition: color 0.16s, border-color 0.16s, background 0.16s; }
+.episode-detail-tab { position: relative; min-width: 0; padding: 11px 5px 10px; border: none; border-right: 1px solid var(--border); border-bottom: 2px solid transparent; background: none; color: var(--text-3); font-family: var(--font-mono); font-size: 9.5px; font-weight: 750; cursor: pointer; transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
 .episode-detail-tab:last-child { border-right: none; }
 .episode-detail-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.7); }
 .episode-detail-tab.on { border-bottom-color: var(--accent); background: var(--surface-raised); color: var(--accent); }
@@ -1999,8 +1999,8 @@ onBeforeUnmount(() => {
   padding: 16px 18px;
   cursor: pointer;
   border-top: 3px solid transparent;
-  animation: fadeUp 0.35s var(--ease-out) both;
-  transition: border-color 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), transform 0.15s var(--ease-out);
+  animation: fadeUp var(--dur-slow) var(--ease-out) both;
+  transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 .ep-card:hover {
   box-shadow: var(--shadow-lift);
@@ -2020,7 +2020,7 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   font-family: var(--font-mono);
   background: var(--accent-bg); color: var(--accent-text);
-  transition: background 0.16s, color 0.16s;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .ep-num-label {
   font-size: 8px; letter-spacing: 0.18em; font-weight: 700;
@@ -2034,7 +2034,7 @@ onBeforeUnmount(() => {
 .ep-num-draft { background: var(--bg-2); color: var(--text-1); }
 
 .ep-badges { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-.ep-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 0; transition: opacity 0.18s; }
+.ep-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .ep-card:hover .ep-actions { opacity: 1; }
 
 /* 标题 */
@@ -2065,7 +2065,7 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--border);
 }
 .ep-time { font-size: 11px; color: var(--text-3); opacity: 0.6; }
-.ep-arrow { color: var(--text-3); transition: transform 0.18s var(--ease-out), color 0.18s; }
+.ep-arrow { color: var(--text-3); transition: transform var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out); }
 .ep-card:hover .ep-arrow { transform: translateX(2px); color: var(--accent); }
 
 /* 状态胶囊 */
@@ -2074,7 +2074,7 @@ onBeforeUnmount(() => {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 9px; border-radius: 20px;
   font-size: 11px; font-weight: 600;
-  transition: background 0.14s, color 0.14s;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .ep-status-draft { background: var(--bg-2); color: var(--text-2); }
 .ep-status-active { background: var(--success-bg); color: var(--success-strong); }
@@ -2087,7 +2087,7 @@ onBeforeUnmount(() => {
   padding: 2px 8px; border-radius: 6px;
   font-size: 11px; font-weight: 600;
   background: var(--bg-2); color: var(--text-2);
-  transition: background 0.14s, color 0.14s;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .ep-res-btn:hover { background: var(--bg-hover); color: var(--text-1); }
 
@@ -2120,7 +2120,7 @@ onBeforeUnmount(() => {
   background: transparent; color: var(--text-1);
   padding: 0 9px; text-align: left;
   font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: all 0.14s var(--ease-out);
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
 }
 .status-menu-item:hover { background: var(--bg-hover); color: var(--text-0); }
 .status-menu-item.on { color: var(--accent); background: var(--accent-bg); }
@@ -2128,7 +2128,7 @@ onBeforeUnmount(() => {
 /* 删除按钮 */
 .ep-delete {
   color: var(--text-3);
-  transition: color 0.15s;
+  transition: color var(--dur-fast) var(--ease-out);
 }
 .ep-delete:hover { color: var(--action-danger); }
 
@@ -2138,7 +2138,7 @@ onBeforeUnmount(() => {
   padding: 48px; text-align: center; color: var(--text-3); font-size: 13px;
   border-style: dashed;
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  transition: border-color var(--dur-med) var(--ease-out), color var(--dur-med) var(--ease-out), background var(--dur-med) var(--ease-out);
 }
 .ep-empty:hover { border-color: var(--accent-text); color: var(--accent-text); background: var(--accent-bg); }
 .ep-empty:hover .ep-empty-icon { transform: scale(1.06); }
@@ -2149,7 +2149,7 @@ onBeforeUnmount(() => {
   width: 48px; height: 48px; border-radius: 50%;
   background: var(--accent-bg); color: var(--accent-text);
   display: flex; align-items: center; justify-content: center;
-  transition: transform 0.2s;
+  transition: transform var(--dur-med) var(--ease-out);
 }
 
 /* Create Episode Dialog (on top of global .dialog skeleton) */
@@ -2211,7 +2211,7 @@ onBeforeUnmount(() => {
 .asset-group-head.is-prop .group-icon { color: var(--kind-prop); }
 .asset-card {
   display: flex; flex-direction: column; overflow: hidden;
-  transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
 }
 .asset-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
 .asset-click-card,
@@ -2229,7 +2229,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
 }
 .character-asset-card:hover {
   transform: translateY(-2px);
@@ -2351,7 +2351,7 @@ onBeforeUnmount(() => {
 .asset-cover { position: relative; aspect-ratio: 1; background: var(--bg-2); overflow: hidden; }
 .asset-cover.wide { aspect-ratio: 16/9; }
 .asset-cover img { width: 100%; height: 100%; object-fit: cover; }
-.previewable-image { cursor: zoom-in; transition: transform 0.18s var(--ease-out), filter 0.18s var(--ease-out); }
+.previewable-image { cursor: zoom-in; transition: transform var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
 .previewable-image:hover { transform: scale(1.015); filter: saturate(1.04); }
 .asset-cover-badge {
   position: absolute;
@@ -2426,7 +2426,6 @@ onBeforeUnmount(() => {
   animation: spin 0.8s linear infinite;
 }
 .ring-spinner.sm { width: 13px; height: 13px; border-width: 2px; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .empty-state {
   min-height: 280px;

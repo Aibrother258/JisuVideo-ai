@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--button-border);
   border-radius: var(--button-radius);
   cursor: pointer;
-  transition: all 0.18s var(--ease-out);
+  transition: all var(--dur-base) var(--ease-out);
   white-space: nowrap;
   min-width: 0;
   width: 100%;
@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
 .base-select-arrow {
   margin-left: auto;
   color: var(--text-2);
-  transition: transform 0.2s var(--ease-out);
+  transition: transform var(--dur-med) var(--ease-out);
   flex-shrink: 0;
 }
 .base-select-trigger.open .base-select-arrow {
@@ -272,7 +272,7 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   z-index: 9999;
-  animation: baseSelectIn 0.15s var(--ease-out);
+  animation: baseSelectIn var(--dur-fast) var(--ease-out);
 }
 
 .base-select-search {
@@ -329,7 +329,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   cursor: pointer;
   text-align: left;
-  transition: background 0.14s var(--ease-out), color 0.14s var(--ease-out), box-shadow 0.14s var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   word-break: break-all;
 }
 .base-select-option:hover,
