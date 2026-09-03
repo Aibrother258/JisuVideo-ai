@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v2.5
+> 版本：v2.6
 > 日期：2026-09-03
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）、StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）、EmptyState（PR #36，index/detail 三处「虚线框卡片空态」迁移）、LoadingButton（PR #38 settings 9 处 + PR #40 episode 23 处按钮迁移）均随七批 PR 合入，Loader2 图标族按钮面清零，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；B1 余 Field 与 B2/B3 待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）、StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）、EmptyState（PR #36，index/detail 三处「虚线框卡片空态」迁移）、LoadingButton（PR #38 settings 9 处 + PR #40 episode 23 处按钮迁移）均随七批 PR 合入，Loader2 图标族按钮面清零，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；Field（PR #42，settings 22 处 + index 5 处 `.field` 骨架迁移）收口后 **B1 通用组件抽取面完成**；B3 分页 hook（PR #43，`usePagedList` + `dramaAPI.list` 分页参数）封装收口；B2（巨型页面拆分）与各页面接入分页（C3/P4）待排期**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -27,6 +27,7 @@
 | v2.3 | 2026-09-03 | P2 推进记录（续，**B1 组件再收一子**）：PR #36 合入 `c4cf9eb`（新增 `EmptyState`：props `title`/`desc` + `#icon`/默认插槽，收敛 index/detail 三处「虚线框卡片空态」（项目列表空态 / 素材库全空 / 分类为空），`.empty-desc` max-width 240 vs 260 笔头漂移统一 260px（index 侧 desc 均单行短句不触发换行，视觉零变化）；episode 展示体空态 `.step-empty`、detail 可点击 `.ep-empty` CTA 卡等特殊形态保留手写并测试守卫；归档见 `docs/pr-records/2026-09-03-ui-b1-empty-batch5.md`，索引 HB-20260903-12）。**边界**：组件只收骨架结构，图标/文案/按钮动作留在调用页（`#icon` + 默认插槽）；空态盘点结论：Skeleton 骨架屏全为内联 style 深度定制（`app-skeleton-line` 已全局、`skeleton-card` 仅 index 单点）不适合抽取；LoadingButton（30+ 处跨 4 文件、已分化 3 种 spinner：Loader2/`ring-spinner`/`spinner-sm`）与 FormField（4 文件各自重复 `.field` CSS，gap 5-8/weight 500-600 微差）复用面成立待排期；B1 余 LoadingButton/Field 与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
 | v2.4 | 2026-09-03 | P2 推进记录（续，**B1 组件再收一子**）：PR #38 合入 `bec885a`（新增 `LoadingButton`：props `loading`/`disabled`/`spinnerSize`，模板收敛「busy 时 disabled + `<Loader2>` 前置 + `#icon` 插槽替换 + 默认插槽文案恒渲染」，class/type/@click 经 attrs 透传视觉由调用页决定，`Loader2` 组件内自包含 import——经一轮复核指出父级同名导入不传递给子组件后补入；settings.vue Loader2 图标族 9 处 busy 按钮迁移（`styleExpanding`/`styleSaving`/`agentSaving`/skill 重试与保存/`cfgFetchingModels`/`cfgTesting` 等），非 loading 图标入 `#icon` 插槽、文案三元留默认插槽；settings 内 Loader2 仅剩非按钮「行内加载占位」保留，归档见 `docs/pr-records/2026-09-03-ui-b1-loading-batch6.md`，索引 HB-20260903-13）。**边界**：仅收敛 Loader2 图标族（标准面）；detail/index CSS 环族（`.ring-spinner.sm`/`.spinner-sm`）与 episode 整块加载态（`.step-loading` 24px）视觉不同不迁入，留后续以 settings 为样板逐面推进；B1 余 Field（FormRow）与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
 | v2.5 | 2026-09-03 | P2 推进记录（续，**Loader2 图标族按钮面清零**）：PR #40 合入 `2b8b6c4`（episode.vue 全部 23 处 Loader2 图标族 busy 按钮迁移至 `LoadingButton`：剧本改写/资产提取×3/角色场景道具卡行生成与上传×6/分镜拆分 bar 与空态/批量与选择栏视频提示词/storyboard prompt stack + video inspector 的 AI 生成与 MiniMax H3 ×4/videos 空态大按钮/assetDetail 提示词·上传·保存/资产新增；`loading` 与 `disabled` 语义正交拆分——原 `:disabled` 中业务忙条件（`videoPromptBatch.running` 全局忙、`rn && rt !== 'script_rewriter'` 他任务忙、`!selectedSbIds.length` 未选）独立为 `:disabled`，避免并入 loading 误显 spinner；episode 剩余 5 处 `<Loader2>` 全为非按钮加载态（`.step-loading` 整块 24px ×3、视频任务缩略图/素材库占位 18px ×2）保留手写并测试守卫；归档见 `docs/pr-records/2026-09-03-ui-b1-loading-batch7.md`，索引 HB-20260903-14）。**边界**：Loader2 图标族按钮面在 settings/episode 全部清零；CSS 环族与整块加载态留「spinner 视觉收敛专项」；B1 余 Field（FormRow）与 B2（巨型页面拆分）/B3（分页 hook）待排期 |
+| v2.6 | 2026-09-03 | P2 推进记录（续，**B1 组件抽取面收口 + B3 分页 hook 封装收口**）：PR #42 合入 `43ee3e2`（B1 batch8——新增 `Field.vue`：`<label class="field">` 骨架 + label/required/hint props + #label/#hint 插槽 + 默认插槽控件，`.required` 星标提为 studio.css 全局类，settings.vue 22 处 + index.vue 5 处手写 `.field` 骨架迁移，附加布局类（.field-wide/.source-field/.compact-field）经 attrs 透传，页面重复骨架样式下沉删除，index 原 gap 6/weight 600 与 settings 基准 gap 5/weight 550 的笔头漂移归一，结构测试 91/91，归档见 `docs/pr-records/2026-09-03-ui-b1-field-batch8.md`，索引 HB-20260903-15）；PR #43 合入 `f93b287`（B3——新增 `usePagedList`：reload 整载/loadMore 追加/reset 作废，`{ ...fixed, page, page_size }` 覆盖顺序保证 fixed 不能篡改分页参数，递增请求代次丢弃过期成功/失败响应；`dramaAPI.list` 扩展 page/page_size/keyword/status；经三轮评审修正——① 参数覆盖顺序与延迟响应行为测试、② 默认测试改 tsx/esm 加载恢复 Node 20 基线（backend 同款）、③ 加载失败按加载器区分 skip/fail，frontend 测试 100/100（Node 20.20 与 v22 实测）且 build/generate 通过，归档见 `docs/pr-records/2026-09-03-ui-b3-paged-hook.md`，索引 HB-20260903-16）。**B1（AppDialog/AppDrawer/StatusBadge/EmptyState/LoadingButton/Field）组件抽取面与 B3 分页能力封装全部收口**；B2（巨型页面拆分）与各页面接入分页（C3/P4）待排期 |
 
 ---
 
@@ -58,7 +59,7 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 | 暗色主题 | 不支持，无 dark token / `prefers-color-scheme` | `studio.css` |
 | 响应式 | 断点碎片化（760/860/900/1080）；`settings.vue` 与全局 header 无窄屏适配 | `index/detail/episode/settings.vue`、`layouts/default.vue` |
 | 无障碍 | 部分有意识（sr-only/focus-visible/ConfirmDialog 键盘），不系统 | — |
-| 数据量 | 项目/剧集/素材/任务全量一次拉取，无分页/虚拟滚动 | `useApi.ts`、各页面 |
+| 数据量 | 项目/剧集/素材/任务仍全量一次拉取；分页能力封装（`usePagedList` + `dramaAPI.list` 分页参数）已就绪，页面接入待排期 | `useApi.ts`、各页面 |
 
 ### 2.1 设置页当前结构（重构前基线）
 
@@ -153,9 +154,9 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 
 | 条目 | 说明 | 工作量 | 价值 |
 | --- | --- | --- | --- |
-| B1 通用组件抽取 | `AppDialog`（吸收各页手写 `.overlay>.dialog`）、`AppDrawer`（吸收任务抽屉）、`StatusBadge`、`EmptyState`、`LoadingButton`、`Field/FormRow`；先抽后改，视觉不变（前五件已收口，余 `Field` 待排期） | L | 高 |
+| B1 通用组件抽取 | `AppDialog`（吸收各页手写 `.overlay>.dialog`）、`AppDrawer`（吸收任务抽屉）、`StatusBadge`、`EmptyState`、`LoadingButton`、`Field`（PR #42：settings 22 处 + index 5 处 `.field` 骨架迁移）；先抽后改，视觉不变（六件全部收口） | L | 高 |
 | B2 巨型页面拆分 | `episode.vue`（296KB）按业务面板拆：storyboard / video-tasks / export / assets / task-drawer；`detail.vue` 拆 ep-list / asset-grid / planner。纯搬移不改行为，复用 Nuxt 自动注册 | L | 高（风险最大项，需分批） |
-| B3 列表分页能力封装 | `usePagedList` hook，供后续分页/虚拟滚动统一接入 | M | 中 |
+| B3 列表分页能力封装 | `usePagedList` hook + `dramaAPI.list` 分页参数扩展（PR #43 收口）；供后续分页/虚拟滚动统一接入（各页面接入待排期） | M | 中 |
 
 ### C. 通用体验增强（P0 起 + P3）
 
