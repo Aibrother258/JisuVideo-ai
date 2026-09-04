@@ -144,6 +144,64 @@ test('B3 review #43 behavior: fixed cannot override hook-computed page/page_size
   assert.equal(paged.page.value, 2)
 })
 
+test('review: loadMore failure keeps loaded items, sets loadMoreError only, and retry reloads just the failed page', { skip }, async () => {
+  const { fetcher, calls } = makeDeferredFetcher()
+  const paged = usePagedList(fetcher, { pageSize: 60 })
+
+  const r1 = paged.reload()
+  calls[0].resolve(pagePayload([{ id: 1 }], { page: 1, page_size: 60, total: 120, total_pages: 2 }))
+  await r1
+  assert.deepEqual(paged.items.value, [{ id: 1 }])
+  assert.equal(paged.loadError.value, '')
+
+  // 第 2 页追加失败：已加载的第 1 页原样保留、loadError 不被污染，错误只落在 loadMoreError
+  const lm = paged.loadMore()
+  calls[1].reject(new Error('network boom'))
+  await lm
+  assert.deepEqual(paged.items.value, [{ id: 1 }])
+  assert.equal(paged.page.value, 1)
+  assert.equal(paged.loadError.value, '')
+  assert.equal(paged.loadMoreError.value, 'network boom')
+  assert.equal(paged.hasMore.value, true) // 失败不推进页码，仍可重试
+
+  // 重试只重拉失败那一页（page 2），成功后追加并清空 loadMoreError
+  const retry = paged.loadMore()
+  assert.equal(calls.length, 3)
+  assert.equal(calls[2].query.page, 2)
+  calls[2].resolve(pagePayload([{ id: 2 }], { page: 2, page_size: 60, total: 120, total_pages: 2 }))
+  await retry
+  assert.deepEqual(paged.items.value, [{ id: 1 }, { id: 2 }])
+  assert.equal(paged.loadMoreError.value, '')
+  assert.equal(paged.loadError.value, '')
+})
+
+test('review: picker fetcher carries kind as type so server filters before pagination (mixed first page cannot starve target kind)', { skip }, async () => {
+  const { fetcher, calls } = makeDeferredFetcher()
+  const paged = usePagedList((q) => fetcher({ ...q, type: 'video' }), { pageSize: 60 })
+
+  // 场景：素材库最新 60 条全是图片、视频排在后续页。请求必须携带 type=video，
+  // 服务端先按媒体类型过滤再分页——否则第 1 页视频为空且「加载更多」入口消失。
+  const r1 = paged.reload()
+  assert.equal(calls[0].query.type, 'video')
+  assert.equal(calls[0].query.page, 1)
+  calls[0].resolve(pagePayload(
+    Array.from({ length: 60 }, (_, i) => ({ id: i + 1, type: 'video' })),
+    { page: 1, page_size: 60, total: 61, total_pages: 2 },
+  ))
+  await r1
+  assert.equal(paged.items.value.length, 60)
+  assert.equal(paged.items.value.every((a) => a.type === 'video'), true)
+
+  // 第 2 页仍带 type，追加取到后续页视频（前端按 kind 过滤时不再出现「暂无视频」假空态）
+  const lm = paged.loadMore()
+  assert.equal(calls[1].query.type, 'video')
+  assert.equal(calls[1].query.page, 2)
+  calls[1].resolve(pagePayload([{ id: 999, type: 'video' }], { page: 2, page_size: 60, total: 61, total_pages: 2 }))
+  await lm
+  assert.equal(paged.items.value.length, 61)
+  assert.equal(paged.hasMore.value, false)
+})
+
 test('B3 review #43 behavior: stale failure is dropped and does not overwrite fresh error state', { skip }, async () => {
   const { fetcher, calls } = makeDeferredFetcher()
   const paged = usePagedList(fetcher, { pageSize: 20 })

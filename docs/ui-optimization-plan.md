@@ -1,8 +1,8 @@
 # JisuVideo-ai 前端 UI 迭代优化方案
 
-> 版本：v2.8
+> 版本：v2.9
 > 日期：2026-09-04
-> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）、StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）、EmptyState（PR #36，index/detail 三处「虚线框卡片空态」迁移）、LoadingButton（PR #38 settings 9 处 + PR #40 episode 23 处按钮迁移）均随七批 PR 合入，Loader2 图标族按钮面清零，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；Field（PR #42，settings 22 处 + index 5 处 `.field` 骨架迁移）收口后 **B1 通用组件抽取面完成**；B3 分页 hook（PR #43，`usePagedList` + `dramaAPI.list` 分页参数）封装收口；**B2 试点收口（PR #45，2026-09-04 合入 `b11be06`，7 文件 5 提交 / 4 次正式 review / 测试 116/116）——episode 拼接导出面板下沉 `EpisodeExportPanel` + `useExportMergesList`，拆分模式成型（受控状态留主壳 + 令牌/事件协作 + 共享 scoped 类不复制），episode.vue 非空行 7069→6802（物理 7422→7150）**；**B2 script 面板拆分（PR #47）已合入（merge `58c1e96`，2026-09-04，纯搬迁、测试 124/124）——v2.8 顺序决策执行完毕，episode.vue 主壳降至 6763 非空行/7108 物理行（#45 历史结果 6802/7150 不变）**；B2 余 assets/storyboard/video-tasks/task-drawer 拆分（等多视频类型扩展前端改造）与各页面接入分页（C3/P4）待排期**
+> 状态：**P0 收口（F 随 PR #13/#16，C1/C2 随 PR #13/#14）；P1 全部收口——A1 Token 收敛（批次一 #15、批次二 #18、批次三 #19、批次四 #20、批次五 #22）、A2 语义色板规范（批次一 #25、批次二 #26，规范 v2）、A3 动效体系化（PR #28，规范 v1，动效 token 六档 + 缓动统一 + keyframes 收敛）；设置页「音频服务」配置板块随 PR #21 合入（音频生成与工作台接入待后续工作流立项）；P2-B1——AppDialog（PR #30，settings 四弹窗迁移）、AppDrawer（PR #32，episode 任务抽屉迁移）、detail/episode 标准弹窗迁移（PR #31）、StatusBadge（PR #34，detail/episode 封面角标 + 行内状态胶囊 8 处迁移）、EmptyState（PR #36，index/detail 三处「虚线框卡片空态」迁移）、LoadingButton（PR #38 settings 9 处 + PR #40 episode 23 处按钮迁移）均随七批 PR 合入，Loader2 图标族按钮面清零，通用组件抽取按「先抽后改 + 标准面先迁 + 深度定制界面保留手写」边界推进；Field（PR #42，settings 22 处 + index 5 处 `.field` 骨架迁移）收口后 **B1 通用组件抽取面完成**；B3 分页 hook（PR #43，`usePagedList` + `dramaAPI.list` 分页参数）封装收口；**B2 试点收口（PR #45，2026-09-04 合入 `b11be06`，7 文件 5 提交 / 4 次正式 review / 测试 116/116）——episode 拼接导出面板下沉 `EpisodeExportPanel` + `useExportMergesList`，拆分模式成型（受控状态留主壳 + 令牌/事件协作 + 共享 scoped 类不复制），episode.vue 非空行 7069→6802（物理 7422→7150）**；**B2 script 面板拆分（PR #47）已合入（merge `58c1e96`，2026-09-04，纯搬迁、测试 124/124）——v2.8 顺序决策执行完毕，episode.vue 主壳降至 6763 非空行/7108 物理行（#45 历史结果 6802/7150 不变）**；B2 余 assets/storyboard/video-tasks/task-drawer 拆分（等待窗口）；**C3/P4 首轮落地（PR #48 待评审，2026-09-04）——素材库/任务列表分页化**：后端 `GET /assets` 与 `GET /tasks` 改为 SQL 下推分页（count + limit/offset，返回 `{ items, pagination }`），episode 参考素材选择器接入 `usePagedList`（每页 60 + 「加载更多」，hook 首个真实页面接入），分镜视频历史消费点适配；index.vue 项目列表接入 `dramaAPI.list` 仍受顶部统计/「继续上次制作」/「制作概况」全量依赖阻塞，待统计数据流裁决后单列**
 > 适用范围：`f:/JisuVideo/JisuVideo-ai/frontend`（Nuxt 3 SPA + Vue 3 + TypeScript + 纯 CSS Variables）
 
 ---
@@ -30,6 +30,7 @@
 | v2.6 | 2026-09-03 | P2 推进记录（续，**B1 组件抽取面收口 + B3 分页 hook 封装收口**）：PR #42 合入 `43ee3e2`（B1 batch8——新增 `Field.vue`：`<label class="field">` 骨架 + label/required/hint props + #label/#hint 插槽 + 默认插槽控件，`.required` 星标提为 studio.css 全局类，settings.vue 22 处 + index.vue 5 处手写 `.field` 骨架迁移，附加布局类（.field-wide/.source-field/.compact-field）经 attrs 透传，页面重复骨架样式下沉删除，index 原 gap 6/weight 600 与 settings 基准 gap 5/weight 550 的笔头漂移归一，结构测试 91/91，归档见 `docs/pr-records/2026-09-03-ui-b1-field-batch8.md`，索引 HB-20260903-15）；PR #43 合入 `f93b287`（B3——新增 `usePagedList`：reload 整载/loadMore 追加/reset 作废，`{ ...fixed, page, page_size }` 覆盖顺序保证 fixed 不能篡改分页参数，递增请求代次丢弃过期成功/失败响应；`dramaAPI.list` 扩展 page/page_size/keyword/status；经三轮评审修正——① 参数覆盖顺序与延迟响应行为测试、② 默认测试改 tsx/esm 加载恢复 Node 20 基线（backend 同款）、③ 加载失败按加载器区分 skip/fail，frontend 测试 100/100（Node 20.20 与 v22 实测）且 build/generate 通过，归档见 `docs/pr-records/2026-09-03-ui-b3-paged-hook.md`，索引 HB-20260903-16）。**B1（AppDialog/AppDrawer/StatusBadge/EmptyState/LoadingButton/Field）组件抽取面与 B3 分页能力封装全部收口**；B2（巨型页面拆分）与各页面接入分页（C3/P4）待排期 |
 | v2.7 | 2026-09-04 | P2 推进记录（续，**B2 试点收口**，最终数字经 #46 收口修正）：PR #45 合入 `b11be06`（B2 试点——episode.vue 拼接导出面板下沉 `EpisodeExportPanel.vue` + `composables/useExportMergesList.ts`：面板 UI 主体纯搬迁不改交互，评审中补状态一致性修复，共享空态与 `.content-panel` 壳留主壳不复制；`mergeData`/`doMerge`/轮询留主壳、export 列表三态与面板专属 CSS 下沉；镜头勾选集合提升为页面级受控状态（`exportSelectedIds`/`exportSelTouched` + `exportListRev` 刷新令牌）；**共 7 文件 5 提交（`b616b73`/`d5be58a`/`37b26f0`/`806553f`/`2f3a357`），经 4 次正式 review（3 Request changes + 1 Approved）收口，最终测试 116/116**；非空行口径 episode.vue 7069→6802（物理 7422→7150）、EpisodeExportPanel 354 非空行/365 物理行，归档见 `docs/pr-records/2026-09-03-ui-b2-episode-export-panel.md`，索引 HB-20260904-01）。**B2 拆分模式成型**：① 与主壳全局状态（顶栏/侧栏/弹窗共用）纠缠的逻辑留主壳、以令牌/事件协作；② 用户可见的跨面板页面级状态受控提升留主壳；③ 共享 scoped 类（空态/布局壳）不复制进子组件；④ 结构测试守卫随 CSS/模板迁移同步改目标文件。script 面板拆分顺序决策更新见下条 v2.8 |
 | v2.8 | 2026-09-04 | **#45 收口修订 + B2 顺序决策更新（#46 收口，评审后修正）**：① #45 最终事实统一入档——7 文件 5 提交、4 次正式 review（3 Request changes + 1 Approved）、最终测试 116/116、行数统一为非空行口径（episode.vue 7069→6802，物理 7422→7150；EpisodeExportPanel 354 非空行/365 物理行），同步 pr-record/iteration-logs/本 plan；② **正式推翻第 8 章/D3 原「B2 拆分等多视频类型扩展前端改造合入后」的冻结顺序**——`docs/multi-video-type-extension-plan.md` 至今仍为「尚未进入生产开发」且无排期，无限期冻结 B2 不成立；script 面板拆分（PR #47，纯搬迁、不改变面板交互）与扩展前端改造（创建/建集入口 + video_type 字段流程）改动区域正交，顺序合入即可避免双向 rebase 冲突；拆分先行把 episode.vue 主壳瘦身至物理 ~7.1K 行量级，后续扩展改造落在更小主壳内、总冲突面更低；**风险控制**：多视频类型扩展进入生产开发前，B2 仅推进 script 面板一块，其余面板（assets/storyboard/video-tasks/task-drawer）拆分暂停待其前端改造，避免冲突面扩大；script 面板拆分已按此合入 **PR #47（merge `58c1e96`，2026-09-04，最终测试 124/124，`npm run build`/`npm run generate` 通过）**，v2.8 顺序决策执行完毕，#47 后 episode.vue 主壳 6763 非空行/7108 物理行（#45 的 6802/7150 保留为历史结果），归档见 `docs/pr-records/2026-09-04-ui-b2-episode-script-panel.md`，索引 HB-20260904-02；③ **行数口径统一为非空行**（凡行数均标注口径）。B2 余 assets/storyboard/video-tasks/task-drawer 拆分（等待窗口）与各页面接入分页（C3/P4）待排期 |
+| v2.9 | 2026-09-04 | **C3/P4 首轮落地（PR #48 待评审）——素材库/任务列表分页化**（用户决策选「素材/任务分页化」，解决真正长列表场景）：后端 `GET /assets`（原全表读取后内存 filter/sort）与 `GET /tasks`（已 SQL 下推过滤但无 limit/offset）改为 **SQL 下推分页**——分页参数 clamp 1–100/默认 20（对齐 `GET /dramas`）、count + `desc(createdAt)` + limit/offset、返回 `{ items, pagination }`（items 字段 case 沿用各端点原约定：assets snake / tasks camel）；episode 参考素材选择器接入 **`usePagedList` 首个真实页面**（fetcher `{ drama_id, episode_id, ...q }`、pageSize 60、打开弹窗 `reset()+reload()` 作废在途与累积、上传成功后 `reload()`、loading/loadError 由 hook 同名状态接管驱动既有「加载中/失败内联 + 重试」UI、网格尾部「加载更多素材」按钮 hasMore 时才渲染），分镜视频历史消费点适配 `res.items`（page_size=100 一次取足保持小列表全量语义）；`GET /episodes/:id/generation-tasks`（任务抽屉）**保持 `{tasks, merges}` 不分页**（状态分区渲染 + 4s 轮询依赖完整任务集，分页随 D1 异步任务可视化评估）；index.vue 项目列表接入 `dramaAPI.list` 本轮不做（顶部统计/「继续上次制作」/「制作概况」依赖全量，待统计数据流裁决）。验证：frontend 测试 128/128、backend 结构测试子集 42/42、backend `typecheck` + frontend `build` 通过；归档见 `docs/pr-records/2026-09-04-ui-c3-pagination-assets-tasks.md`（索引待归档）。C3 余 index 项目列表接入（数据流裁决后）与虚拟滚动/懒加载，B2 等待窗口拆分、C6 等维持待排期 |
 
 ---
 
@@ -61,7 +62,7 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 | 暗色主题 | 不支持，无 dark token / `prefers-color-scheme` | `studio.css` |
 | 响应式 | 断点碎片化（760/860/900/1080）；`settings.vue` 与全局 header 无窄屏适配 | `index/detail/episode/settings.vue`、`layouts/default.vue` |
 | 无障碍 | 部分有意识（sr-only/focus-visible/ConfirmDialog 键盘），不系统 | — |
-| 数据量 | 项目/剧集/素材/任务仍全量一次拉取；分页能力封装（`usePagedList` + `dramaAPI.list` 分页参数）已就绪，页面接入待排期 | `useApi.ts`、各页面 |
+| 数据量 | 素材库（`GET /assets`）与任务列表（`GET /tasks`）已分页化（SQL 下推 + `{items,pagination}`，v2.9）；episode 参考素材选择器接入 `usePagedList` 落地；剧集/项目列表仍一次拉取——index 顶部统计与「继续上次制作」依赖全量，接入分页待统计数据流裁决 | `useApi.ts`、assets/tasks 路由、episode.vue、index.vue |
 
 ### 2.1 设置页当前结构（重构前基线）
 
@@ -158,7 +159,7 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 | --- | --- | --- | --- |
 | B1 通用组件抽取 | `AppDialog`（吸收各页手写 `.overlay>.dialog`）、`AppDrawer`（吸收任务抽屉）、`StatusBadge`、`EmptyState`、`LoadingButton`、`Field`（PR #42：settings 22 处 + index 5 处 `.field` 骨架迁移）；先抽后改，视觉不变（六件全部收口） | L | 高 |
 | B2 巨型页面拆分 | `episode.vue`（296KB）按业务面板拆：storyboard / video-tasks / export / assets / task-drawer；`detail.vue` 拆 ep-list / asset-grid / planner。纯搬移不改行为，复用 Nuxt 自动注册 | L | 高（风险最大项，需分批） |
-| B3 列表分页能力封装 | `usePagedList` hook + `dramaAPI.list` 分页参数扩展（PR #43 收口）；供后续分页/虚拟滚动统一接入（各页面接入待排期） | M | 中 |
+| B3 列表分页能力封装 | `usePagedList` hook + `dramaAPI.list` 分页参数扩展（PR #43 收口）；**episode 素材库首轮接入（v2.9）**打通 reload/reset/loadMore/hasMore 全路径，供后续分页/虚拟滚动统一接入 | M | 中 |
 
 ### C. 通用体验增强（P0 起 + P3）
 
@@ -166,7 +167,7 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 | --- | --- | --- | --- | --- |
 | C1 骨架屏补齐 | 剧集列表、素材库、工作台各阶段、任务抽屉接入 skeleton（复用 index.vue 已有样式/模式） | M | 高 | P0 |
 | C2 三态统一 + 全局错误处理 | 统一 `Loading/Empty/Error` 呈现；请求失败可重试；可选全局错误边界 | M | 高 | P0/P2 |
-| C3 分页/虚拟滚动/懒加载 | 素材库、剧集列表、任务列表；需评估 `useApi` 与后端是否支持分页参数（涉及后端，需先盘点） | L | 中 | P2 评估、P4 实施 |
+| C3 分页/虚拟滚动/懒加载 | 素材库（`GET /assets`）与任务列表（`GET /tasks`）已分页化并接入 episode（v2.9 首轮）；剧集列表（index.vue 项目列表）接入待统计数据流裁决（顶部统计/「继续上次制作」依赖全量）；虚拟滚动/懒加载仍待排期 | L | 中 | P2 评估、P4 实施 |
 | C4 暗色主题 | 依赖 A1 完成；新增 dark token 集 + `data-theme` 切换（默认跟随系统） | L | 高 | P3 |
 | C5 响应式统一 | 统一断点（建议 1280/1024/768 三档，替换现有 760/860/900/1080）；补 `settings.vue`、`layouts/default.vue` 全局 header 的窄屏方案；studio 面板窄屏降级 | L | 高 | P3 |
 | C6（v1.1）表单字段级校验 | 配置/新建类表单校验错误内联到 field（现状主要靠 toast，如 settings 配置弹窗、新建集），统一错误样式与 `field-hint`/`field-error` 用法 | M | 中 | P2（先盘点现状再定） |
@@ -201,7 +202,7 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 | **P1 打地基** | Token 收敛 + 规范文档 + 动效统一 | A1–A3 | 1–2 周 | P0 后 |
 | **P2 组件化** | 通用组件抽取 + 巨型页面拆分 + 分页 hook | B1–B3 | 2–3 周 | P1（token 稳定后样式收敛成本低） |
 | **P3 主题与多端** | 暗色模式、响应式断点统一与窄屏适配 | C4、C5 | 1–2 周 | P1 |
-| **P4 体验深化** | 异步任务可视化、Onboarding、媒体对照、仪表盘、A11y、分页落地 | D1–D5、E1–E4、C3 | 持续迭代 | P2（拆分成组件后可复用） |
+| **P4 体验深化** | 异步任务可视化、Onboarding、媒体对照、仪表盘、A11y、分页落地（素材/任务列表已落地 v2.9，剧集列表待数据流裁决） | D1–D5、E1–E4、C3 | 持续迭代 | P2（拆分成组件后可复用） |
 
 > 建议执行顺序：先做 **P0 的 F（设置页重构）** 作为样板交付并评审，再并行铺 P0 其余项与 P1。
 
@@ -246,6 +247,6 @@ JisuVideo-ai 前端已完成「项目创建 → 剧本 → 资产 → 分镜 →
 | D2 | Skills 页内嵌「Agent 列表 → Skill 管理」第三层是否保留 | 改为两级导航后，Skills 内容区左侧仍有 Agent 列表，视觉上像三层导航 | 首期保留不动；后续可选将 Agent 选择改为内容区顶部下拉 |
 | D3 | B2 巨型页面拆分与多视频类型扩展（v2.2 冻结稿）的实施顺序 | 扩展稿将改动 `detail.vue`/`episode.vue` 相关流程 | **已更新（v2.8，见修订记录）并已执行：script 面板纯搬迁拆分先行并已合入（PR #47，merge `58c1e96`），其余面板拆分等扩展前端改造合入后再拆**，避免双向冲突 |
 | D4 | 暗色主题（C4）排期 1–2 周是否乐观 | 代码存在内联 `style` 与半透明 rgba 硬编码，P1 token 化后仍有残留 | 按 2–3 周排期，逐页灰度上线 |
-| D5 | 分页/虚拟滚动（C3）是否先做「滚动分批渲染」过渡 | 后端接口是否支持 offset/limit 未盘点 | P2 先盘点 `useApi` 与后端路由，不支持则前端先分批渲染 |
+| D5 | 分页/虚拟滚动（C3）是否先做「滚动分批渲染」过渡 | 后端 `GET /dramas`/`GET /assets`/`GET /tasks` 已支持 page/page_size 分页（v2.9 盘点落地） | episode 素材库已接入 hook（v2.9）；剩余页面（index 等项目列表）接入 hook 即可，无需滚动分批渲染过渡 |
 | D6 | 文案是否完整 i18n（E4） | 当前单语种（中文）为主 | 仅收敛文案常量与插值，不做完整 i18n 首期 |
 | D7（v1.2） | `?tab=` URL 深链是否本期实施 | 刷新/分享保持所在二级目录，属体验增强 | **已延期**：作为独立增强项另行排期，待 P2-B2 页面拆分时评估（避免为临时 tab 状态引入路由耦合） |

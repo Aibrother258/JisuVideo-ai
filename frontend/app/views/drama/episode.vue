@@ -1613,7 +1613,7 @@
             <div class="app-state-icon"><CircleAlert :size="20" /></div>
             <div class="app-state-title">素材库加载失败</div>
             <p class="app-state-desc">{{ refAssetLibraryError }}</p>
-            <button class="btn btn-primary btn-sm" @click="loadRefAssetLibrary"><RefreshCw :size="12" /> 重试</button>
+            <button class="btn btn-primary btn-sm" @click="reloadRefAssetLibrary"><RefreshCw :size="12" /> 重试</button>
           </div>
           <div v-else-if="refAssetCandidates.length" class="ref-asset-picker-grid">
             <button
@@ -1630,6 +1630,19 @@
               <strong>{{ asset.name }}</strong>
               <small>{{ asset.source }}</small>
             </button>
+            <!-- 追加（加载更多）失败：保留已加载素材，仅尾部内联「点击重试」；重试仍走 loadMore 只重拉失败那页 -->
+            <div v-if="refAssetLibraryLoadMoreError" class="ref-asset-picker-more">
+              <button class="btn btn-sm" :disabled="refAssetLibraryLoadingMore" @click="loadMoreRefAssets">
+                <RefreshCw :size="12" /> 加载失败，点击重试
+              </button>
+            </div>
+            <div v-else-if="refAssetLibraryHasMore" class="ref-asset-picker-more">
+              <button class="btn btn-sm" :disabled="refAssetLibraryLoadingMore" @click="loadMoreRefAssets">
+                <Loader2 v-if="refAssetLibraryLoadingMore" :size="12" class="animate-spin" />
+                <template v-else><RefreshCw :size="12" /></template>
+                {{ refAssetLibraryLoadingMore ? '加载中…' : '加载更多素材' }}
+              </button>
+            </div>
           </div>
           <div v-else class="ref-asset-picker-empty">素材库里还没有{{ refAssetKindLabel }}，请先使用“本地上传”。</div>
         </div>
@@ -1739,6 +1752,7 @@ import {
   MapPin, Play, Plus, X, ListTodo, RefreshCw, CircleAlert,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, assetLibraryAPI } from '~/composables/useApi'
+import { usePagedList } from '~/composables/usePagedList'
 import AppDialog from '~/components/AppDialog.vue'
 import AppDrawer from '~/components/AppDrawer.vue'
 import StatusBadge from '~/components/StatusBadge.vue'
@@ -2135,10 +2149,25 @@ const videoRefAudioUrls = ref([])
 const videoRefImageUrls = ref([])
 const videoDuration = ref(10)
 const uploadingRefMedia = ref(false)
-const mediaLibraryAssets = ref([])
 const refAssetPicker = ref({ open: false, kind: 'image' })
-const refAssetPickerLoading = ref(false)
-const refAssetLibraryError = ref('')
+// 素材库分页加载（P2-B3 usePagedList 页面首轮接入）：打开选择器 reload 第 1 页；
+// 每页 60，hasMore 为真时网格底部提供「加载更多」按钮追加，避免打开选择器时全量拉取
+const {
+  items: mediaLibraryAssets,
+  loading: refAssetPickerLoading,
+  loadError: refAssetLibraryError,
+  loadMoreError: refAssetLibraryLoadMoreError,
+  hasMore: refAssetLibraryHasMore,
+  loadingMore: refAssetLibraryLoadingMore,
+  loadMore: loadMoreRefAssets,
+  reload: reloadRefAssetLibrary,
+  reset: resetRefAssetLibrary,
+} = usePagedList(
+  // 携带当前选择器类型：服务端先按 type 过滤再分页，避免「第 1 页 60 条全为其他类型、
+  // 目标类型排在后续页」时前端过滤后为空、加载更多入口也随之消失
+  (q) => assetLibraryAPI.list({ drama_id: dramaId, episode_id: epId.value, type: refAssetPicker.value.kind, ...q }),
+  { pageSize: 60 },
+)
 const REF_SELECTION_STORE_KEY = `huobao:video-refs:${dramaId}:${episodeNumber}`
 const storedShotRefSelections = ref((() => {
   try { return JSON.parse(localStorage.getItem(REF_SELECTION_STORE_KEY) || '{}') }
@@ -2638,22 +2667,11 @@ function isRefAssetSelected(asset) {
 
 const selectedRefAssetCount = computed(() => selectedRefList().value.length)
 
-async function loadRefAssetLibrary() {
-  refAssetPickerLoading.value = true
-  refAssetLibraryError.value = ''
-  try {
-    mediaLibraryAssets.value = await assetLibraryAPI.list({ drama_id: dramaId, episode_id: epId.value }) || []
-  } catch (error) {
-    // 失败内联呈现 + 重试，避免回落误导性「素材库还没有…」空态
-    refAssetLibraryError.value = error.message || '素材库加载失败'
-  } finally {
-    refAssetPickerLoading.value = false
-  }
-}
-
 async function openRefAssetPicker(kind) {
   refAssetPicker.value = { open: true, kind }
-  await loadRefAssetLibrary()
+  // 每次打开从第 1 页重载：作废上次打开遗留的分页累积与在途请求，避免跨集/跨次串数据
+  resetRefAssetLibrary()
+  await reloadRefAssetLibrary()
 }
 
 function closeRefAssetPicker() {
@@ -3672,8 +3690,13 @@ async function loadSbVideoHistory() {
   previewVideoUrl.value = ''
   if (!selectedSb.value?.id) { sbVideoHistory.value = []; sbVideoHistoryError.value = ''; return }
   try {
-    const rows = await taskAPI.list({ type: 'video', storyboard_id: selectedSb.value.id })
-    sbVideoHistory.value = (Array.isArray(rows) ? rows : [])
+    // 分镜历史面板依赖全量语义：横向滚动卡带 + 条数计数 + 任意一条可预览/设为主视频/删除，
+    // 无「加载更多」入口，不属于长列表场景。因此不传 page/page_size，走后端旧契约取全量数组，
+    // 不再受 page_size=100 上限静默截断（>100 条的第 101 条及更早记录依然可访问）。
+    // 后端仅在显式传分页参数时返回 { items, pagination }，这里用 Array.isArray 归一两种形态
+    const res = await taskAPI.list({ type: 'video', storyboard_id: selectedSb.value.id })
+    const rows = Array.isArray(res) ? res : (res?.items || [])
+    sbVideoHistory.value = rows
       .filter(t => t.status === 'completed' && taskVideoPath(t))
       .sort((a, b) => taskCreatedAt(b).localeCompare(taskCreatedAt(a)))
     sbVideoHistoryError.value = ''
@@ -4120,7 +4143,7 @@ function uploadRefMedia(kind) {
         const res = await uploadAPI.image(file, libraryMeta)
         videoRefImageUrls.value = [...videoRefImageUrls.value, res.url]
         rememberRefAssetOrigin(res.url, res.asset_id)
-        await loadRefAssetLibrary()
+        await reloadRefAssetLibrary()
         toast.success('参考图片已上传')
       } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
     })
@@ -4137,7 +4160,7 @@ function uploadRefMedia(kind) {
       const res = isVideo ? await uploadAPI.video(file, libraryMeta) : await uploadAPI.audio(file, libraryMeta)
       list.value = [...list.value, res.url]
       rememberRefAssetOrigin(res.url, res.asset_id)
-      await loadRefAssetLibrary()
+      await reloadRefAssetLibrary()
       toast.success(`参考${label}已上传`)
     } catch (e) { toast.error(e.message) } finally { uploadingRefMedia.value = false }
   })
@@ -6396,6 +6419,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .ref-asset-card small { color: var(--text-3); font-size: 10px; }
 .ref-asset-card-check { position: absolute; top: 13px; right: 13px; z-index: 1; padding: 3px 6px; border-radius: 999px; background: rgba(20,20,24,.72); color: var(--text-invert); font-size: 9px; }
 .ref-asset-picker-empty { min-height: 220px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); font-size: 12px; }
+.ref-asset-picker-more { grid-column: 1 / -1; display: flex; justify-content: center; padding: 8px 0 2px; }
 
 /* Prod grid */
 .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
