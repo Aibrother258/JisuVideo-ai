@@ -60,6 +60,7 @@
 | HB-20260904-03 | UI C3/P4 首轮落地——素材库/任务列表分页化（后端 `GET /assets` 与 `GET /tasks` SQL 下推分页 + episode 参考素材选择器接入 `usePagedList`） | 完成（PR #48，merge `0ca0e0e0`）；共 3 轮评审（结构断言宽松化 / 契约兼容 / 视频历史截断修复），最终分镜历史回归无参全量契约；frontend 130/130、backend 结构子集 42/42、build 通过 | [查看归档](../pr-records/2026-09-04-ui-c3-pagination-assets-tasks.md) |
 | HB-20260904-04 | UI C4 暗色主题首批（B1）——dark token 覆盖块 + `data-theme` 切换 + 首帧 FOUC + B1 字面量 token 化 | 完成（PR #53，merge `7c99e15`）；经三轮评审收口（静态 head bootstrap / 真构建产物集成测试 + CI 强制 / 子进程兜底清理）；frontend 142/142、test:build 通过 | [查看归档](../pr-records/2026-09-04-ui-c4-dark-theme-b1.md) |
 | HB-20260904-05 | UI C4 暗色主题第二批（B2）——局部语义色/投影残留收口 + `solid-ink` 反色实心块 | 完成（PR #54，merge `f959214`）；经三轮 Request Changes 守卫逐级收紧（逐选择器断言 / bg shorthand 只许 solid-ink / 全部同名规则 + 空白规范化），145/145、test:build 通过 | [查看归档](../pr-records/2026-09-04-ui-c4-b2-solid-ink-token.md) |
+| HB-20260904-06 | UI C4 暗色主题第三批——设置页「外观」三态切换面板 + 持久化（C4 完结批） | 完成（PR #56，merge `c58323e`）；评审 P2 跟进：说明文字改 `--text-2`（dark AA）+ 双主题守卫锚定；面板抽 `ThemeAppearanceCard` + vitest 挂载级交互套件（真实 useTheme/controller，`npm run test:ui` 4/4，CI/verify 强制）；frontend 148/148、test:build 通过 | [查看归档](../pr-records/2026-09-04-ui-c4-batch3-appearance-switcher.md) |
 
 ## 记录规范
 
