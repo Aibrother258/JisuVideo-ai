@@ -38,3 +38,49 @@ jobs:
       # on every push / PR, not only on demand.
       - name: Build-artifact integration (theme bootstrap ordering)
         run: npm run test:build
+
+  backend:
+    name: backend (typecheck + npm test with MySQL)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: huobao
+          MYSQL_DATABASE: huobao_drama
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -phuobao --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Full backend suite with MySQL service: id-param-route (runs the 400/no-query
+      # contract via db.select stub, never skipped) + merge-fastpath needs initDb to
+      # succeed at import time, so a real MySQL service is required on CI.
+      - name: Full test suite
+        run: npm test
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: huobao
+          MYSQL_DATABASE: huobao_drama
