@@ -10,9 +10,13 @@ test('GET /assets: SQL-pushed pagination with drama/episode reuse semantics pres
   // 分页参数解析：parseInt + `|| 默认值` 兜底 NaN（page_size clamp 1-100，对齐 GET /dramas）
   assert.match(src, /const page = Math\.max\(1, Number\.parseInt\(c\.req\.query\('page'\) \|\| '1', 10\) \|\| 1\)/)
   assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\.parseInt\(c\.req\.query\('page_size'\) \|\| '20', 10\) \|\| 20\)\)/)
-  // 数字过滤参数经 parseRecordId 收敛（NaN/非正数视为未传，不进入 SQL）
-  assert.match(src, /const dramaId = parseRecordId\(c\.req\.query\('drama_id'\)\)/)
-  assert.match(src, /const episodeId = parseRecordId\(c\.req\.query\('episode_id'\)\)/)
+  // 数字过滤参数统一契约（parseRecordId 三态）：非法值在进入 SQL 前返回 400，绝不静默省略过滤
+  assert.match(src, /const dramaIdRes = parseRecordId\(c\.req\.query\('drama_id'\)\)/)
+  assert.match(src, /if \(dramaIdRes\.kind === 'invalid'\) return badRequest\(c, 'drama_id 参数必须是合法正整数'\)/)
+  assert.match(src, /const dramaId = dramaIdRes\.kind === 'id' \? dramaIdRes\.id : undefined/)
+  assert.match(src, /const episodeIdRes = parseRecordId\(c\.req\.query\('episode_id'\)\)/)
+  assert.match(src, /if \(episodeIdRes\.kind === 'invalid'\) return badRequest\(c, 'episode_id 参数必须是合法正整数'\)/)
+  assert.match(src, /const episodeId = episodeIdRes\.kind === 'id' \? episodeIdRes\.id : undefined/)
   // 过滤条件 SQL 下推：未删除 + 短剧归属（公共素材保留）+ 跨集排除 + type
   // （conds 带 `: SQL[]` 类型注解为类型收窄所需，用可选组匹配避免类型标注改动使测试误挂）
   assert.match(src, /const conds(?:: SQL\[\])? = \[isNull\(schema\.assets\.deletedAt\)\]/)
@@ -35,9 +39,13 @@ test('GET /tasks: existing SQL filters gain page/page_size and { items, paginati
   // 分页参数解析：parseInt + `|| 默认值` 兜底 NaN（clamp 与 GET /assets / GET /dramas 一致）
   assert.match(src, /const page = Math\.max\(1, Number\.parseInt\(c\.req\.query\('page'\) \|\| '1', 10\) \|\| 1\)/)
   assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\.parseInt\(c\.req\.query\('page_size'\) \|\| '20', 10\) \|\| 20\)\)/)
-  // 数字过滤参数经 parseRecordId 收敛（NaN/非正数视为未传，不进入 SQL）
-  assert.match(src, /const storyboardId = parseRecordId\(c\.req\.query\('storyboard_id'\)\)/)
-  assert.match(src, /const dramaId = parseRecordId\(c\.req\.query\('drama_id'\)\)/)
+  // 数字过滤参数统一契约（parseRecordId 三态）：非法值在进入 SQL 前返回 400，绝不静默省略过滤
+  assert.match(src, /const storyboardIdRes = parseRecordId\(c\.req\.query\('storyboard_id'\)\)/)
+  assert.match(src, /if \(storyboardIdRes\.kind === 'invalid'\) return badRequest\(c, 'storyboard_id 参数必须是合法正整数'\)/)
+  assert.match(src, /const storyboardId = storyboardIdRes\.kind === 'id' \? storyboardIdRes\.id : undefined/)
+  assert.match(src, /const dramaIdRes = parseRecordId\(c\.req\.query\('drama_id'\)\)/)
+  assert.match(src, /if \(dramaIdRes\.kind === 'invalid'\) return badRequest\(c, 'drama_id 参数必须是合法正整数'\)/)
+  assert.match(src, /const dramaId = dramaIdRes\.kind === 'id' \? dramaIdRes\.id : undefined/)
   // 既有 type/storyboard_id/drama_id 条件下推保持
   assert.match(src, /if \(type\) conds\.push\(eq\(schema\.sysTask\.type, type\)\)/)
   assert.match(src, /if \(storyboardId\) conds\.push\(eq\(schema\.sysTask\.storyboardId, storyboardId\)\)/)

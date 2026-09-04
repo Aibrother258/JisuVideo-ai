@@ -1,15 +1,31 @@
 /**
  * 解析查询参数中的记录 ID（drama_id / episode_id / storyboard_id 等）。
  *
- * 返回「大于 0 的安全整数」，其余情况（缺失、空串、非数字、非正数、超精度）一律返回 undefined，
- * 由调用方按「未传该过滤条件」处理。
+ * 返回三态判别联合，把「未提供」「非法」「合法」明确区分开：
  *
- * 背景：URL 查询参数到 SQL 过滤之间必须收敛数值转换，避免 Number('abc') 得到 NaN 后
- * 经 eq() 直接进入 SQL 绑定参数（MySQL 驱动对 NaN 的编码行为不一致，可能抛错或产生脏过滤）。
- * 与列表分页参数（page / page_size）的「parseInt + NaN 兜底」策略保持同一防御基线。
+ * - absent  —— 参数未出现或为空串（沿用旧契约：不增加过滤条件）；
+ * - invalid —— 参数已提供但非「大于 0 的安全整数」（含非数字、小数、负数、
+ *   零、纯空格、超精度整数等）：路由必须返回 400，禁止静默省略过滤条件；
+ * - id      —— 合法正整数。
+ *
+ * 为什么非法值要返回 400 而不是按「未传」处理：如果非法值被静默省略过滤，
+ * 会把原本受限的查询（如 /tasks?storyboard_id=abc）放大成全量查询，
+ * 造成跨项目数据误展示，并为以后的权限隔离埋下隐患。背景见
+ * docs/product-positioning-roadmap.md §13 双 Fork 协作中 Fork B 的 API 边界校验分工。
+ *
+ * 语法语义：接受十进制纯数字串（允许首位零，Number 语义与旧代码一致），
+ * 拒绝 '1e3' / '0x1F' / '+7' 等非十进制写法；外层空格先 trim 再判定。
  */
-export function parseRecordId(raw: string | undefined): number | undefined {
-  if (raw == null || raw.trim() === '') return undefined
-  const n = Number(raw)
-  return Number.isSafeInteger(n) && n > 0 ? n : undefined
+export type RecordIdParam =
+  | { kind: 'absent' }
+  | { kind: 'invalid' }
+  | { kind: 'id'; id: number }
+
+export function parseRecordId(raw: string | undefined | null): RecordIdParam {
+  if (raw == null || raw === '') return { kind: 'absent' }
+  const trimmed = raw.trim()
+  if (!/^\d+$/.test(trimmed)) return { kind: 'invalid' }
+  const n = Number(trimmed)
+  if (!Number.isSafeInteger(n) || n <= 0) return { kind: 'invalid' }
+  return { kind: 'id', id: n }
 }

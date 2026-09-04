@@ -1,9 +1,11 @@
 /**
- * 真实行为测试：parseRecordId 纯函数。
+ * 真实行为测试：parseRecordId 纯函数（三态判别联合契约）。
  *
- * 与 tests/ 下其余「源码结构测试」不同，这里直接导入并执行 TS 源码逻辑，
- * 断言的是算法行为而不是代码外观。query-id.ts 是零依赖纯函数，
- * 因此本测试无需 MySQL 即可运行。
+ * 契约要点：区分「未提供」「非法」「合法」，保证非法值在进入 SQL 前被路由
+ * 转成 400——非法输入绝不静默省略过滤条件（否则会把受限查询放大成全量，
+ * 造成跨项目数据误展示）。
+ *
+ * query-id.ts 是零依赖纯函数，本测试无需 MySQL 即可运行。
  *
  * 运行：cd backend && npm test（或按需 `node --import tsx/esm --test tests/parse-record-id.test.mjs`）。
  * tsx 加载器由 npm 脚本统一加载（node --import tsx/esm），本文件不再自注册。
@@ -13,30 +15,27 @@ import assert from 'node:assert/strict'
 
 const { parseRecordId } = await import('../src/utils/query-id.js')
 
-test('parseRecordId: 合法正整数原样返回', () => {
-  assert.equal(parseRecordId('12'), 12)
-  assert.equal(parseRecordId('1'), 1)
-  assert.equal(parseRecordId(' 7 '), 7)
-  assert.equal(parseRecordId(String(Number.MAX_SAFE_INTEGER)), Number.MAX_SAFE_INTEGER)
+test('parseRecordId: 未提供 / 空串 → absent（不筛选，旧契约兼容）', () => {
+  assert.deepEqual(parseRecordId(undefined), { kind: 'absent' })
+  assert.deepEqual(parseRecordId(null), { kind: 'absent' })
+  assert.deepEqual(parseRecordId(''), { kind: 'absent' })
 })
 
-test('parseRecordId: 缺失/空值返回 undefined（等价于未传该过滤条件）', () => {
-  assert.equal(parseRecordId(undefined), undefined)
-  assert.equal(parseRecordId(''), undefined)
-  assert.equal(parseRecordId('   '), undefined)
+test('parseRecordId: 非法值 → invalid（路由必须返回 400，禁止省略过滤）', () => {
+  // 非数字 / 小数 / 负数 / 零 / 纯空格 / 超精度 / 非十进制写法
+  const invalid = [
+    'abc', '12abc', '1.5', '-1', '0', '00', '   ', 'NaN', 'Infinity',
+    '1e3', '0x1F', '+7', '9007199254740992', '99999999999999999999', '12 3',
+  ]
+  for (const raw of invalid) {
+    assert.deepEqual(parseRecordId(raw), { kind: 'invalid' }, `raw=${JSON.stringify(raw)}`)
+  }
 })
 
-test('parseRecordId: 非数字/小数/负数/零返回 undefined，杜绝 NaN 进入 SQL', () => {
-  assert.equal(parseRecordId('abc'), undefined)
-  assert.equal(parseRecordId('12abc'), undefined)
-  assert.equal(parseRecordId('1.5'), undefined)
-  assert.equal(parseRecordId('-1'), undefined)
-  assert.equal(parseRecordId('0'), undefined)
-  assert.equal(parseRecordId('NaN'), undefined)
-  assert.equal(parseRecordId('Infinity'), undefined)
-})
-
-test('parseRecordId: 超出安全整数精度返回 undefined', () => {
-  assert.equal(parseRecordId('9007199254740992'), undefined)
-  assert.equal(parseRecordId('99999999999999999999'), undefined)
+test('parseRecordId: 合法十进制正整数 → id', () => {
+  assert.deepEqual(parseRecordId('12'), { kind: 'id', id: 12 })
+  assert.deepEqual(parseRecordId('1'), { kind: 'id', id: 1 })
+  assert.deepEqual(parseRecordId(' 7 '), { kind: 'id', id: 7 })
+  assert.deepEqual(parseRecordId('007'), { kind: 'id', id: 7 })
+  assert.deepEqual(parseRecordId(String(Number.MAX_SAFE_INTEGER)), { kind: 'id', id: Number.MAX_SAFE_INTEGER })
 })

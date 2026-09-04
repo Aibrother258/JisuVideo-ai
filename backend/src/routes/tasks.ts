@@ -200,10 +200,14 @@ app.get('/:id', async (c) => {
 // 过滤/排序/分页全部 SQL 下推；返回 { items, pagination }，items 字段沿用 camelCase（与 GET /tasks/:id 一致）
 app.get('/', async (c) => {
   const type = c.req.query('type')
-  // 数字过滤参数统一经 parseRecordId 收敛：非数字/非正数视为未传（不进入 SQL），
-  // 避免 Number('abc') 得 NaN 后经 eq() 传入 SQL 绑定参数（与 GET /assets 一致）
-  const storyboardId = parseRecordId(c.req.query('storyboard_id'))
-  const dramaId = parseRecordId(c.req.query('drama_id'))
+  // 数字过滤参数统一契约（parseRecordId 三态）：未提供/空串 → 不筛选；
+  // 已提供但非合法正整数 → 400（与 GET /assets 同一契约，见 utils/query-id.ts）。
+  const storyboardIdRes = parseRecordId(c.req.query('storyboard_id'))
+  if (storyboardIdRes.kind === 'invalid') return badRequest(c, 'storyboard_id 参数必须是合法正整数')
+  const storyboardId = storyboardIdRes.kind === 'id' ? storyboardIdRes.id : undefined
+  const dramaIdRes = parseRecordId(c.req.query('drama_id'))
+  if (dramaIdRes.kind === 'invalid') return badRequest(c, 'drama_id 参数必须是合法正整数')
+  const dramaId = dramaIdRes.kind === 'id' ? dramaIdRes.id : undefined
   // 兼容旧契约：只有显式传入 page / page_size 任一参数才启用分页并返回 { items, pagination }；
   // 未传分页参数时维持旧行为——返回过滤后的全量数组，避免旧脚本/第三方调用静默截断
   const paginated = c.req.query('page') != null || c.req.query('page_size') != null
