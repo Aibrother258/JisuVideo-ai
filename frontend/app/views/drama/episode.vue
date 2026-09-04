@@ -4613,7 +4613,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   line-height: 1;
 }
 .back-btn:hover {
-  background: rgba(0,0,0,0.09);
+  background: var(--fill-hover);
   color: var(--text-0);
 }
 .back-btn:focus-visible {
@@ -4664,7 +4664,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .pipe-item.doing { color: var(--text-1); }
 .pipe-item.doing .pipe-icon {
   background: var(--accent-bg);
-  border-color: rgba(0,113,227,0.25);
+  border-color: var(--accent-border);
 }
 .pipe-item-pulse {
   width: 6px; height: 6px; border-radius: 999px;
@@ -4768,7 +4768,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   border-radius: 999px;
   border: none;
   padding: 0;
-  background: rgba(0,0,0,0.14);
+  background: var(--dot-idle);
   cursor: pointer;
   transition: all var(--dur-med) var(--ease-out);
 }
@@ -4918,7 +4918,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
 .bubble-dots { display: flex; gap: 7px; padding: 0 4px; }
 .bubble-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: rgba(0,0,0,0.14); cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  background: var(--dot-idle); cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
   border: none;
   padding: 0;
 }
