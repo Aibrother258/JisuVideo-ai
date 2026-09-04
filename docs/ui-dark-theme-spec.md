@@ -1,8 +1,8 @@
 # JisuVideo-ai 暗色主题专项方案（UI C4）
 
-> 版本：v1.1
+> 版本：v1.2
 > 日期：2026-09-04
-> 状态：首批已合入 master（PR #53，merge `7c99e15`）；第二批（本 PR）收口局部语义色与投影残留并补覆盖完整性守卫
+> 状态：首批与第二批均已合入 master（PR #53 `7c99e15` / PR #54 `f959214`，2026-09-04）；第三批（设置页「外观」三态切换控件）待排期
 > 关联：`docs/ui-optimization-plan.md` C4 条目（plan v3.0 立项）；A1/A2/A3 token 与色板规范收口后依赖已解除
 > 适用范围：`frontend/app`（Nuxt 3 SPA，纯 CSS Variables，无 UI 框架）
 
@@ -106,7 +106,7 @@
 | 批次 | 面 | 内容 | 动作 |
 |---|---|---|---|
 | B1（随首批） | episode/detail 纸面与黑叠加 | `detail #fbfbfd/#fbfaf7`、`rgba(255,255,255,.7/.72)` 玻璃、`episode rgba(0,0,0,.09/.14)` hover/遮罩、`rgba(0,113,227,.25)` 描边 | 收敛为可覆盖 token（新增 `--surface-paper` / `--glass-raised` / `--scrim-soft-raise` 等或复用既有族） |
-| B2（第二批，本 PR） | 局部语义色 | `episode --sel*`（选区紫，首批已提全局 + AA）、`ConfirmDialog #d70015` danger hover（本批 `--action-danger-hover`，双主题白字 AA）、detail/back-btn hover（首批归一 `--fill-hover`）；shadow 残留三档（本批 `--shadow-hover/menu/viewer` + dark 加深）；episode ref-asset 深 pill 为媒体覆盖、明暗通用，保持（记录于 A2 §5.1）。页面走查修复：激活实心 pill / logo 方块误以 `--text-0` 为底（dark 反白→白字白底失效），独立成 `--solid-ink`（dark 亮灰实心，白字 ≈ 9:1 AA） | 语义 token 化 + dark 档 |
+| B2（第二批，已合入 PR #54 `f959214`） | 局部语义色 | `episode --sel*`（选区紫，首批已提全局 + AA）、`ConfirmDialog #d70015` danger hover（本批 `--action-danger-hover`，双主题白字 AA）、detail/back-btn hover（首批归一 `--fill-hover`）；shadow 残留三档（本批 `--shadow-hover/menu/viewer` + dark 加深）；episode ref-asset 深 pill 为媒体覆盖、明暗通用，保持（记录于 A2 §5.1）。页面走查修复：激活实心 pill / logo 方块误以 `--text-0` 为底（dark 反白→白字白底失效），独立成 `--solid-ink`（dark 亮灰实心，白字 ≈ 9:1 AA） | 语义 token 化 + dark 档 |
 | 保持 | 品牌/类型面 | index 风格渐变（JS 内联）、settings cap/provider-badge 渐变、封面渐变、text-shadow、媒体阴影 | 彩色品牌与阴影，暗色下不反相 |
 
 ## 5. 验收标准
@@ -123,7 +123,7 @@
 | 批次 | 交付 | 验证 |
 |---|---|---|
 | **首批（已合入 PR #53 `7c99e15`）** | dark token 覆盖块 + `color-scheme` + 首帧 bootstrap（nuxt.config 静态 head）+ system 运行时跟随（plugin/composable）+ B1 纸面字面量 token 化 + 局部暗色修复（`--sel` 提升全局、skill 错误卡语义 token）+ 行为级测试（主题核心/AA 对比度）+ 构建产物集成测试（test:build，动态端口 + 进程生命周期守卫）+ CI workflow | `npm test` 全量 + `npm run test:build`（真构建产物 HTML 顺序断言，CI/`npm run verify` 强制执行）；亮色零变化；暗色人工验收 |
-| **第二批（本 PR）** | B2 局部语义色收口：danger hover `--action-danger-hover`（双主题 AA）、shadow 残留三档 `--shadow-hover/menu/viewer`（+dark 加深）+ 页面级暗色细节走查（代码级：全仓裸色清零校验 + dark 覆盖完整性自动守卫 + 关键 token AA 锚定；视觉清单见 PR 描述） | 同上；新增守卫：light 颜色 token 一律需 dark 档或显式豁免、danger hover 双主题白字 ≥4.5 |
+| **第二批（已合入 PR #54 `f959214`）** | B2 局部语义色收口：danger hover `--action-danger-hover`（双主题 AA）、shadow 残留三档 `--shadow-hover/menu/viewer`（+dark 加深）+ 页面级暗色细节走查（代码级：全仓裸色清零校验 + dark 覆盖完整性自动守卫 + 关键 token AA 锚定；视觉清单见 PR 描述） | 同上；新增守卫：light 颜色 token 一律需 dark 档或显式豁免、danger hover 双主题白字 ≥4.5 |
 | 第三批（待） | 设置页「外观」切换控件（浅色/深色/跟随系统三态）+ 持久化 | 手工 + 结构守卫 |
 
 ## 7. 风险与回滚
