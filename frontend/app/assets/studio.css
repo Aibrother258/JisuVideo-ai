@@ -132,6 +132,12 @@
   --glass-hover: rgba(255,255,255,0.7);
   --dot-idle: rgba(0,0,0,0.14);
   --accent-border: rgba(0,113,227,0.25);
+  /* C4-P2-4：pipeline 选中态靛紫（原 episode.vue .studio 局部变量提升；light 值不变，dark 见覆盖块 AA 值）
+     语义：当前导航/进行中步骤项，区别于进行中(蓝 --accent) 与已完成(绿 --success) */
+  --sel: #5856d6;
+  --sel-bg: rgba(88,86,214,0.10);
+  --sel-text: #4240b0;
+  --sel-glow: rgba(88,86,214,0.16);
   /* A2 批次二：媒体画布深色遮罩档（episode on-media 深底圆钮/索引/时间/播放大遮罩 13 处收敛，R3 归一见规范 v2 §6） */
   --media-scrim-soft: rgba(0,0,0,0.28);
   --media-scrim: rgba(0,0,0,0.50);
@@ -305,6 +311,12 @@
   --glass-hover: rgba(255,255,255,0.05);
   --dot-idle: rgba(255,255,255,0.3);
   --accent-border: rgba(10,132,255,0.5);
+  /* C4-P2-4：选中态靛紫暗色档（Apple indigo dark #5e5ce6 亮档）；
+     --sel-text #a5a3ff on dark surface ≈ 7.4:1、白字 on --sel(#5e5ce6) ≈ 5:1，均过 AA */
+  --sel: #5e5ce6;
+  --sel-bg: rgba(94,92,230,0.16);
+  --sel-text: #a5a3ff;
+  --sel-glow: rgba(94,92,230,0.28);
 
   /* 资产类别语义色（亮档）；amber 提示横幅深底 */
   --kind-scene: #30d158;

@@ -22,7 +22,7 @@
 | 1 | 主题挂在 `<html data-theme>`：`system`（缺省，跟随 `prefers-color-scheme`）/ `light` / `dark` 三态 | 三态覆盖「默认跟随系统 + 手动覆盖」完整需求；`data-theme` 缺省即 system，DOM 无额外噪声 |
 | 2 | token 结构采用两段覆盖：`:root`（light，现状不动）为底，`:root[data-theme='dark']` 定义 dark 覆盖；system 态由 head 内联脚本在首帧前解析 `prefers-color-scheme` 并写入 `data-theme='dark'/'light'` | 避免 CSS 媒体查询与属性选择器双份 dark 定义（纯 CSS 无 mixin，重复一份但把「跟随系统」收敛到 JS 单点）；FOUC 预防见决策 4 |
 | 3 | 手动选择存 `localStorage['ui-theme']`（`system/light/dark`），仅在 `system` 态监听 `matchMedia('(prefers-color-scheme: dark)')` 变化实时切换；应用内不引入全局状态（读 localStorage + DOM 属性即时生效） | 主题是纯表现层即时偏好，无需响应式状态参与渲染；SPA 下无跨端同步需求 |
-| 4 | FOUC 预防：`app.vue` 内联一段 head `<script>`（`useHead`），在 CSS 前解析 localStorage + 系统偏好写 `data-theme` | SPA 首帧也需避免「先亮后闪暗」；脚本仅 5 行，不引第三方 |
+| 4 | FOUC 预防：首帧 bootstrap（`app/utils/theme-core.mjs` 导出的 `themeBootstrapScript`）经 `nuxt.config app.head.script` **静态内联进 SPA HTML `<head>`**，先于样式表/入口脚本同步执行；运行时跟随与手动覆盖在 `plugins/theme.client.ts`（`createThemeController` 依赖注入，system 态注册 `matchMedia` change 监听、手动 light/dark 解除监听），`composables/useTheme.ts` 暴露 `setTheme` 供第三批设置页调用 | `ssr:false` 下组件内 `useHead` 要等客户端 JS 下载启动后才注入，首帧已按亮色绘制过一帧——bootstrap 必须落在静态 HTML；脚本仅 5 行、零依赖，本地存储与系统偏好分开容错（存储不可用仍跟随系统） |
 | 5 | `:root` 增加 `color-scheme: light`；`[data-theme='dark']` 与 system 暗色态增加 `color-scheme: dark` | 原生控件（select/checkbox/滚动条/日期选择）跟随主题，避免白表单控件钉在暗页上 |
 | 6 | 首批**不做**手动切换 UI（设置页「外观」控件后续批次）；机制先行 + 默认跟随系统，改 `localStorage` 即可验收暗色 | 切换 UI 涉及设置页结构扩展，独立小批次，避免首批范围膨胀 |
 | 7 | 阴影在暗色下降低可见度，采用「同族提 alpha + 表面亮度差主导层次」，不新增发光/描边体系 | 保持观感克制，暗色苹果风格以层级亮度而非投影表达深度 |
@@ -116,13 +116,13 @@
 3. 原生控件（select/滚动条/switch）随 `color-scheme: dark` 变暗，无白底原生控件钉在暗页。
 4. 系统偏好暗色时开页即暗（无先亮后闪）；改系统偏好实时切换；`localStorage['ui-theme']='light'` 可强制亮。
 5. **light 回归**：`:root` light token 值零改动，亮色观感与合入前逐像素一致。
-6. 结构测试守卫：studio.css 存在 dark 覆盖块与 `color-scheme`；app.vue 存在 FOUC 内联脚本；light token 值未被改动（锚定样本值）。
+6. 测试守卫：结构测试锚定 studio.css dark 覆盖块与 `color-scheme`、nuxt.config 首帧 bootstrap（app.vue 不再运行时注入）、B1/P2 字面量清理、light token 值零改动；行为测试直接运行 `theme-core.mjs`（零 DOM 依赖）：三态解析与非法值回退、存储读写异常容错、bootstrap 全场景矩阵（vm 沙箱执行）、controller 运行时跟随/手动覆盖/监听生命周期、`--sel` 双主题 AA 对比度（WCAG 实算）；构建产物校验 bootstrap 已嵌入 SPA 渲染模板且先于入口资源。
 
 ## 6. 分批路线
 
 | 批次 | 交付 | 验证 |
 |---|---|---|
-| **首批（本 PR）** | dark token 覆盖块 + `color-scheme` + FOUC 内联脚本 + B1 纸面字面量 token 化 + 结构测试守卫 | frontend 全量测试 + build；亮色零变化；暗色人工验收 |
+| **首批（本 PR）** | dark token 覆盖块 + `color-scheme` + 首帧 bootstrap（nuxt.config 静态 head，产物嵌入校验）+ system 运行时跟随（plugin/composable）+ B1 纸面字面量 token 化 + 局部暗色修复（`--sel` 提升全局、skill 错误卡语义 token）+ 行为级测试（主题核心/AA 对比度） | frontend 全量测试 + build；亮色零变化；暗色人工验收 |
 | 第二批 | B2 局部语义色 token 化 + 页面级暗色细节走查修正（对比度/遮罩/玻璃） | 同上 |
 | 第三批 | 设置页「外观」切换控件（浅色/深色/跟随系统三态）+ 持久化 | 手工 + 结构守卫 |
 

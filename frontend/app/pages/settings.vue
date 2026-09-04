@@ -2024,7 +2024,7 @@ onMounted(() => {
 .skill-card-foot { display: flex; align-items: center; gap: 8px; }
 .skill-load-error {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-  border: 1px solid #f0c0bb; background: #fdf1f0; border-radius: 10px;
+  border: 1px solid var(--error-outline); background: var(--error-bg); border-radius: 10px;
 }
 .skill-load-error-icon { color: var(--error); }
 .skill-loading {
