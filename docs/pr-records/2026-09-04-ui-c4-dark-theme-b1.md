@@ -46,7 +46,7 @@ C4 原定义（plan §5-C4）：新增 dark token 集 + `data-theme` 切换（�
 
 ## 5. 验证
 
-- frontend `npm test`：**132/132 通过**（新增 4 组：dark 结构 / light 锚点 / FOUC / B1 清理）
+- frontend `npm test`：**142/142 通过**（首轮 token 提交曾为 132/132；三轮评审逐轮增补主题控制器运行时、真构建产物集成测试、CI 强制与子进程清理等用例后收口为最终基线）
 - `npm run test:build`：1/1（全新 build + 真实 HTML bootstrap 顺序断言），双向负面验证：移除 bootstrap 后红、server 入口失效后红
 - IDE 诊断：0
 - 人工验收方式：系统偏好深色（或 DevTools → Rendering → prefers-color-scheme: dark）即全站暗色；`localStorage['ui-theme']='light'` 强制亮色
