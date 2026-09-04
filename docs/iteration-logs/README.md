@@ -57,6 +57,7 @@
 |---|---|---|---|
 | HB-20260904-01 | UI P2-B2 试点——episode 拼接导出面板下沉 `EpisodeExportPanel` + `useExportMergesList` 并发令牌 | 完成（PR #45，merge `b11be06`）；共 7 文件 5 提交，经 4 次正式 review（3 Request changes + 1 Approved）；episode.vue 非空行 7069→6802（物理 7422→7150），EpisodeExportPanel 354 非空行/365 物理行；测试 116/116 通过 | [查看归档](../pr-records/2026-09-03-ui-b2-episode-export-panel.md) |
 | HB-20260904-02 | UI P2-B2 script 面板下沉——episode 剧本面板拆 `EpisodeScriptPanel` + 状态矩阵纯函数化 | 完成（PR #47，merge `58c1e96`）；共 3 提交，经 2 次正式 review（1 Request changes + 1 Approved）；episode.vue 非空行 6802→6763（物理 7150→7108，净 −39/−42）；测试 124/124、build/generate 通过 | [查看归档](../pr-records/2026-09-04-ui-b2-episode-script-panel.md) |
+| HB-20260904-03 | UI C3/P4 首轮落地——素材库/任务列表分页化（后端 `GET /assets` 与 `GET /tasks` SQL 下推分页 + episode 参考素材选择器接入 `usePagedList`） | 完成（PR #48，merge `0ca0e0e0`）；共 3 轮评审（结构断言宽松化 / 契约兼容 / 视频历史截断修复），最终分镜历史回归无参全量契约；frontend 130/130、backend 结构子集 42/42、build 通过 | [查看归档](../pr-records/2026-09-04-ui-c3-pagination-assets-tasks.md) |
 
 ## 记录规范
 
