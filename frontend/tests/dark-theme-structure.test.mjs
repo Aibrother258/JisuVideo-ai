@@ -98,28 +98,37 @@ test('C4-B2 batch: localized semantic colors globalized (danger hover + shadow l
   assert.match(ep, /var\(--shadow-viewer\)/)
   // 反色实心块（filter-chip 激活 / 步骤指示 / logo 方块）改 --solid-ink：
   // --text-0 在 dark 反白，若仍作底会出现白字白底。
-  // P2 评审：按具体选择器逐条断言（文件级“至少出现一次”会漏掉其中某块回退）
+  // P2 评审：按具体选择器逐条断言（文件级“至少出现一次”会漏掉其中某块回退），
+  // 且规则体内任何背景声明（background / background-color）只能取 var(--solid-ink)，
+  // 防止 background-color: #fff 之类覆盖 shorthand 的颜色层。
   const block = (src, selector) => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const m = src.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))
-    assert.ok(m, `missing rule: ${selector}`)
-    return m[1]
+    const re = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'g')
+    // 规则级定位：selector 必须作为独立规则起始（跳过前缀空白后前一字符
+    // 不能是选择器可续字符），避免 substring 命中相似选择器（如 .x.filter-chip.on）
+    const continuesSelector = (ch) => /[\w.#[\]>&:+~*()"',-]/.test(ch)
+    let m
+    while ((m = re.exec(src)) !== null) {
+      let j = m.index - 1
+      while (j >= 0 && /\s/.test(src[j])) j--
+      if (j < 0 || !continuesSelector(src[j])) return m[1]
+    }
+    assert.fail(`missing standalone rule: ${selector}`)
   }
-  const forbidFallback = (body, label) => {
-    // 回退到字面量色或浅色表面 token（dark 反白/浅底）都会让实心反色块失效
-    assert.doesNotMatch(body, /background:\s*(?:#[0-9a-fA-F]{3,8}|rgba?\(|var\(--(?:text-0|surface-[\w-]+|bg-[\w-]+|fill-[\w-]+)\))/,
-      `${label} must not fall back to a literal color or a light-surface token`)
+  const solidBgOnly = (body, label) => {
+    assert.match(body, /background:\s*var\(--solid-ink\)/, `${label} must paint with --solid-ink`)
+    const decl = /background(?:-color)?\s*:\s*([^;]*)/g
+    let m
+    while ((m = decl.exec(body)) !== null) {
+      // 字面量色 / --text-0 / 浅表面 token 覆盖都会让暗色再次出现白字白底
+      assert.equal(m[1].trim(), 'var(--solid-ink)',
+        `${label}: every background declaration must be exactly var(--solid-ink)`)
+    }
   }
   const idx = read('app/pages/index.vue')
-  for (const sel of ['.filter-chip.on', '.step-indicator span.on']) {
-    const body = block(idx, sel)
-    assert.match(body, /background:\s*var\(--solid-ink\)/, `${sel} must paint with --solid-ink`)
-    forbidFallback(body, sel)
-  }
+  for (const sel of ['.filter-chip.on', '.step-indicator span.on']) solidBgOnly(block(idx, sel), sel)
   const def = read('app/layouts/default.vue')
-  const brandBody = block(def, '.brand-mark')
-  assert.match(brandBody, /background:\s*var\(--solid-ink\)/, '.brand-mark must paint with --solid-ink')
-  forbidFallback(brandBody, '.brand-mark')
+  solidBgOnly(block(def, '.brand-mark'), '.brand-mark')
 })
 
 test('C4-B2 batch: every light color token has a dark override unless intentionally unchanged (media/white-on-color)', () => {
