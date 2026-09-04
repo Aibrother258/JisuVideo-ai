@@ -1,8 +1,8 @@
 # JisuVideo-ai 暗色主题专项方案（UI C4）
 
-> 版本：v1.2
+> 版本：v1.3
 > 日期：2026-09-04
-> 状态：首批与第二批均已合入 master（PR #53 `7c99e15` / PR #54 `f959214`，2026-09-04）；第三批（设置页「外观」三态切换控件）待排期
+> 状态：**C4 三批全部合入 master**——首批 PR #53 `7c99e15` / 第二批 PR #54 `f959214` / 第三批 PR #56 `c58323e`（2026-09-04）；暗色主题专项完结
 > 关联：`docs/ui-optimization-plan.md` C4 条目（plan v3.0 立项）；A1/A2/A3 token 与色板规范收口后依赖已解除
 > 适用范围：`frontend/app`（Nuxt 3 SPA，纯 CSS Variables，无 UI 框架）
 
@@ -124,7 +124,7 @@
 |---|---|---|
 | **首批（已合入 PR #53 `7c99e15`）** | dark token 覆盖块 + `color-scheme` + 首帧 bootstrap（nuxt.config 静态 head）+ system 运行时跟随（plugin/composable）+ B1 纸面字面量 token 化 + 局部暗色修复（`--sel` 提升全局、skill 错误卡语义 token）+ 行为级测试（主题核心/AA 对比度）+ 构建产物集成测试（test:build，动态端口 + 进程生命周期守卫）+ CI workflow | `npm test` 全量 + `npm run test:build`（真构建产物 HTML 顺序断言，CI/`npm run verify` 强制执行）；亮色零变化；暗色人工验收 |
 | **第二批（已合入 PR #54 `f959214`）** | B2 局部语义色收口：danger hover `--action-danger-hover`（双主题 AA）、shadow 残留三档 `--shadow-hover/menu/viewer`（+dark 加深）+ 页面级暗色细节走查（代码级：全仓裸色清零校验 + dark 覆盖完整性自动守卫 + 关键 token AA 锚定；视觉清单见 PR 描述） | 同上；新增守卫：light 颜色 token 一律需 dark 档或显式豁免、danger hover 双主题白字 ≥4.5 |
-| 第三批（待） | 设置页「外观」切换控件（浅色/深色/跟随系统三态）+ 持久化 | 手工 + 结构守卫 |
+| **第三批（已合入 PR #56 `c58323e`）** | 设置页「外观」切换面板（跟随系统/浅色/深色三态 +「当前实际外观」实时回显）接 `useTheme.setTheme`（controller `setMode` → `localStorage['ui-theme']` 持久化 + `data-theme` 即时生效 + system 实时跟随）；切换 UI 抽独立组件 `ThemeAppearanceCard.vue`（接线内聚、Nuxt 自动注册）；评审 P2 跟进——选项说明文字改 `--text-2`（dark AA 4.60:1）+ AA 守卫锚定、挂载级交互测试（vitest + happy-dom + @vue/test-utils，真实 `useTheme` + 真实 `createThemeController`，覆盖三态选择/存储写入失败容错/system 实时回显） | `npm run test:ui` 4/4（CI/`npm run verify` 强制）+ `npm test` 148/148 + `npm run test:build`；手工三态验收 |
 
 ## 7. 风险与回滚
 
