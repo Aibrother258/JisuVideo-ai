@@ -94,8 +94,13 @@ after(async () => {
   // Ensure the child has fully exited so no orphan process / port lingers.
   if (server.exitCode === null && server.signalCode === null) {
     const exited = new Promise((resolve) => {
-      server.once('exit', resolve)
-      setTimeout(resolve, 5000)
+      const timer = setTimeout(() => {
+        resolve() // last-resort guard: never hang the suite on a stuck child
+      }, 5000)
+      server.once('exit', () => {
+        clearTimeout(timer) // normal path: do not keep the process alive for the fallback window
+        resolve()
+      })
     })
     server.kill()
     await exited
