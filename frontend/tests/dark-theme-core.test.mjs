@@ -164,3 +164,13 @@ test('C4 P2-4: sel-indigo tokens pass AA text contrast in both themes', () => {
   assert.ok(contrast(tokenValue(css, 'sel-text'), '#ffffff') >= 4.5,
     `light sel-text on white AA (${contrast(tokenValue(css, 'sel-text'), '#ffffff').toFixed(2)}:1)`)
 })
+
+test('C4-B2: solid danger button hover keeps AA white label in both themes', () => {
+  const css = read('app/assets/studio.css')
+  const dark = css.match(/:root\[data-theme='dark'\] \{\r?\n([\s\S]*?)\r?\n\}/m)[1]
+  // ConfirmDialog 实心危险钮 hover：白字（--text-invert #fff）压在 hover 底上，双主题均须 ≥4.5
+  assert.ok(contrast('#ffffff', tokenValue(css, 'action-danger-hover')) >= 4.5,
+    `light danger hover AA (${contrast('#ffffff', tokenValue(css, 'action-danger-hover')).toFixed(2)}:1)`)
+  assert.ok(contrast('#ffffff', tokenValue(dark, 'action-danger-hover')) >= 4.5,
+    `dark danger hover AA (${contrast('#ffffff', tokenValue(dark, 'action-danger-hover')).toFixed(2)}:1)`)
+})

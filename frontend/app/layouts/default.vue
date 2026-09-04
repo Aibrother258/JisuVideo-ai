@@ -101,7 +101,7 @@ watch(() => route.path, checkAiConfigs)
 .brand-mark {
   width: 32px; height: 32px;
   display: flex; align-items: center; justify-content: center;
-  background: var(--text-0); border-radius: 9px;
+  background: var(--solid-ink); border-radius: 9px;
   overflow: hidden;
 }
 .brand-logo {

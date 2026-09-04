@@ -1168,7 +1168,7 @@ onMounted(load)
   outline: none;
   box-shadow: 0 0 0 3.5px var(--button-focus);
 }
-.filter-chip.on { background: var(--text-0); color: var(--text-invert); }
+.filter-chip.on { background: var(--solid-ink); color: var(--text-invert); }
 .sort-select {
   margin-left: auto;
   width: auto;
@@ -1419,7 +1419,7 @@ onMounted(load)
   font-size: 11px;
   font-weight: 700;
 }
-.step-indicator span.on { background: var(--text-0); color: var(--text-invert); }
+.step-indicator span.on { background: var(--solid-ink); color: var(--text-invert); }
 .step-indicator i { width: 24px; height: 1px; background: var(--border-strong); }
 .dialog-form {
   display: flex;
