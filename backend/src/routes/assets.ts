@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { and, count, desc, eq, isNotNull, isNull, ne, not, or, type SQL } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
+import { parseRecordId } from '../utils/query-id.js'
 import { success } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 
@@ -10,8 +11,10 @@ const app = new Hono()
 // 素材库只返回未删除记录；同一短剧下允许跨集复用，未归属短剧的记录视为公共素材。
 // 过滤/排序/分页全部 SQL 下推，避免全表读取后内存过滤。
 app.get('/', async (c) => {
-  const dramaId = Number(c.req.query('drama_id') || 0)
-  const episodeId = Number(c.req.query('episode_id') || 0)
+  // 数字过滤参数统一经 parseRecordId 收敛：非数字/非正数视为未传（不进入 SQL），
+  // 避免 Number('abc') 得 NaN 后经 eq() 传入 SQL 绑定参数
+  const dramaId = parseRecordId(c.req.query('drama_id'))
+  const episodeId = parseRecordId(c.req.query('episode_id'))
   const type = String(c.req.query('type') || '').trim().toLowerCase()
   // 兼容旧契约：只有显式传入 page / page_size 任一参数才启用分页并返回 { items, pagination }；
   // 未传分页参数时维持旧行为——返回过滤后的全量数组，避免旧脚本/第三方调用静默截断

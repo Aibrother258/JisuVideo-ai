@@ -4,6 +4,7 @@ import { db, schema } from '../db/index.js'
 import { success, created, badRequest } from '../utils/response.js'
 import { generateImage, generateVideo, type VideoReferenceSnapshot } from '../services/generation.js'
 import { verifyH3PromptFreshness } from '../services/h3-source.js'
+import { parseRecordId } from '../utils/query-id.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -199,8 +200,10 @@ app.get('/:id', async (c) => {
 // 过滤/排序/分页全部 SQL 下推；返回 { items, pagination }，items 字段沿用 camelCase（与 GET /tasks/:id 一致）
 app.get('/', async (c) => {
   const type = c.req.query('type')
-  const storyboardId = c.req.query('storyboard_id')
-  const dramaId = c.req.query('drama_id')
+  // 数字过滤参数统一经 parseRecordId 收敛：非数字/非正数视为未传（不进入 SQL），
+  // 避免 Number('abc') 得 NaN 后经 eq() 传入 SQL 绑定参数（与 GET /assets 一致）
+  const storyboardId = parseRecordId(c.req.query('storyboard_id'))
+  const dramaId = parseRecordId(c.req.query('drama_id'))
   // 兼容旧契约：只有显式传入 page / page_size 任一参数才启用分页并返回 { items, pagination }；
   // 未传分页参数时维持旧行为——返回过滤后的全量数组，避免旧脚本/第三方调用静默截断
   const paginated = c.req.query('page') != null || c.req.query('page_size') != null
@@ -210,8 +213,8 @@ app.get('/', async (c) => {
 
   const conds = []
   if (type) conds.push(eq(schema.sysTask.type, type))
-  if (storyboardId) conds.push(eq(schema.sysTask.storyboardId, Number(storyboardId)))
-  if (dramaId) conds.push(eq(schema.sysTask.dramaId, Number(dramaId)))
+  if (storyboardId) conds.push(eq(schema.sysTask.storyboardId, storyboardId))
+  if (dramaId) conds.push(eq(schema.sysTask.dramaId, dramaId))
   // 条件为空时 .where(undefined) 合法（条件被忽略），count 与 rows 共用同一 where，与 assets.ts 风格统一
   const where = conds.length ? and(...conds) : undefined
 

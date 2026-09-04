@@ -135,11 +135,13 @@ test('image/video generation tasks are unified into a single sys_task table', ()
   // 的 DROP 清理。这里只断言「不再建旧表」，不反向要求 DROP —— 恢复 DROP 属于
   // 破坏性操作，需要单独评估，不应由结构测试驱动。
 
-  // 路由与服务只操作 sys_task（统一 /tasks 入口，type 过滤）
+  // 路由与服务只操作 sys_task（统一 /tasks 入口，type 过滤）。
+  // 注：`r.type === type` 为早期「内存过滤」形态的过期断言，已随 SQL 下推重构失效；
+  // 现统一为 GET /tasks 的 type 过滤条件下推（eq(schema.sysTask.type, type)）。
   const tasksRoute = read('src/routes/tasks.ts')
   const service = read('src/services/generation.ts')
   assert.match(tasksRoute, /schema\.sysTask/)
-  assert.match(tasksRoute, /r\.type === type/)
+  assert.match(tasksRoute, /eq\(schema\.sysTask\.type, type\)/)
   assert.match(service, /db\.insert\(schema\.sysTask\)/)
 
   assert.match(envExample, /PUBLIC_BASE_URL/)

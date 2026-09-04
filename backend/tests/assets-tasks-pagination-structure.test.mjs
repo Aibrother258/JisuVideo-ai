@@ -10,6 +10,9 @@ test('GET /assets: SQL-pushed pagination with drama/episode reuse semantics pres
   // 分页参数解析：parseInt + `|| 默认值` 兜底 NaN（page_size clamp 1-100，对齐 GET /dramas）
   assert.match(src, /const page = Math\.max\(1, Number\.parseInt\(c\.req\.query\('page'\) \|\| '1', 10\) \|\| 1\)/)
   assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\.parseInt\(c\.req\.query\('page_size'\) \|\| '20', 10\) \|\| 20\)\)/)
+  // 数字过滤参数经 parseRecordId 收敛（NaN/非正数视为未传，不进入 SQL）
+  assert.match(src, /const dramaId = parseRecordId\(c\.req\.query\('drama_id'\)\)/)
+  assert.match(src, /const episodeId = parseRecordId\(c\.req\.query\('episode_id'\)\)/)
   // 过滤条件 SQL 下推：未删除 + 短剧归属（公共素材保留）+ 跨集排除 + type
   // （conds 带 `: SQL[]` 类型注解为类型收窄所需，用可选组匹配避免类型标注改动使测试误挂）
   assert.match(src, /const conds(?:: SQL\[\])? = \[isNull\(schema\.assets\.deletedAt\)\]/)
@@ -32,10 +35,13 @@ test('GET /tasks: existing SQL filters gain page/page_size and { items, paginati
   // 分页参数解析：parseInt + `|| 默认值` 兜底 NaN（clamp 与 GET /assets / GET /dramas 一致）
   assert.match(src, /const page = Math\.max\(1, Number\.parseInt\(c\.req\.query\('page'\) \|\| '1', 10\) \|\| 1\)/)
   assert.match(src, /const pageSize = Math\.min\(100, Math\.max\(1, Number\.parseInt\(c\.req\.query\('page_size'\) \|\| '20', 10\) \|\| 20\)\)/)
+  // 数字过滤参数经 parseRecordId 收敛（NaN/非正数视为未传，不进入 SQL）
+  assert.match(src, /const storyboardId = parseRecordId\(c\.req\.query\('storyboard_id'\)\)/)
+  assert.match(src, /const dramaId = parseRecordId\(c\.req\.query\('drama_id'\)\)/)
   // 既有 type/storyboard_id/drama_id 条件下推保持
   assert.match(src, /if \(type\) conds\.push\(eq\(schema\.sysTask\.type, type\)\)/)
-  assert.match(src, /if \(storyboardId\) conds\.push\(eq\(schema\.sysTask\.storyboardId, Number\(storyboardId\)\)\)/)
-  assert.match(src, /if \(dramaId\) conds\.push\(eq\(schema\.sysTask\.dramaId, Number\(dramaId\)\)\)/)
+  assert.match(src, /if \(storyboardId\) conds\.push\(eq\(schema\.sysTask\.storyboardId, storyboardId\)\)/)
+  assert.match(src, /if \(dramaId\) conds\.push\(eq\(schema\.sysTask\.dramaId, dramaId\)\)/)
   // count + limit/offset 下推：count 与 rows 共用同一 where（条件为空时 .where(undefined) 合法）
   assert.match(src, /const where = conds\.length \? and\(\.\.\.conds\) : undefined/)
   assert.match(src, /db\.select\(\{ value: count\(\) \}\)\.from\(schema\.sysTask\)\.where\(where\)/)
