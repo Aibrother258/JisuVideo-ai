@@ -3690,9 +3690,13 @@ async function loadSbVideoHistory() {
   previewVideoUrl.value = ''
   if (!selectedSb.value?.id) { sbVideoHistory.value = []; sbVideoHistoryError.value = ''; return }
   try {
-    // GET /tasks 现返回 { items, pagination }；单分镜视频历史量级小，一次取足（page_size=100 为接口上限）保持全量语义
-    const res = await taskAPI.list({ type: 'video', storyboard_id: selectedSb.value.id, page: 1, page_size: 100 })
-    sbVideoHistory.value = (res?.items || [])
+    // 分镜历史面板依赖全量语义：横向滚动卡带 + 条数计数 + 任意一条可预览/设为主视频/删除，
+    // 无「加载更多」入口，不属于长列表场景。因此不传 page/page_size，走后端旧契约取全量数组，
+    // 不再受 page_size=100 上限静默截断（>100 条的第 101 条及更早记录依然可访问）。
+    // 后端仅在显式传分页参数时返回 { items, pagination }，这里用 Array.isArray 归一两种形态
+    const res = await taskAPI.list({ type: 'video', storyboard_id: selectedSb.value.id })
+    const rows = Array.isArray(res) ? res : (res?.items || [])
+    sbVideoHistory.value = rows
       .filter(t => t.status === 'completed' && taskVideoPath(t))
       .sort((a, b) => taskCreatedAt(b).localeCompare(taskCreatedAt(a)))
     sbVideoHistoryError.value = ''

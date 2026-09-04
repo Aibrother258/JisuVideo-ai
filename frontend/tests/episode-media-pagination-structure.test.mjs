@@ -13,10 +13,10 @@ test('C3/P4 batch: assetLibraryAPI.list and taskAPI.list accept page/page_size a
   assert.match(api, /if \(params\?\.page_size\) query\.set\('page_size', String\(params\.page_size\)\)/)
   assert.match(api, /GET \/assets：items 字段为 snake_case/)
   assert.match(api, /api\.get<\{ items: any\[\]; pagination\?: \{ page: number; page_size: number; total: number; total_pages: number \} \}>\(`\/assets/)
-  // 任务列表：分页参数透传 + PagedResponse 返回结构（camelCase，与 GET /tasks/:id 一致）
+  // 任务列表：分页参数透传 + 双形态返回——未传分页参数=全量数组（旧契约），传了= { items: camelCase, pagination }
   assert.match(api, /list: \(params\?: \{ type\?: 'image' \| 'video'; drama_id\?: number; storyboard_id\?: number; page\?: number; page_size\?: number \}\) => \{/)
-  assert.match(api, /GET \/tasks：items 字段为 camelCase/)
-  assert.match(api, /api\.get<\{ items: any\[\]; pagination\?: \{ page: number; page_size: number; total: number; total_pages: number \} \}>\(`\/tasks/)
+  assert.match(api, /GET \/tasks：未传 page\/page_size 时后端返回过滤后的全量数组/)
+  assert.match(api, /api\.get<\{ items: any\[\]; pagination\?: \{ page: number; page_size: number; total: number; total_pages: number \} \} \| any\[\]>\(`\/tasks/)
 })
 
 test('C3/P4 batch: episode ref-asset picker loads the library via usePagedList (reload first page + load more)', () => {
@@ -62,9 +62,12 @@ test('C3/P4 batch: picker reset + reload on open, reload after upload, and a loa
   assert.match(ep, /\.ref-asset-picker-more \{ grid-column: 1 \/ -1;/)
 })
 
-test('C3/P4 batch: storyboard video history consumes { items } from paged task list', () => {
+test('C3/P4 batch: storyboard video history keeps full history via legacy no-arg contract (no page_size cap)', () => {
   const ep = read('app/views/drama/episode.vue')
-  // GET /tasks 返回 { items, pagination }；单分镜历史量级小，一次取足 page_size=100 保持全量语义
-  assert.match(ep, /taskAPI\.list\(\{ type: 'video', storyboard_id: selectedSb\.value\.id, page: 1, page_size: 100 \}\)/)
-  assert.match(ep, /sbVideoHistory\.value = \(res\?\.items \|\| \[\]\)/)
+  // 分镜历史面板依赖全量语义（横向滚动 + 计数 + 任意条可预览/设主视频/删除，无加载更多入口），
+  // 故不传 page/page_size → 后端旧契约返回全量数组：>100 条时第 101 条及更早记录不再被静默截断
+  assert.match(ep, /taskAPI\.list\(\{ type: 'video', storyboard_id: selectedSb\.value\.id \}\)/)
+  // 双形态归一：显式分页时后端返回 { items, pagination }，旧契约返回数组
+  assert.match(ep, /const rows = Array\.isArray\(res\) \? res : \(res\?\.items \|\| \[\]\)/)
+  assert.match(ep, /sbVideoHistory\.value = rows/)
 })

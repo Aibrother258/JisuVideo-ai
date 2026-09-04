@@ -129,9 +129,10 @@ export const taskAPI = {
     if (params?.storyboard_id) query.set('storyboard_id', String(params.storyboard_id))
     if (params?.page) query.set('page', String(params.page))
     if (params?.page_size) query.set('page_size', String(params.page_size))
-    // GET /tasks：items 字段为 camelCase（与 GET /tasks/:id 一致）。
-    // 未传 page/page_size 时后端返回过滤后的全量数组（旧契约兼容），传了才返回 { items, pagination }
-    return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } }>(`/tasks${query.size ? `?${query.toString()}` : ''}`)
+    // GET /tasks：未传 page/page_size 时后端返回过滤后的全量数组（旧契约，
+    // 单分镜视频历史等依赖全量语义的消费点使用）；传了才返回 { items: camelCase rows, pagination }（与 GET /tasks/:id 字段 case 一致）。
+    // 返回类型为双形态，消费方用 Array.isArray 归一后读取
+    return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } } | any[]>(`/tasks${query.size ? `?${query.toString()}` : ''}`)
   },
   // 按集聚合生成任务（sys_task + video_merges）
   listByEpisode: (episodeId: number) => api.get<{ tasks: any[]; merges: any[] }>(`/episodes/${episodeId}/generation-tasks`),
