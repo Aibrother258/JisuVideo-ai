@@ -26,6 +26,12 @@ jobs:
       - name: Fast unit/structure suite
         run: npm test
 
+      # C4 batch3 (P2 review): mounted interaction suite for the settings appearance
+      # card — proves the three-state theme switcher is really wired (radio click ->
+      # data-theme / storage / copy), not just present in source.
+      - name: Mounted UI interaction suite
+        run: npm run test:ui
+
       # C4 P1-1 guard: fresh production build + served-SPA ordering assertion.
       # This is the only test that proves the theme bootstrap still runs before
       # the stylesheet and the module entry in the real artifact; it must run

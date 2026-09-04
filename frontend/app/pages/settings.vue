@@ -68,6 +68,7 @@
               <button class="btn btn-ghost btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="11" /> 重试</button>
             </div>
             <p v-else-if="tab === 'styles' && !stylePresets.length" class="config-empty">暂无风格预设</p>
+            <p v-else-if="tab === 'appearance'" class="config-empty">浅色 / 深色 / 跟随系统</p>
             <button
               v-else
               v-for="it in subItems"
@@ -125,8 +126,18 @@
 
       <div class="settings-content">
 
+        <!-- ===== 外观：界面主题（UI C4 第三批）===== -->
+        <div v-if="tab === 'appearance'" ref="paneRef" class="settings-scroll">
+          <div class="settings-head">
+            <h2 class="settings-title">外观</h2>
+            <p class="settings-desc">界面主题即时生效并保存在本机，下次打开保持；「跟随系统」会在系统切换深浅色时实时同步。</p>
+          </div>
+          <!-- 三态切换 UI 与接线内聚在独立组件（C4 第三批，可挂载级测试） -->
+          <ThemeAppearanceCard />
+        </div>
+
         <!-- ===== AI 服务配置 ===== -->
-        <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
+        <div v-else-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">AI 服务</h2>
             <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；已接入工作流的能力启用后即被工作台自动采用，仅配置/测试阶段的接入中能力暂不生效，弹窗内有推荐模板可选。</p>
@@ -672,7 +683,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert, SunMoon } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import Field from '~/components/Field.vue'
 import AppDialog from '~/components/AppDialog.vue'
@@ -687,6 +698,7 @@ const navGroups = [
     id: 'basic',
     label: '基础',
     items: [
+      { id: 'appearance', label: '外观', icon: SunMoon },
       { id: 'ai', label: 'AI 服务', icon: Cpu },
       { id: 'styles', label: '风格预设', icon: Palette },
     ],
@@ -734,6 +746,7 @@ function initPaneWidths() {
   } catch { /* 忽略损坏数据 */ }
 }
 const curTabMeta = computed(() => ({
+  appearance: { icon: SunMoon, title: '外观', desc: '界面主题切换' },
   ai: { icon: Cpu, title: 'AI 服务', desc: '能力分组与默认模型' },
   styles: { icon: Palette, title: '风格预设', desc: '视觉风格片段管理' },
   agents: { icon: Bot, title: 'Prompts', desc: '模型与系统提示词' },

@@ -162,3 +162,35 @@ test('C4-B2 batch: every light color token has a dark override unless intentiona
   }
   assert.deepEqual(missing, [], 'color tokens missing a dark override must be added to the overlay or the explicit exempt list')
 })
+
+test('C4 batch3: settings.vue exposes the appearance tab which renders the ThemeAppearanceCard', () => {
+  const s = read('app/pages/settings.vue')
+  // 一级导航入口与面板存在
+  assert.match(s, /\{ id: 'appearance', label: '外观', icon: SunMoon \}/)
+  assert.match(s, /tab === 'appearance'/)
+  assert.match(s, /class="settings-title">外观</)
+  // 三态切换 UI/接线已抽为独立组件（交互级测试见 tests/ui），页面只负责渲染
+  assert.match(s, /<ThemeAppearanceCard \/>/)
+  // curTabMeta 提供外观子目录头部
+  assert.match(s, /appearance: \{ icon: SunMoon, title: '外观', desc: '界面主题切换' \}/)
+})
+
+test('C4 batch3: ThemeAppearanceCard offers the three-state switcher wired to useTheme (no direct storage bypass)', () => {
+  const c = read('app/components/ThemeAppearanceCard.vue')
+  // 三态选项：system / light / dark
+  assert.match(c, /value: 'system'/)
+  assert.match(c, /value: 'light'/)
+  assert.match(c, /value: 'dark'/)
+  assert.match(c, /role="radiogroup"/)
+  // 选择态由全局 mode state 驱动（与 bootstrap/plugin 同一 useState 实例）
+  assert.match(c, /:checked="mode === opt\.value"/)
+  // 接入 useTheme：选择即 setTheme → controller 持久化 + 应用
+  assert.match(c, /import \{ useTheme \} from '~\/composables\/useTheme'/)
+  assert.match(c, /@change="setTheme\(opt\.value\)"/)
+  // 回显：mode/resolved 驱动选中态与「当前实际外观」文案
+  assert.match(c, /当前实际外观：\{\{ resolved === 'dark' \? '深色' : '浅色' \}\}/)
+  // 持久化单点：组件内不得直接写 ui-theme（storage 由 theme-core writeStoredMode 统一处理）
+  assert.doesNotMatch(c, /localStorage\.setItem\(['"]ui-theme/)
+  // 评审 P2：说明文字 11px 普通文本需 AA —— 用 --text-2（dark ≈4.60:1），防回退 --text-3（≈4.01:1 不达标）
+  assert.match(c, /\.theme-opt-desc \{ font-size: 11px; color: var\(--text-2\); \}/)
+})
