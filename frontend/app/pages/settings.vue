@@ -132,32 +132,8 @@
             <h2 class="settings-title">外观</h2>
             <p class="settings-desc">界面主题即时生效并保存在本机，下次打开保持；「跟随系统」会在系统切换深浅色时实时同步。</p>
           </div>
-          <section class="card svc-group theme-card">
-            <div class="svc-group-head">
-              <span class="theme-card-icon"><SunMoon :size="15" /></span>
-              <div class="svc-group-heading">
-                <div class="svc-group-title">界面主题</div>
-                <div class="svc-group-sub">选择应用显示外观</div>
-              </div>
-            </div>
-            <div class="theme-options" role="radiogroup" aria-label="界面主题">
-              <label
-                v-for="opt in themeOptions"
-                :key="opt.value"
-                :class="['theme-opt', { active: mode === opt.value }]"
-              >
-                <input type="radio" name="ui-theme" :value="opt.value" :checked="mode === opt.value" @change="setTheme(opt.value)" />
-                <span class="theme-radio" aria-hidden="true"></span>
-                <component :is="opt.icon" :size="15" class="theme-opt-icon" />
-                <span class="theme-opt-copy">
-                  <span class="theme-opt-name">{{ opt.label }}</span>
-                  <span class="theme-opt-desc">{{ opt.desc }}</span>
-                </span>
-                <span v-if="mode === opt.value" class="theme-opt-check"><Check :size="14" /></span>
-              </label>
-            </div>
-            <div class="theme-pref-note">当前实际外观：{{ resolved === 'dark' ? '深色' : '浅色' }}（{{ modeLabel }}）</div>
-          </section>
+          <!-- 三态切换 UI 与接线内聚在独立组件（C4 第三批，可挂载级测试） -->
+          <ThemeAppearanceCard />
         </div>
 
         <!-- ===== AI 服务配置 ===== -->
@@ -707,24 +683,15 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert, SunMoon, Monitor, Sun, Moon } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert, SunMoon } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import Field from '~/components/Field.vue'
 import AppDialog from '~/components/AppDialog.vue'
 import LoadingButton from '~/components/LoadingButton.vue'
 import { toast } from 'vue-sonner'
-import { useTheme } from '~/composables/useTheme'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
 
 const tab = ref('ai')
-// C4 第三批：界面主题三态（选择即 setTheme → controller 持久化 + 应用；见 theme.client.ts / theme-core.mjs）
-const { mode, resolved, setTheme } = useTheme()
-const themeOptions = [
-  { value: 'system', label: '跟随系统', desc: '随系统深浅色偏好自动切换', icon: Monitor },
-  { value: 'light', label: '浅色', desc: '始终使用浅色外观', icon: Sun },
-  { value: 'dark', label: '深色', desc: '始终使用深色外观', icon: Moon },
-]
-const modeLabel = computed(() => (mode.value === 'dark' ? '深色' : mode.value === 'light' ? '浅色' : '跟随系统'))
 // 两级导航：一级分组 + 二级目录。Agent 配置 / Skills 常驻可见（原「Agent 高级配置」开关已移除）
 const navGroups = [
   {
@@ -2027,46 +1994,6 @@ onMounted(() => {
 .cfg-model-check { color: var(--text-invert); flex-shrink: 0; }
 .model-fetch-actions { display: flex; gap: 8px; margin-top: 6px; }
 .config-empty { font-size: 12px; color: var(--text-3); padding: 14px 20px; }
-
-/* —— 外观：界面主题三态（UI C4 第三批）—— */
-.theme-card-icon {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
-  background: var(--accent-bg); color: var(--accent);
-}
-.theme-options { display: flex; flex-direction: column; padding: 4px 0; }
-.theme-opt {
-  position: relative; display: flex; align-items: center; gap: 10px;
-  padding: 11px 20px; cursor: pointer;
-  border-top: 1px solid var(--border);
-}
-.theme-opt:first-child { border-top: none; }
-.theme-opt:hover, .theme-opt:focus-within { background: var(--bg-hover); }
-.theme-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
-.theme-radio {
-  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
-  border: 1.5px solid var(--border-strong);
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: border-color var(--dur-fast) var(--ease-out);
-}
-.theme-radio::after {
-  content: ''; width: 8px; height: 8px; border-radius: 50%;
-  background: transparent; transition: background var(--dur-fast) var(--ease-out);
-}
-.theme-opt:focus-within .theme-radio { box-shadow: 0 0 0 3px var(--button-focus); }
-.theme-opt.active .theme-radio { border-color: var(--accent); }
-.theme-opt.active .theme-radio::after { background: var(--accent); }
-.theme-opt-icon { color: var(--text-2); flex-shrink: 0; }
-.theme-opt.active .theme-opt-icon { color: var(--accent); }
-.theme-opt-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.theme-opt-name { font-size: 13px; font-weight: 600; color: var(--text-0); }
-.theme-opt-desc { font-size: 11px; color: var(--text-3); }
-.theme-opt-check { margin-left: auto; color: var(--accent); flex-shrink: 0; display: inline-flex; }
-.theme-pref-note {
-  display: flex; align-items: center;
-  padding: 10px 20px; border-top: 1px solid var(--border);
-  font-size: 11.5px; color: var(--text-2);
-}
 .config-switch { display: inline-flex; flex-shrink: 0; cursor: pointer; }
 .config-switch input:focus-visible + .switch { box-shadow: 0 0 0 3.5px var(--button-focus); }
 .btn-icon.btn-sm { width: 30px; min-width: 30px; height: 30px; min-height: 30px; }

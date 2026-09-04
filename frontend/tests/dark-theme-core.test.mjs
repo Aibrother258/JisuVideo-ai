@@ -174,3 +174,21 @@ test('C4-B2: solid danger button hover keeps AA white label in both themes', () 
   assert.ok(contrast('#ffffff', tokenValue(dark, 'action-danger-hover')) >= 4.5,
     `dark danger hover AA (${contrast('#ffffff', tokenValue(dark, 'action-danger-hover')).toFixed(2)}:1)`)
 })
+
+test('C4 batch3 (P2 review): ThemeAppearanceCard small text keeps AA 4.5:1 on the .card surface in both themes', () => {
+  const css = read('app/assets/studio.css')
+  const dark = css.match(/:root\[data-theme='dark'\] \{\r?\n([\s\S]*?)\r?\n\}/m)[1]
+  // .card 背景 = var(--surface-raised)；说明/注释文字 11~11.5px 普通文本须 ≥4.5:1。
+  // 用 --text-2 而非 --text-3：dark 下 #86868b on #1e1e1f ≈4.60:1（--text-3 ≈4.01:1 不达标）。
+  const check = (label, fgBlock) => {
+    const surface = tokenValue(fgBlock, 'surface-raised')
+    const fg = tokenValue(fgBlock, 'text-2')
+    assert.ok(contrast(fg, surface) >= 4.5,
+      `${label} text-2 on surface-raised AA (${contrast(fg, surface).toFixed(2)}:1)`)
+  }
+  check('light', css)
+  check('dark', dark)
+  // 组件实际引用 --text-2（防未来回退 --text-3 而守卫仍绿）
+  const card = read('app/components/ThemeAppearanceCard.vue')
+  assert.match(card, /\.theme-opt-desc \{ font-size: 11px; color: var\(--text-2\); \}/)
+})
