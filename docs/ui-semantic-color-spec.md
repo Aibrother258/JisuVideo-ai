@@ -22,7 +22,7 @@
 | 新风格高亮 | `--new-style-*` | 「新风格待入库」高亮紫（index 来源徽标/确认卡） | `--new-style`、`--new-style-bg/-soft/-border` |
 | 反色/叠层 | `--text-invert`、`--surface-glass`、`--bar-glass`、`--overlay-mask` | 彩底/深底白字、毛玻璃浮层、顶部毛玻璃条、弹窗遮罩 | — |
 | 媒体 | `--media-stage-bg`、`--media-scrim(-soft/-strong)`、`--media-text(-dim)`、`--cover-*` | 视频/封面深色画布、画布上深色遮罩档、画布白字层级 | — |
-| 阴影 | `--shadow-*` | 层级：xs/sm/lift/lg/xl/float/badge | — |
+| 阴影 | `--shadow-*` | 层级：xs/sm/lift/lg/xl/float/badge；C4-B2 增 hover（卡抬升）/menu（弹层）/viewer（大图浮层） | — |
 
 ## 2. 语义归属规则（评审基准）
 
@@ -75,11 +75,11 @@
 | episode `.back-btn:hover` | `rgba(0,0,0,.09)` | 孤例 hover 深档（与 detail 同款） |
 | episode pipeline `.pipe-item.doing .pipe-icon` 边框 | `rgba(0,113,227,.25)` | 单处 accent 描边（0.25 值域高于 glow 0.18），不强收敛 |
 | episode 步骤导航未激活点 | `rgba(0,0,0,.14)`（`.sidebar-jump-dot`、`.bubble-dot` 各 1） | 深色小圆点，单页面双处，暗色主题统一时处理 |
-| episode `.frame-thumb:hover` | `box-shadow 0 2px 8px rgba(0,0,0,.2)` | 孤例 hover 投影档，无匹配 token |
-| episode `.ref-asset-card-check` | `rgba(20,20,24,.72)` | 缩略图内「已选」深 pill 底（0.72 深档+冷色调，scrim-strong 0.60 覆盖观感偏浅） |
-| episode `.image-viewer-img` | `box-shadow 0 18px 48px rgba(0,0,0,.18)` | 大图浏览专用投影，值域无匹配 |
-| ModelSelect 菜单弹层 | `box-shadow 0 12px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.06)` | 组件弹层投影，无匹配档位；组件抽取时统一 |
-| ConfirmDialog 危险钮 hover | `#d70015` | 危险实心钮 hover 深档，P2 组件化并入 action 系 |
+| episode `.frame-thumb:hover` | （C4-B2 已收）`0 2px 8px rgba(0,0,0,.2)` → `--shadow-hover` | hover 抬升档，值不变 |
+| episode `.ref-asset-card-check` | `rgba(20,20,24,.72)` | 缩略图内「已选」深 pill 底：媒体覆盖深底、明暗通用（暗色主题不反相，同 media-scrim 语义）；保持字面量并记录 |
+| episode `.image-viewer-img` | （C4-B2 已收）`0 18px 48px rgba(0,0,0,.18)` → `--shadow-viewer` | 大图浮层投影档，值不变 |
+| ModelSelect 菜单弹层 | （C4-B2 已收）`0 12px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.06)` → `--shadow-menu` | 弹层投影档，值不变 |
+| ConfirmDialog 危险钮 hover | （C4-B2 已收）`#d70015` → `--action-danger-hover` | 危险实心钮 hover 深档并入 action 系（dark `#cc3b32` 白字 4.95:1） |
 
 ### 5.2 批次裁决归档
 

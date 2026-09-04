@@ -179,7 +179,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   background: var(--bg-1);
   border: 1px solid var(--border);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-menu);
   overflow-y: auto;
   animation: modelMenuIn var(--dur-fast) var(--ease-out);
 }

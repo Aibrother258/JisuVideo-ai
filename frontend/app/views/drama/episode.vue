@@ -5843,7 +5843,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   background: var(--bg-2); cursor: pointer;
   transition: all var(--dur-fast) var(--ease-out); border: 1.5px solid var(--border);
 }
-.frame-thumb:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.frame-thumb:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); }
 .frame-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .frame-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .frame-re {
@@ -6835,7 +6835,7 @@ onMounted(async () => { await refresh(true); loadConfigs(); syncExtractStatus() 
   max-width: 100%;
   max-height: calc(100vh - 140px);
   border-radius: 18px;
-  box-shadow: 0 18px 48px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow-viewer);
   background: var(--surface-muted);
 }
 
