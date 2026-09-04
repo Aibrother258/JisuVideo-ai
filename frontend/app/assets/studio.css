@@ -2,6 +2,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  color-scheme: light;
   --surface-base: #f5f5f7;
   --surface-raised: #ffffff;
   --surface-muted: #f5f5f7;
@@ -124,6 +125,19 @@
   --accent-soft: #f0f7ff;
   /* A2 批次二：顶部毛玻璃条（default header / episode studio-topbar 同值 rgba(251,251,253,.72)，值不变） */
   --bar-glass: rgba(251,251,253,0.72);
+  /* C4-B1：纸面与玻璃残留 token 化（值=原字面量不变；detail 稿件区/草稿卡/审阅区 + episode tab hover）
+     0.72 玻璃头归一至 0.7，back-btn hover 0.09 归一至 --fill-hover(0.08)：alpha 差 ≤0.02 视觉不可辨（A2 R3 同款归一） */
+  --surface-paper: #fbfbfd;
+  --surface-paper-warm: #fbfaf7;
+  --glass-hover: rgba(255,255,255,0.7);
+  --dot-idle: rgba(0,0,0,0.14);
+  --accent-border: rgba(0,113,227,0.25);
+  /* C4-P2-4：pipeline 选中态靛紫（原 episode.vue .studio 局部变量提升；light 值不变，dark 见覆盖块 AA 值）
+     语义：当前导航/进行中步骤项，区别于进行中(蓝 --accent) 与已完成(绿 --success) */
+  --sel: #5856d6;
+  --sel-bg: rgba(88,86,214,0.10);
+  --sel-text: #4240b0;
+  --sel-glow: rgba(88,86,214,0.16);
   /* A2 批次二：媒体画布深色遮罩档（episode on-media 深底圆钮/索引/时间/播放大遮罩 13 处收敛，R3 归一见规范 v2 §6） */
   --media-scrim-soft: rgba(0,0,0,0.28);
   --media-scrim: rgba(0,0,0,0.50);
@@ -180,6 +194,148 @@
   /* A3 动效体系：缓动——Apple Light 仅一档出加速；linear/ease-in-out 仅限旋转与骨架循环例外 */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: var(--ease-out);
+}
+
+/* === UI C4 暗色主题：:root[data-theme='dark'] 同名覆盖（值依据 docs/ui-dark-theme-spec.md §3）===
+   仅写「值发生变化」的变量；未列出者（媒体台面/遮罩/白字、text-invert、shadow-inset、非颜色 token）暗色下不变。
+   跟随系统由 app.vue 首帧内联脚本解析 prefers-color-scheme 写入 data-theme，缺省即 system。 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* surface / bg：浅灰反转为深灰阶梯，raised 比 base 亮一档 */
+  --surface-base: #161617;
+  --surface-raised: #1e1e1f;
+  --surface-muted: #161617;
+  --surface-soft: #1c1c1e;
+  --surface-input: #1e1e1f;
+  --surface-outline: rgba(255,255,255,0.12);
+  --surface-outline-strong: rgba(255,255,255,0.2);
+  --bg-0: #1c1c1e;
+  --bg-1: #1e1e1f;
+  --bg-2: #262628;
+  --bg-3: #2c2c2e;
+  --bg-hover: rgba(255,255,255,0.06);
+  --bg-active: rgba(255,255,255,0.09);
+
+  /* border：黑 alpha → 白 alpha（暗底分隔需更明显） */
+  --border: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.2);
+  --border-hover: rgba(255,255,255,0.3);
+  --border-focus: #0a84ff;
+
+  /* text：反相白→灰阶梯 */
+  --text-0: #f5f5f7;
+  --text-1: #a1a1a6;
+  --text-2: #86868b;
+  --text-3: #7c7c81;
+
+  /* accent：Apple dark 亮档 */
+  --accent: #0a84ff;
+  --accent-dark: #0a6fd8;
+  --accent-bg: rgba(10,132,255,0.16);
+  --accent-text: #409cff;
+  --accent-glow: rgba(10,132,255,0.32);
+  --accent-gradient: #0a84ff;
+  --accent-soft: rgba(10,132,255,0.14);
+
+  /* action / button */
+  --action-primary: #0a84ff;
+  --action-primary-hover: #3b9aff;
+  --action-primary-press: #0a6fd8;
+  --action-secondary: #2c2c2e;
+  --action-secondary-hover: #343437;
+  --action-danger: #ff453a;
+  --action-danger-bg: rgba(255,69,58,0.16);
+  --action-danger-hover-bg: rgba(255,69,58,0.26);
+  --button-bg: #2c2c2e;
+  --button-bg-hover: #343437;
+  --button-bg-active: #3a3a3c;
+  --button-focus: rgba(10,132,255,0.4);
+  --button-shadow: 0 1px 2px rgba(0,0,0,0.12);
+  --button-shadow-hover: 0 1px 2px rgba(0,0,0,0.12);
+
+  /* panel / shadows：暗底投影不可见，同族加深 */
+  --shadow-panel: 0 1px 3px rgba(0,0,0,0.12), 0 4px 14px rgba(0,0,0,0.12);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.1);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 4px 14px rgba(0,0,0,0.12);
+  --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 14px rgba(0,0,0,0.12);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.12), 0 4px 14px rgba(0,0,0,0.12);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.16), 0 12px 32px rgba(0,0,0,0.18);
+  --shadow-lift: 0 4px 12px rgba(0,0,0,0.16), 0 12px 32px rgba(0,0,0,0.18);
+  --shadow-xl: 0 12px 28px rgba(0,0,0,0.22), 0 32px 72px rgba(0,0,0,0.26);
+  --shadow-elevated: 0 12px 28px rgba(0,0,0,0.22), 0 32px 72px rgba(0,0,0,0.26);
+  --shadow-float: 0 1px 4px rgba(0,0,0,0.14);
+  --shadow-badge: 0 1px 4px rgba(0,0,0,0.18);
+
+  /* 状态色：Apple dark 亮档；-strong 浅底深字反转为亮字 */
+  --success: #30d158;
+  --success-bg: rgba(48,209,88,0.16);
+  --success-strong: #30d158;
+  --success-border: rgba(48,209,88,0.4);
+  --success-border-strong: rgba(48,209,88,0.45);
+  --error: #ff453a;
+  --error-bg: rgba(255,69,58,0.16);
+  --error-outline: rgba(255,69,58,0.36);
+  --error-border-strong: rgba(255,69,58,0.55);
+  --info: #64d2ff;
+  --info-bg: rgba(100,210,255,0.16);
+  --info-strong: #64d2ff;
+  --warning: #ff9f0a;
+  --warning-bg: rgba(255,159,10,0.18);
+  --warning-strong: #ffb340;
+  --warning-border-strong: rgba(255,159,10,0.45);
+
+  /* 通用填充层级（白 alpha 族） */
+  --fill-subtle: rgba(255,255,255,0.06);
+  --fill-hover: rgba(255,255,255,0.1);
+  --switch-track: #39393d;
+  --scrollbar-thumb: rgba(255,255,255,0.2);
+  --scrollbar-thumb-hover: rgba(255,255,255,0.32);
+  --overlay-mask: rgba(0,0,0,0.55);
+
+  /* 未保存修改警示（琥珀纸面反转为深底琥珀） */
+  --unsaved-border: #b98a2f;
+  --unsaved-text: #ffd97a;
+  --unsaved-bg: rgba(255,190,60,0.14);
+
+  /* 封面占位反深（渐变面） */
+  --cover-fallback: linear-gradient(135deg, #2a2f3a, #1c2230);
+  --cover-fallback-fg: #8fa2c9;
+
+  /* 玻璃：半透明白 → 半透明深 */
+  --surface-glass: rgba(30,30,32,0.85);
+  --bar-glass: rgba(22,22,23,0.72);
+  /* C4-B1：纸面/玻璃/圆点/accent 描边暗色档（原浅色字面量反相） */
+  --surface-paper: #1f1f21;
+  --surface-paper-warm: #201d1a;
+  --glass-hover: rgba(255,255,255,0.05);
+  --dot-idle: rgba(255,255,255,0.3);
+  --accent-border: rgba(10,132,255,0.5);
+  /* C4-P2-4：选中态靛紫暗色档（Apple indigo dark #5e5ce6 亮档）；
+     --sel-text #a5a3ff on dark surface ≈ 7.4:1、白字 on --sel(#5e5ce6) ≈ 5:1，均过 AA */
+  --sel: #5e5ce6;
+  --sel-bg: rgba(94,92,230,0.16);
+  --sel-text: #a5a3ff;
+  --sel-glow: rgba(94,92,230,0.28);
+
+  /* 资产类别语义色（亮档）；amber 提示横幅深底 */
+  --kind-scene: #30d158;
+  --kind-scene-strong: #30d158;
+  --kind-scene-bg: rgba(48,209,88,0.16);
+  --kind-prop: #ffb340;
+  --kind-prop-bg: rgba(255,159,10,0.16);
+  --notice-bg: rgba(255,180,40,0.12);
+  --notice-border: #8a6d1f;
+  --notice-text: #ffd97a;
+  --notice-link: #ffb340;
+  --notice-link-border: #8a6d1f;
+  --notice-link-hover-bg: rgba(255,180,40,0.2);
+
+  /* 新风格高亮紫（亮档） */
+  --new-style: #c77dff;
+  --new-style-bg: rgba(199,125,255,0.16);
+  --new-style-soft: rgba(199,125,255,0.08);
+  --new-style-border: rgba(199,125,255,0.28);
 }
 
 html, body, #__nuxt { height: 100%; }

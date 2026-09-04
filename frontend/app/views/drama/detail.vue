@@ -1780,7 +1780,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
-.back-btn:hover { background: rgba(0,0,0,0.09); color: var(--text-0); }
+.back-btn:hover { background: var(--fill-hover); color: var(--text-0); }
 .back-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3.5px var(--button-focus);
@@ -1874,7 +1874,7 @@ onBeforeUnmount(() => {
   line-height: 1.8;
   font-size: 13px;
   color: var(--text-1);
-  background: #fbfbfd;
+  background: var(--surface-paper);
 }
 .project-setting-fields { display: flex; flex-direction: column; gap: 13px; }
 .project-style-panel { display: flex; flex-direction: column; gap: 10px; margin-top: 17px; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -1918,10 +1918,10 @@ onBeforeUnmount(() => {
 .recommended-count p { margin: 0; color: var(--text-3); font-size: 10.5px; line-height: 1.45; }
 .episode-count-control > label { display: flex; flex-direction: column; gap: 5px; }
 .episode-count-control > label span { color: var(--text-2); font-size: 10px; font-weight: 650; }
-.episode-plan-stale { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--warning) 8%, white); }
+.episode-plan-stale { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--warning) 8%, var(--surface-raised)); }
 .episode-plan-stale strong { flex-shrink: 0; color: var(--warning); font-size: 10.5px; }
 .episode-plan-stale span { color: var(--text-2); font-size: 10.5px; line-height: 1.45; }
-.episode-plan-conflict { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--danger) 7%, white); }
+.episode-plan-conflict { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--danger) 7%, var(--surface-raised)); }
 .episode-plan-conflict div { display: flex; flex-direction: column; gap: 3px; }
 .episode-plan-conflict strong { color: var(--danger); font-size: 11px; }
 .episode-plan-conflict span { color: var(--text-2); font-size: 10.5px; line-height: 1.5; }
@@ -1935,9 +1935,9 @@ onBeforeUnmount(() => {
 .review-progress-track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--bg-3); }
 .review-progress-track i { display: block; height: 100%; border-radius: inherit; background: var(--success); transition: width 0.28s var(--ease-out); }
 .episode-draft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
-.episode-draft-card { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 13px; border: 1px solid var(--border); border-radius: var(--radius); background: #fbfbfd; cursor: pointer; transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.episode-draft-card { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 13px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-paper); cursor: pointer; transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
 .episode-draft-card:hover, .episode-draft-card:focus-visible { border-color: var(--border-strong); box-shadow: var(--shadow-lift); transform: translateY(-1px); outline: none; }
-.episode-draft-card.reviewed { border-color: color-mix(in srgb, var(--success) 40%, var(--border)); background: color-mix(in srgb, var(--success) 4%, white); }
+.episode-draft-card.reviewed { border-color: color-mix(in srgb, var(--success) 40%, var(--border)); background: color-mix(in srgb, var(--success) 4%, var(--surface-raised)); }
 .episode-draft-topline, .episode-draft-footline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .episode-draft-number { color: var(--accent); font-family: var(--font-mono); font-size: 9px; font-weight: 800; letter-spacing: 0.1em; }
 .episode-review-state { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 999px; background: var(--bg-2); color: var(--text-3); font-size: 8.5px; font-weight: 750; }
@@ -1964,7 +1964,7 @@ onBeforeUnmount(() => {
 .episode-detail-tabs { display: grid; grid-template-columns: repeat(var(--episode-tab-count), minmax(0, 1fr)); width: 100%; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-1); }
 .episode-detail-tab { position: relative; min-width: 0; padding: 11px 5px 10px; border: none; border-right: 1px solid var(--border); border-bottom: 2px solid transparent; background: none; color: var(--text-3); font-family: var(--font-mono); font-size: 9.5px; font-weight: 750; cursor: pointer; transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
 .episode-detail-tab:last-child { border-right: none; }
-.episode-detail-tab:hover { color: var(--text-1); background: rgba(255,255,255,0.7); }
+.episode-detail-tab:hover { color: var(--text-1); background: var(--glass-hover); }
 .episode-detail-tab.on { border-bottom-color: var(--accent); background: var(--surface-raised); color: var(--accent); }
 .episode-detail-tab i { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); }
 .episode-detail-tab.reviewed i { background: var(--success); }
@@ -1972,9 +1972,9 @@ onBeforeUnmount(() => {
 .episode-review-fields { display: flex; flex-direction: column; gap: 14px; padding-right: 18px; border-right: 1px solid var(--border); }
 .episode-review-title-input { font-size: 15px; font-weight: 750; }
 .episode-review-note-field { margin-top: 2px; padding-top: 14px; border-top: 1px dashed var(--border); }
-.episode-review-note { min-height: 112px; border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: color-mix(in srgb, var(--accent) 3%, white); }
-.episode-review-manuscript { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: #fbfaf7; }
-.episode-review-manuscript-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 15px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.72); }
+.episode-review-note { min-height: 112px; border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: color-mix(in srgb, var(--accent) 3%, var(--surface-raised)); }
+.episode-review-manuscript { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-paper-warm); }
+.episode-review-manuscript-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 15px; border-bottom: 1px solid var(--border); background: var(--glass-hover); }
 .episode-review-manuscript-head > div { display: flex; flex-direction: column; gap: 3px; }
 .episode-review-manuscript-head small, .episode-review-manuscript-head > span { color: var(--text-3); font-size: 9.5px; }
 .episode-review-content { min-height: 280px; overflow-y: auto; padding: 20px 22px 32px; color: var(--text-1); font-family: "Noto Serif SC", "Songti SC", SimSun, serif; font-size: 14px; line-height: 2; white-space: pre-wrap; }
