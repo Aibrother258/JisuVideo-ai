@@ -53,24 +53,10 @@ Tables are created on startup from `src/db/mysql-schema.ts`.
 - AI service configs stored in DB (`ai_service_configs` table)
 - Agent prompts stored as files (`backend/workspace/prompts/<agent_type>.md`), falling back to code defaults in `src/agents/index.ts` (`DEFAULT_PROMPTS`); agent skills in `backend/workspace/skills/` (`SKILL.md`). Only AI service configs are stored in DB.
 
-## Windows 命令执行规范（防乱码/编码问题）
+## 本机环境规范（不入库）
 
-本机为 Windows PowerShell 环境。执行 `execute_command` 时注意以下**可验证**规则，减少中文乱码与解析问题（不是绝对禁令，PowerShell 本身支持中文）：
-
-1. **文本统一 UTF-8**：涉及中文文本的文件一律按 UTF-8 读写；命令行参数经 PowerShell 传给外部程序（git/gh 等）时可能按系统代码页（GBK）编码。
-   ⚠️ **实测必踩（2026-09-04 验证）**：向 `gh` 传递中文参数不是"可能乱码"，而是**直接导致 PowerShell 解析失败**：
-   - `gh pr create --title "中文标题"` → `ParserError: 字符串缺少终止符: "。`
-   - 多行中文字符串（如 `gh pr comment --body "第一行\n第二行"`）→ 同样 `ParserError`
-   - 失败时终端把中文回显为乱码（如 `琛ュ厖`），命令根本没有执行到 gh
-
-   **硬性规避（照做，不要再尝试直接传中文）**：
-   - `gh` / `git` 命令的**参数值一律用英文**（`--title`、`--body` 内联文本等）
-   - 长文本用 `--body-file <文件>` / `--body-file` 传递 —— 文件内容由 gh 自己读取，绕过 shell 编码，中文完全正常
-   - 确需中文标题时，先用英文创建，再让用户去网页端点 Edit 修改
-2. **涉及编码时显式指定**：PowerShell 读取/写出文件时显式加 `-Encoding UTF8`；核对命令输出时优先把结果重定向到文件，再用读取工具按 UTF-8 查看，避免控制台代码页错乱造成误判。
-3. **避免复杂嵌套引号**：多语句命令的引号在 PowerShell 中容易解析出错（真正原因是未闭合引号或参数含空格被拆开，`---`、全角标点本身不会导致 `ParserError`），优先拆分为多条简单命令，必要时用 `Select-String` 等代替 `head/grep`。
-4. **外部命令（git/docker/gh）的中文输出乱码**只影响控制台显示，不影响执行结果；精确核对时写入文件再读取。
-5. **PowerShell 原生命令可直接使用**（`Invoke-WebRequest`、`Get-NetTCPConnection`、`Get-Process`），提示文本可用中文，无需刻意转英文。
+本机专属的 Windows/PowerShell 编码坑、路径与别名配置等，已拆到 `CLAUDE.local.md`。
+**该文件不入库**（见 `.gitignore` 的 `/CLAUDE.local.md`），由各开发者在本地自行维护、按需调整，不进入仓库历史。
 
 ## GitHub 操作规范（fork 仓库）
 
