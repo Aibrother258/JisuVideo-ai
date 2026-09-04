@@ -98,22 +98,28 @@ test('C4-B2 batch: localized semantic colors globalized (danger hover + shadow l
   assert.match(ep, /var\(--shadow-viewer\)/)
   // 反色实心块（filter-chip 激活 / 步骤指示 / logo 方块）改 --solid-ink：
   // --text-0 在 dark 反白，若仍作底会出现白字白底。
-  // P2 评审：按具体选择器逐条断言（文件级“至少出现一次”会漏掉其中某块回退），
-  // 且规则体内任何背景声明（background / background-color）只能取 var(--solid-ink)，
-  // 防止 background-color: #fff 之类覆盖 shorthand 的颜色层。
-  const block = (src, selector) => {
-    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'g')
+  // P2 评审：按具体选择器逐条断言（文件级“至少出现一次”会漏掉其中某块回退）；
+  // 规则体内任何背景声明（background / background-color）只能取 var(--solid-ink)，
+  // 防 background-color: #fff 之类覆盖 shorthand 的颜色层；
+  // 收集并校验同名独立规则的每一次出现，防 cascade 中后置规则覆盖首条；
+  // 选择器内空白按 \s+ 匹配（class 名仍精确），防合法换行/多空格格式化误报。
+  const rules = (src, selector) => {
+    const rx = selector.trim().split(/\s+/)
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('\\s+')
+    const re = new RegExp(`${rx}\\s*\\{([^}]*)\\}`, 'g')
     // 规则级定位：selector 必须作为独立规则起始（跳过前缀空白后前一字符
     // 不能是选择器可续字符），避免 substring 命中相似选择器（如 .x.filter-chip.on）
     const continuesSelector = (ch) => /[\w.#[\]>&:+~*()"',-]/.test(ch)
+    const bodies = []
     let m
     while ((m = re.exec(src)) !== null) {
       let j = m.index - 1
       while (j >= 0 && /\s/.test(src[j])) j--
-      if (j < 0 || !continuesSelector(src[j])) return m[1]
+      if (j < 0 || !continuesSelector(src[j])) bodies.push(m[1])
     }
-    assert.fail(`missing standalone rule: ${selector}`)
+    assert.ok(bodies.length > 0, `missing standalone rule: ${selector}`)
+    return bodies
   }
   const solidBgOnly = (body, label) => {
     assert.match(body, /background:\s*var\(--solid-ink\)/, `${label} must paint with --solid-ink`)
@@ -125,10 +131,11 @@ test('C4-B2 batch: localized semantic colors globalized (danger hover + shadow l
         `${label}: every background declaration must be exactly var(--solid-ink)`)
     }
   }
-  const idx = read('app/pages/index.vue')
-  for (const sel of ['.filter-chip.on', '.step-indicator span.on']) solidBgOnly(block(idx, sel), sel)
-  const def = read('app/layouts/default.vue')
-  solidBgOnly(block(def, '.brand-mark'), '.brand-mark')
+  const check = (src, sels) => {
+    for (const sel of sels) for (const body of rules(src, sel)) solidBgOnly(body, sel)
+  }
+  check(read('app/pages/index.vue'), ['.filter-chip.on', '.step-indicator span.on'])
+  check(read('app/layouts/default.vue'), ['.brand-mark'])
 })
 
 test('C4-B2 batch: every light color token has a dark override unless intentionally unchanged (media/white-on-color)', () => {
