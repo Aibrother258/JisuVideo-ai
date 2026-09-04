@@ -1,14 +1,17 @@
 /**
- * C4 P1-1 build integration test (run via `npm run test:build`).
+ * C4 P1-1 build integration test (run via `npm run test:build`; enforced by CI).
  *
  * Does NOT trust a stale .output or source-text regexes:
  *   1. always generates a fresh production build from current sources;
- *   2. boots the built nitro server (the SPA html is server-rendered under ssr:false);
- *   3. requests the real html and asserts the theme bootstrap script sits in <head>
- *      BEFORE the stylesheet link and the module entry script.
- *
- * If the build/artifacts are unavailable the test fails loudly (build step above
- * makes artifacts; a build error propagates as a failed test) — never silently skips.
+ *   2. boots the built nitro server with NITRO_PORT=0 — the OS assigns a free
+ *      port, so a foreign service squatting on a fixed port can never be
+ *      mistaken for our server;
+ *   3. parses the server's own "Listening on http://127.0.0.1:<port>" line and
+ *      only ever probes THAT url — the probe is tied to the process we spawned;
+ *   4. a spawn error or an early exit BEFORE the server becomes ready rejects
+ *      the wait (the test fails instead of silently probing a stale service);
+ *   5. after the run the child is killed and its exit awaited — no orphan
+ *      processes or port reuse between runs.
  */
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -17,7 +20,9 @@ import { fileURLToPath } from 'node:url'
 
 const frontend = fileURLToPath(new URL('../..', import.meta.url)) // tests/build → frontend/
 const BOOTSTRAP = "setAttribute('data-theme',d?'dark':'light')"
-const PORT = 4417
+const READY_TIMEOUT_MS = 120_000
+const LISTENING_RE = /Listening on (https?:\/\/[^\s]+)/
+const SERVER_ENTRY = '.output/server/index.mjs'
 
 function runBuild() {
   const res = spawnSync('npm', ['run', 'build'], {
@@ -28,40 +33,80 @@ function runBuild() {
   assert.equal(res.status, 0, `npm run build failed (exit ${res.status})`)
 }
 
-async function waitForHttp(url, timeoutMs = 60000) {
-  const start = Date.now()
-  let lastErr
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(url)
-      if (res.ok) return res
-      lastErr = new Error(`HTTP ${res.status}`)
-    } catch (err) {
-      lastErr = err
-    }
-    await new Promise((r) => setTimeout(r, 300))
-  }
-  throw new Error(`nitro server did not become ready: ${lastErr}`)
-}
-
 let server
+let baseUrl
+let stderrTail = ''
+let stdoutBuf = ''
+
+/** Resolves with the server's real base URL, rejects on any startup failure. */
+function waitForListening() {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        reject(new Error(
+          `nitro did not print a listening address within ${READY_TIMEOUT_MS}ms; ` +
+          `stdout tail: ${stdoutBuf.slice(-400)}; stderr tail: ${stderrTail.slice(-400)}`))
+      }
+    }, READY_TIMEOUT_MS)
+
+    const fail = (message) => {
+      if (!settled) {
+        settled = true
+        clearTimeout(timer)
+        reject(new Error(`${message}; stderr tail: ${stderrTail.slice(-400)}`))
+      }
+    }
+
+    server.stdout.on('data', (chunk) => {
+      stdoutBuf += chunk.toString()
+      const m = LISTENING_RE.exec(stdoutBuf)
+      if (m && !settled) {
+        settled = true
+        clearTimeout(timer)
+        resolve(m[1])
+      }
+    })
+    // A spawn failure or an exit before "Listening on ..." means our server is
+    // NOT the thing a probe would hit — the test must abort, never pass.
+    server.on('error', (err) => fail(`nitro failed to spawn: ${err.message}`))
+    server.once('exit', (code, signal) => fail(
+      `nitro exited before becoming ready (code=${code}, signal=${signal})`))
+  })
+}
 
 before(async () => {
   runBuild() // fresh production build from current sources — stale artifacts can never fake the check
-  server = spawn(process.execPath, ['.output/server/index.mjs'], {
+  server = spawn(process.execPath, [SERVER_ENTRY], {
     cwd: frontend,
-    env: { ...process.env, PORT: String(PORT), NITRO_PORT: String(PORT) },
-    stdio: 'ignore',
+    env: { ...process.env, NITRO_PORT: '0', NITRO_HOST: '127.0.0.1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
-  await waitForHttp(`http://127.0.0.1:${PORT}/`)
+  server.stderr.on('data', (chunk) => {
+    stderrTail = (stderrTail + chunk.toString()).slice(-2000)
+  })
+  baseUrl = await waitForListening()
 })
 
-after(() => {
-  if (server && !server.killed) server.kill()
+after(async () => {
+  if (!server) return
+  // Ensure the child has fully exited so no orphan process / port lingers.
+  if (server.exitCode === null && server.signalCode === null) {
+    const exited = new Promise((resolve) => {
+      server.once('exit', resolve)
+      setTimeout(resolve, 5000)
+    })
+    server.kill()
+    await exited
+  }
+  if (server.stdout) server.stdout.destroy()
+  if (server.stderr) server.stderr.destroy()
 })
 
 test('C4 P1-1: served SPA html embeds the theme bootstrap before stylesheet and module entry', async () => {
-  const res = await fetch(`http://127.0.0.1:${PORT}/`)
+  const res = await fetch(`${baseUrl}/`)
+  assert.ok(res.ok, `expected HTTP 200 from ${baseUrl}, got ${res.status}`)
   const html = await res.text()
 
   const boot = html.indexOf(BOOTSTRAP)
