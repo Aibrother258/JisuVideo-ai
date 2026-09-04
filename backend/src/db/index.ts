@@ -58,7 +58,13 @@ export function getInsertId(result: unknown) {
   return Number(insertId)
 }
 
-await initDb()
+// 测试专用双条件保护：仅当 NODE_ENV==='test' 且显式 MYSQL_NO_INIT=1 时跳过顶层建表，
+// 供路由级行为测试（tests/id-param-route.test.mjs）在无 MySQL 环境下导入真实路由模块、
+// 用 db.select stub 真实运行（不允许静默 skip）。生产 / Docker / 普通 npm test 未设置
+// 该组合时行为不变，仍正常执行 initDb。
+if (!(process.env.NODE_ENV === 'test' && process.env.MYSQL_NO_INIT === '1')) {
+  await initDb()
+}
 
 export const db = drizzle(pool, { schema, mode: 'default' })
 export { schema }
