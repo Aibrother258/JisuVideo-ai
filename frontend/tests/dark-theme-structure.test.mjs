@@ -162,3 +162,25 @@ test('C4-B2 batch: every light color token has a dark override unless intentiona
   }
   assert.deepEqual(missing, [], 'color tokens missing a dark override must be added to the overlay or the explicit exempt list')
 })
+
+test('C4 batch3: settings.vue appearance tab offers three-state theme switcher wired to useTheme (no direct storage bypass)', () => {
+  const s = read('app/pages/settings.vue')
+  // 一级导航入口与面板存在
+  assert.match(s, /\{ id: 'appearance', label: '外观', icon: SunMoon \}/)
+  assert.match(s, /tab === 'appearance'/)
+  assert.match(s, /class="settings-title">外观</)
+  // 三态选项：system / light / dark
+  assert.match(s, /value: 'system'/)
+  assert.match(s, /value: 'light'/)
+  assert.match(s, /value: 'dark'/)
+  assert.match(s, /role="radiogroup"/)
+  // 选择态由全局 mode state 驱动（与 bootstrap/plugin 同一 useState 实例）
+  assert.match(s, /:checked="mode === opt\.value"/)
+  // 接入 useTheme：选择即 setTheme → controller 持久化 + 应用
+  assert.match(s, /const \{ mode, resolved, setTheme \} = useTheme\(\)/)
+  assert.match(s, /@change="setTheme\(opt\.value\)"/)
+  // 持久化单点：不得在页面内直接写 ui-theme（storage 由 theme-core writeStoredMode 统一处理）
+  assert.doesNotMatch(s, /localStorage\.setItem\(['"]ui-theme/)
+  // curTabMeta 提供外观子目录头部
+  assert.match(s, /appearance: \{ icon: SunMoon, title: '外观', desc: '界面主题切换' \}/)
+})

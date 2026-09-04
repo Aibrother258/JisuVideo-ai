@@ -68,6 +68,7 @@
               <button class="btn btn-ghost btn-sm" @click="loadStylePresets(true)"><RefreshCw :size="11" /> 重试</button>
             </div>
             <p v-else-if="tab === 'styles' && !stylePresets.length" class="config-empty">暂无风格预设</p>
+            <p v-else-if="tab === 'appearance'" class="config-empty">浅色 / 深色 / 跟随系统</p>
             <button
               v-else
               v-for="it in subItems"
@@ -125,8 +126,42 @@
 
       <div class="settings-content">
 
+        <!-- ===== 外观：界面主题（UI C4 第三批）===== -->
+        <div v-if="tab === 'appearance'" ref="paneRef" class="settings-scroll">
+          <div class="settings-head">
+            <h2 class="settings-title">外观</h2>
+            <p class="settings-desc">界面主题即时生效并保存在本机，下次打开保持；「跟随系统」会在系统切换深浅色时实时同步。</p>
+          </div>
+          <section class="card svc-group theme-card">
+            <div class="svc-group-head">
+              <span class="theme-card-icon"><SunMoon :size="15" /></span>
+              <div class="svc-group-heading">
+                <div class="svc-group-title">界面主题</div>
+                <div class="svc-group-sub">选择应用显示外观</div>
+              </div>
+            </div>
+            <div class="theme-options" role="radiogroup" aria-label="界面主题">
+              <label
+                v-for="opt in themeOptions"
+                :key="opt.value"
+                :class="['theme-opt', { active: mode === opt.value }]"
+              >
+                <input type="radio" name="ui-theme" :value="opt.value" :checked="mode === opt.value" @change="setTheme(opt.value)" />
+                <span class="theme-radio" aria-hidden="true"></span>
+                <component :is="opt.icon" :size="15" class="theme-opt-icon" />
+                <span class="theme-opt-copy">
+                  <span class="theme-opt-name">{{ opt.label }}</span>
+                  <span class="theme-opt-desc">{{ opt.desc }}</span>
+                </span>
+                <span v-if="mode === opt.value" class="theme-opt-check"><Check :size="14" /></span>
+              </label>
+            </div>
+            <div class="theme-pref-note">当前实际外观：{{ resolved === 'dark' ? '深色' : '浅色' }}（{{ modeLabel }}）</div>
+          </section>
+        </div>
+
         <!-- ===== AI 服务配置 ===== -->
-        <div v-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
+        <div v-else-if="tab === 'ai'" ref="paneRef" class="settings-scroll">
           <div class="settings-head">
             <h2 class="settings-title">AI 服务</h2>
             <p class="settings-desc">通过二级目录切换能力类型，右侧直接展示对应配置；已接入工作流的能力启用后即被工作台自动采用，仅配置/测试阶段的接入中能力暂不生效，弹窗内有推荐模板可选。</p>
@@ -672,21 +707,31 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Palette, Star, RefreshCw, Sparkles, CircleAlert, TriangleAlert, SunMoon, Monitor, Sun, Moon } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import Field from '~/components/Field.vue'
 import AppDialog from '~/components/AppDialog.vue'
 import LoadingButton from '~/components/LoadingButton.vue'
 import { toast } from 'vue-sonner'
+import { useTheme } from '~/composables/useTheme'
 import { aiConfigAPI, promptAPI, skillsAPI, stylePresetAPI } from '~/composables/useApi'
 
 const tab = ref('ai')
+// C4 第三批：界面主题三态（选择即 setTheme → controller 持久化 + 应用；见 theme.client.ts / theme-core.mjs）
+const { mode, resolved, setTheme } = useTheme()
+const themeOptions = [
+  { value: 'system', label: '跟随系统', desc: '随系统深浅色偏好自动切换', icon: Monitor },
+  { value: 'light', label: '浅色', desc: '始终使用浅色外观', icon: Sun },
+  { value: 'dark', label: '深色', desc: '始终使用深色外观', icon: Moon },
+]
+const modeLabel = computed(() => (mode.value === 'dark' ? '深色' : mode.value === 'light' ? '浅色' : '跟随系统'))
 // 两级导航：一级分组 + 二级目录。Agent 配置 / Skills 常驻可见（原「Agent 高级配置」开关已移除）
 const navGroups = [
   {
     id: 'basic',
     label: '基础',
     items: [
+      { id: 'appearance', label: '外观', icon: SunMoon },
       { id: 'ai', label: 'AI 服务', icon: Cpu },
       { id: 'styles', label: '风格预设', icon: Palette },
     ],
@@ -734,6 +779,7 @@ function initPaneWidths() {
   } catch { /* 忽略损坏数据 */ }
 }
 const curTabMeta = computed(() => ({
+  appearance: { icon: SunMoon, title: '外观', desc: '界面主题切换' },
   ai: { icon: Cpu, title: 'AI 服务', desc: '能力分组与默认模型' },
   styles: { icon: Palette, title: '风格预设', desc: '视觉风格片段管理' },
   agents: { icon: Bot, title: 'Prompts', desc: '模型与系统提示词' },
@@ -1981,6 +2027,46 @@ onMounted(() => {
 .cfg-model-check { color: var(--text-invert); flex-shrink: 0; }
 .model-fetch-actions { display: flex; gap: 8px; margin-top: 6px; }
 .config-empty { font-size: 12px; color: var(--text-3); padding: 14px 20px; }
+
+/* —— 外观：界面主题三态（UI C4 第三批）—— */
+.theme-card-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent-bg); color: var(--accent);
+}
+.theme-options { display: flex; flex-direction: column; padding: 4px 0; }
+.theme-opt {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 11px 20px; cursor: pointer;
+  border-top: 1px solid var(--border);
+}
+.theme-opt:first-child { border-top: none; }
+.theme-opt:hover, .theme-opt:focus-within { background: var(--bg-hover); }
+.theme-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
+.theme-radio {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.theme-radio::after {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: transparent; transition: background var(--dur-fast) var(--ease-out);
+}
+.theme-opt:focus-within .theme-radio { box-shadow: 0 0 0 3px var(--button-focus); }
+.theme-opt.active .theme-radio { border-color: var(--accent); }
+.theme-opt.active .theme-radio::after { background: var(--accent); }
+.theme-opt-icon { color: var(--text-2); flex-shrink: 0; }
+.theme-opt.active .theme-opt-icon { color: var(--accent); }
+.theme-opt-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.theme-opt-name { font-size: 13px; font-weight: 600; color: var(--text-0); }
+.theme-opt-desc { font-size: 11px; color: var(--text-3); }
+.theme-opt-check { margin-left: auto; color: var(--accent); flex-shrink: 0; display: inline-flex; }
+.theme-pref-note {
+  display: flex; align-items: center;
+  padding: 10px 20px; border-top: 1px solid var(--border);
+  font-size: 11.5px; color: var(--text-2);
+}
 .config-switch { display: inline-flex; flex-shrink: 0; cursor: pointer; }
 .config-switch input:focus-visible + .switch { box-shadow: 0 0 0 3.5px var(--button-focus); }
 .btn-icon.btn-sm { width: 30px; min-width: 30px; height: 30px; min-height: 30px; }
