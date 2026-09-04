@@ -1,13 +1,14 @@
 # 原文整理与智能分集 v0.4 需求与契约
 
-> 版本：v0.4-rev6（契约稿，待 Bugbot 复审 → owner 最终裁决）
-> 日期：2026-09-04（初稿）/ 2026-09-05（rev1，响应 PR #63 Hermes 技术评审）/ 2026-09-05（rev2，响应 Hermes 复审 P0-5/P0-6）/ 2026-09-05（rev3，响应 Codex 接管复审 P0-①~P0-⑤ / P1-①~P1-②）/ 2026-09-05（rev4，响应 Codex rev3 复审 P0 版本谱系 + P1×2 + P2）/ 2026-09-05（rev5，响应 Bugbot rev4 复审 4×P1 + 2×P2，字段语义单一来源收口）/ 2026-09-05（rev6，响应 Bugbot rev5 复审 2×P2，收口清零）
+> 版本：v0.4-rev7（契约稿，待 Bugbot 复审 → owner 最终裁决）
+> 日期：2026-09-04（初稿）/ 2026-09-05（rev1，响应 PR #63 Hermes 技术评审）/ 2026-09-05（rev2，响应 Hermes 复审 P0-5/P0-6）/ 2026-09-05（rev3，响应 Codex 接管复审 P0-①~P0-⑤ / P1-①~P1-②）/ 2026-09-05（rev4，响应 Codex rev3 复审 P0 版本谱系 + P1×2 + P2）/ 2026-09-05（rev5，响应 Bugbot rev4 复审 4×P1 + 2×P2，字段语义单一来源收口）/ 2026-09-05（rev6，响应 Bugbot rev5 复审 2×P2，收口清零）/ 2026-09-05（rev7，响应 Bugbot rev6 最终复核 1×P2，switch expected 归属收口）
 > 修订记录：rev1 修复 P0-1/P0-2（§6.1 表结构选型与存储约束重写）、P0-3（§5.3 新增 `PUT /dramas/:id/source/current` + T10）、P0-4（§5.3 confirm 三态返回与原子性 UPDATE + T11）；同步吸收与本次表/端点修改同源的 P1-1（`source_hash` → `content_hash`/`base_hash`）、P1-4（整理任务进度复用 `GET /tasks/:id`）、P1-5（`user-edited` 测试缺口随 T10 补齐）；其余 P1-2/P1-3/P1-6 与 P2 各项登记为 v0.4.1 修正式 / owner 裁决意见（见 §10）。
 > 修订记录（rev2）：修复 P0-5（§6.1 版本序号并入自增主键 `id`，废除 `MAX(version_seq)+1` 并发撞号）、P0-6（§5.3 新增 `POST /dramas/:id/source/switch` 版本切换端点 + T12）；P1-新1（`PUT current` 与 skip 状态机死锁）随 P0-6 方案 A 自动闭环；P1-新2（`sys_task` 生命周期复用）与既有 P1 打包登记 v0.4.1（见 §10）。
 > 修订记录（rev3）：修复 Codex 复审 5 条 P0——①confirm 等指针写统一「锁 `dramas` 行 + 锁内判定」原子原语（§5.3）、②switch 请求体拆 `target_version_id` + `expected_current_version_id`（§5.3）、③`from-plan` 读取与哈希校验对象改为当前有效正文并列为 v0.4 唯一必改点（§5.2/§5.4）、④冻结规范化输入基准并登记 trim 实施改动（§3.3/§5.2）、⑤skip 语义收紧为「从未整理才允许」（§5.3）；顺手吸收 P1 两条文案（§0.1/§3.3 能力表述降级、§2.1 `chapter_marker` 不入删除区间）；§7.2 T2/T7/T8/T11/T12 断言同步（见 §10）。
 > 修订记录（rev4）：修复 Codex rev3 复审 P0（版本谱系倒退）——confirm 废除原地迁移，**版本行完全不可变**：confirm = 以 target `cleaned` 为 parent 新建 `confirmed` 派生行并切指针，原 `cleaned` 行保留；请求体拆 `target_version_id` + `expected_current_version_id`，锁内同时校验当前指针、target=cleaned、target.parent=当前有效正文、target=其 parent 下最新 cleaned（任一不符 409/400）；clean 候选记录启动基线（`parent_version_id`），完成时不因指针漂移改写。同步吸收 P1×2（skip 回正为「current=source 即可设置标记，cleaned 保留为未采用候选」；source 区分 raw/`dramas.description` 与 canonical/`source_versions.content`，逐字节断言指向 canonical）与 P2（`GET /versions` `current.kind` 枚举移除 cleaned）；T7/T11 增补并发用例（见 §10）。
 > 修订记录（rev5）：响应 Bugbot rev4 复审 head `59463d5`（4×P1 + 2×P2，全部为字段/公式级跨章一致性问题）——①clean 段 `content_hash` 回正为本行内容哈希、基线记录统一走 `parent_version_id` + `base_hash`（§5.3，I1/I2）；②confirm/switch 的 `target_version_id` 校验补 `drama_id` = 路由项目、跨项目 `400`（§5.3，I6）；③质量门与 `diff` 语义统一相对「任务输入基线 = parent content」（首轮 = canonical source，二次整理 = 当前 confirmed/user-edited，§2.1，I3）；④`confirmed` 派生行 `diff`/`stats` = identity、不复制 target 的 diff（展示经 parent cleaned 行读取，§5.3/§6.1，I3）；⑤`GET /versions` 每行补 `parent_version_id`（§5.3，P2-①）；⑥区分「编辑/确认 = 新建版本、回退/回到原文 = 仅移动指针」（§6.1，P2-②，I8）。根治：新增 §6.1「字段语义单一来源」I1–I9 跨章不变量清单（见 §10）。
 > 修订记录（rev6）：响应 Bugbot rev5 复审 head `56da3df`（2×P2 收口清零）——①§6.1 选型段措辞二分：新增类（懒生成 `source` / clean 产出 `cleaned` / confirm 派生 `confirmed` / PUT current 派生 `user-edited`）= 新建版本行 + 切指针；回退类（`switch`）= 仅移动指针、不新建版本行（不变量 I8）；②`PUT current` 的 `expected_current_version_id` 校验改归属优先：先按 `id` + `drama_id` 判定（不存在或属于其他项目 → `400`），属于当前项目但非当前指针才 `409`，kind 不合法 `400`；原子性与 T10 断言同步（不变量 I6）。**同一归属优先原则平行落实到 confirm 校验 1 与 switch 返回表**（409 行限定「属于当前项目」，400 行覆盖跨项目的 target/expected），杜绝 I6 缺口在其余含版本 id 参数的端点重现。登记见 §10。
+> 修订记录（rev7）：响应 Bugbot rev6 最终复核 head `cc9c26e`（1×P2，switch 原子流程漏写 expected 归属）——§5.3 switch 原子性补全为 5 步：锁 `dramas` 行 → 按 `id` + `drama_id` 校验 `target_version_id`（不存在 / 跨项目 / kind 非法 → `400`）→ `expected_current_version_id` 非 `null` 时按 `id` + `drama_id` 校验归属（不存在 / 跨项目 → `400`，I6）→ 属于本项目但不等于锁内当前指针 → `409` → `UPDATE` 指针提交；T12 补「跨项目 expected → 400」断言。返回表与 I6 已含该语义，rev7 使原子流程文字与之一致。登记见 §10。
 > 关联：`docs/product-positioning-roadmap.md` §4「命名收敛」与 §4.1「v0.4 修正方向」、§5 定位裁决 #4；GitHub Issue #61
 > 基线：主仓库 `master` = `d778550`（rev4 同步主仓 master 至 PR #59/#69 等合入后）
 > 本文性质：**公共契约与需求稿**。只定义状态、数据、接口、失败降级与验收标准；不包含任何运行时代码、数据库迁移或对既有文件的业务修改。
@@ -355,7 +356,13 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | `target_version_id` / `expected_current_version_id` 不存在**于本项目**（不存在 / 属于其他项目，I6） | `400` |
 | 行存在、属于当前项目且 kind 合法，但 `expected_current_version_id` ≠ 锁内读到的当前指针 | `409 VERSION_CONFLICT`：并发下指针已被其他请求切走（两个 switch 并发时后到者 `409`，T12） |
 
-- 原子性（rev3 定稿；rev5 目标校验补 `drama_id`）：按 §5.3 统一原子原语，单事务内锁 `dramas` 行 → 校验 target 行存在、`drama_id` = 路由项目、kind 合法（`SELECT id, base_kind FROM source_versions WHERE id=? AND drama_id=?`）→ 校验 `expected_current_version_id` = 当前指针 → `UPDATE dramas SET current_source_version_id=?target WHERE id=?` → 提交。行锁 + 旧指针校验双保险，杜绝并发覆盖与跨项目切换；与 confirm / PUT current 的并发按锁序判定，T12 的 `409` 断言稳定可复现。
+- 原子性（rev3 定稿；rev5 目标校验补 `drama_id`；rev7 expected 归属补全，响应 Bugbot 最终复核 P2，与返回表 400/409 行及 I6 对齐）——单事务内顺序执行：
+  1. 锁 `dramas` 当前项目行（`SELECT ... FOR UPDATE`）；
+  2. 按 `id` + `drama_id` 校验 `target_version_id`：不存在 / 属于其他项目 / `base_kind ∉ { source, confirmed, user-edited }` → `400`（`SELECT id, base_kind FROM source_versions WHERE id=? AND drama_id=?`）；
+  3. `expected_current_version_id` 非 `null` 时，按 `id` + `drama_id` 校验归属：不存在 / 属于其他项目 → `400`（rev7，I6）；
+  4. `expected_current_version_id` 属于本项目但不等于锁内当前指针 → `409`；
+  5. `UPDATE dramas SET current_source_version_id=?target WHERE id=?` → 提交。
+  行锁 + 归属校验（target 与 expected 各一次）+ 旧指针校验三重保证，杜绝并发覆盖与跨项目切换；与 confirm / PUT current 的并发按锁序判定，T12 的 `409` 断言稳定可复现。
 - 行为语义：switch 只移动指针，**不产生新版本行**，历史完整保留；被切走的旧当前行自动降为只读历史。切换后用户可继续 `clean`（基于新当前正文重新整理）；`skip` 仅当新当前 = `source` 时可用（rev4，P1）。
 - 响应 `200`：`{ current: { kind: "source|confirmed|user-edited", id: 1 } }`。
 
@@ -453,7 +460,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | T9 | 集成（旧项目） | 无版本记录项目完整走分集 | 行为与现状基线一致（逐接口 diff 为空） |
 | T10 | 路由（user-edited） | `PUT /source/current` 编辑切换 | confirmed 编辑后新建 `user-edited` 行、指针切换、旧行保留为快照；重复编辑产生第二条 user-edited；`expected_current_version_id` 不存在或**属于其他项目** → 400（rev6，I6）；属于本项目但已非当前指针（并发切走）→ 409；对 `cleaned`/`source` 行编辑 → 400 |
 | T11 | 路由（并发） | confirm / PUT current 并发 | 同一 cleaned 并发 confirm 两次，第二个按锁序 409（rev4 锁内判定）；clean 基于 A 启动、期间 switch 到 B、再 confirm A 的结果 → 409（parent 基线不符，rev4）；PUT current 并发切换，败者 409 且不产生孤儿版本行 |
-| T12 | 路由（switch） | `POST /source/switch` 版本切换 | 从 confirmed 切回 `source` 行 → 200 且 current=source、不新建版本行；切 `cleaned` 行 → 400；`target_version_id` 不存在或**属于其他项目** → 400（rev5 P1-②）；target = 当前指针（expected 匹配）→ 幂等 200；`expected_current_version_id` 过期（两个 switch 并发 / 与 PUT current 并发）→ 后到者 409（rev3）；switch 后旧当前行降为只读历史、再 `clean`+`confirm` 状态机可重新走通（P0-6 / P1-新1 闭环） |
+| T12 | 路由（switch） | `POST /source/switch` 版本切换 | 从 confirmed 切回 `source` 行 → 200 且 current=source、不新建版本行；切 `cleaned` 行 → 400；`target_version_id` 不存在或**属于其他项目** → 400（rev5 P1-②）；`expected_current_version_id` 不存在 / **属于其他项目**（跨项目真实版本 ID）→ 400（rev7，I6）；target = 当前指针（expected 匹配）→ 幂等 200；`expected_current_version_id` 属于本项目但过期（两个 switch 并发 / 与 PUT current 并发）→ 后到者 409（rev3）；switch 后旧当前行降为只读历史、再 `clean`+`confirm` 状态机可重新走通（P0-6 / P1-新1 闭环） |
 
 ### 7.3 三个代表样本（roadmap §6「真实基线」先行对象）
 
@@ -556,6 +563,12 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | --- | --- | --- |
 | P2-A | §6.1 选型段「所有正文状态转换一律新建版本行 + 切指针」括注又含「switch 只移指针」，与 I8 / §5.3 / T12 冲突 | §6.1 选型句两分：**新增类**（懒生成 `source` / clean / confirm / PUT current）= 新建版本行 + 切指针；**回退类**（`switch`）= 仅移动指针、不新建版本行（I8） |
 | P2-B | `PUT current` 对 `expected_current_version_id` 仍是「存在但不是当前 → 409」；传入他项目真实存在的版本 ID 也走 409，与 I6「跨项目一律 400」冲突 | §5.3 PUT current 校验改**归属优先**：先按 `id` + `drama_id` 判定（不存在或属于其他项目 → `400`），属于当前项目但非当前指针 → `409`，kind 不合法 → `400`；原子性段与 §7.2 T10 断言同步（I6）。**平行落实**：confirm 锁内校验 1 与 switch 返回表同样按归属先行（409 行限定「属于当前项目」，400 行覆盖跨项目的 target/expected），杜绝同缺口在含版本 id 参数端点重现 |
+
+**rev7（本节修订，响应 Bugbot rev6 最终复核 head `cc9c26e`，2026-09-05，switch expected 归属收口）**：
+
+| 编号 | 评审项 | 落点 |
+| --- | --- | --- |
+| P2 | switch 原子流程只按 `id` + `drama_id` 校验 `target_version_id`，随后直接比较 `expected_current_version_id` 与当前指针；跨项目真实存在的 expected 版本 ID 会走 409，与返回表 §5.3-355 及 I6「跨项目一律 400」不符 | §5.3 switch 原子性补全 5 步：锁 `dramas` 行 → target 按 `id`+`drama_id` 归属/kind 校验（400）→ expected 非 `null` 时按 `id`+`drama_id` 归属校验（400）→ 属于本项目但不等于锁内当前指针 → `409` → `UPDATE` 提交；§7.2 T12 补「跨项目 expected → 400」断言 |
 
 ### 10.2 登记 v0.4.1 修正式（后续独立 PR，本文不再扩大范围）
 
