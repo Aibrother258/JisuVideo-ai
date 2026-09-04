@@ -45,6 +45,21 @@ test('GET /tasks: existing SQL filters gain page/page_size and { items, paginati
   assert.match(src, /pagination: \{ page, page_size: pageSize, total, total_pages: Math\.ceil\(total \/ pageSize\) \}/)
 })
 
+test('GET /assets & GET /tasks keep legacy contract: no page/page_size -> full array (no silent truncation)', () => {
+  const assets = read('src/routes/assets.ts')
+  const tasks = read('src/routes/tasks.ts')
+  // 兼容开关：只有显式传入 page / page_size 任一参数才启用分页
+  for (const src of [assets, tasks]) {
+    assert.match(src, /const paginated = c\.req\.query\('page'\) != null \|\| c\.req\.query\('page_size'\) != null/)
+  }
+  // 未分页分支：返回过滤/排序后的全量数组（无 limit/offset、无 pagination 元信息）
+  assert.match(assets, /if \(!paginated\) \{[\s\S]*?return success\(c, rows\.map\(toSnakeCase\)\)/)
+  assert.match(tasks, /if \(!paginated\) \{[\s\S]*?return success\(c, rows\)/)
+  // 分页分支契约不变：仍返回 { items, pagination }
+  assert.match(assets, /items: rows\.map\(toSnakeCase\),\s*pagination:/)
+  assert.match(tasks, /items: rows,\s*pagination:/)
+})
+
 test('generation-tasks drawer endpoint stays { tasks, merges } (grouped view, not a paged list)', () => {
   // 任务抽屉按集聚合 + 状态分组渲染，保持 { tasks, merges } 全量语义；
   // 分页化随 D1 异步任务可视化专项评估，避免破坏分组/轮询数据流

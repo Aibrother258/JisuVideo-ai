@@ -12,7 +12,14 @@ test('B3 batch1: usePagedList hook self-contained + exposes paged-list contract'
   assert.match(hook, /import \{ computed, ref \} from 'vue'/)
   // 泛型 hook 签名 + 返回契约
   assert.match(hook, /export function usePagedList<T>\(fetcher: PagedFetcher<T>, options: UsePagedListOptions = \{\}\): UsePagedListReturn<T> \{/)
-  assert.match(hook, /return \{ items, loading, loadingMore, loadError, page, pageSize, total, totalPages, hasMore, reload, loadMore, reset \}/)
+  assert.match(hook, /return \{ items, loading, loadingMore, loadError, loadMoreError, page, pageSize, total, totalPages, hasMore, reload, loadMore, reset \}/)
+  // 首屏（reload）失败写 loadError，追加（loadMore）失败写 loadMoreError —— 两者分离，
+  // 追加失败不污染首屏错误态、也不清空已加载 items（调用方在列表底部内联重试）
+  assert.match(hook, /loadError: Ref<string>/)
+  assert.match(hook, /loadMoreError: Ref<string>/)
+  assert.match(hook, /if \(append\) \{/)
+  assert.match(hook, /loadMoreError\.value = err\?\.message \|\| '加载失败'/)
+  assert.match(hook, /loadError\.value = err\?\.message \|\| '加载失败'/)
   // 默认 page_size 对齐后端 GET /dramas 默认 20
   assert.match(hook, /const pageSize = options\.pageSize \?\? 20/)
   // 查询参数拼装：fixed 先展开、page/page_size 后写覆盖（固定筛选不能覆盖分页参数）

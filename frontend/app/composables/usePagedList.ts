@@ -59,8 +59,14 @@ export interface UsePagedListReturn<T> {
   loading: Ref<boolean>
   /** loadMore 追加中 */
   loadingMore: Ref<boolean>
-  /** 最近一次有效请求的错误文案；成功请求后清空 */
+  /** 最近一次有效请求（reload/首屏）的错误文案；成功请求后清空 */
   loadError: Ref<string>
+  /**
+   * 最近一次 loadMore 追加失败的错误文案（与首屏错误分离）。
+   * 追加失败只写本字段：已加载的 items 原样保留、loadError 不被污染，
+   * 由调用方在列表底部渲染「加载失败，点击重试」；重试只重拉失败那页。
+   */
+  loadMoreError: Ref<string>
   /** 已加载的页码（1 起；未加载为 0） */
   page: Ref<number>
   pageSize: number
@@ -88,6 +94,7 @@ export function usePagedList<T>(fetcher: PagedFetcher<T>, options: UsePagedListO
   const loading = ref(false)
   const loadingMore = ref(false)
   const loadError = ref('')
+  const loadMoreError = ref('')
   const ready = ref(false)
   // 请求代次：每次发起请求递增；reset 再递增以作废全部在途请求
   let requestSeq = 0
@@ -117,9 +124,15 @@ export function usePagedList<T>(fetcher: PagedFetcher<T>, options: UsePagedListO
       page.value = p
       ready.value = true
       loadError.value = ''
+      loadMoreError.value = ''
     } catch (err: any) {
       if (seq !== requestSeq) return // 过期失败同样丢弃，不覆盖新请求的错误态
-      loadError.value = err?.message || '加载失败'
+      if (append) {
+        // 追加失败：不碰 items/loadError/page，只记追加错误，供列表尾部内联重试
+        loadMoreError.value = err?.message || '加载失败'
+      } else {
+        loadError.value = err?.message || '加载失败'
+      }
       console.error(`[usePagedList] page ${p} load failed`, err)
     } finally {
       // 仅当自己仍是最新请求时才复位 flag；过期请求的 flag 由接管方（reload/reset）复位
@@ -131,6 +144,7 @@ export function usePagedList<T>(fetcher: PagedFetcher<T>, options: UsePagedListO
     if (loading.value) return
     loadingMore.value = false // 接管在途 loadMore：其过期响应被丢弃，此处复位其 flag
     loadError.value = ''
+    loadMoreError.value = ''
     await fetchPage(1, false, loading)
   }
 
@@ -149,8 +163,9 @@ export function usePagedList<T>(fetcher: PagedFetcher<T>, options: UsePagedListO
     loading.value = false
     loadingMore.value = false
     loadError.value = ''
+    loadMoreError.value = ''
     ready.value = false
   }
 
-  return { items, loading, loadingMore, loadError, page, pageSize, total, totalPages, hasMore, reload, loadMore, reset }
+  return { items, loading, loadingMore, loadError, loadMoreError, page, pageSize, total, totalPages, hasMore, reload, loadMore, reset }
 }

@@ -129,7 +129,8 @@ export const taskAPI = {
     if (params?.storyboard_id) query.set('storyboard_id', String(params.storyboard_id))
     if (params?.page) query.set('page', String(params.page))
     if (params?.page_size) query.set('page_size', String(params.page_size))
-    // GET /tasks：items 字段为 camelCase（与 GET /tasks/:id 一致）
+    // GET /tasks：items 字段为 camelCase（与 GET /tasks/:id 一致）。
+    // 未传 page/page_size 时后端返回过滤后的全量数组（旧契约兼容），传了才返回 { items, pagination }
     return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } }>(`/tasks${query.size ? `?${query.toString()}` : ''}`)
   },
   // 按集聚合生成任务（sys_task + video_merges）
@@ -165,7 +166,8 @@ export const assetLibraryAPI = {
     if (params?.type) query.set('type', params.type)
     if (params?.page) query.set('page', String(params.page))
     if (params?.page_size) query.set('page_size', String(params.page_size))
-    // GET /assets：items 字段为 snake_case（toSnakeCase 输出，与原全量数组元素一致）
+    // GET /assets：items 字段为 snake_case（toSnakeCase 输出，与原全量数组元素一致）。
+    // 未传 page/page_size 时后端返回过滤后的全量数组（旧契约兼容），传了才返回 { items, pagination }
     return api.get<{ items: any[]; pagination?: { page: number; page_size: number; total: number; total_pages: number } }>(`/assets${query.size ? `?${query.toString()}` : ''}`)
   },
 }

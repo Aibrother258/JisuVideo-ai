@@ -13,6 +13,9 @@ app.get('/', async (c) => {
   const dramaId = Number(c.req.query('drama_id') || 0)
   const episodeId = Number(c.req.query('episode_id') || 0)
   const type = String(c.req.query('type') || '').trim().toLowerCase()
+  // 兼容旧契约：只有显式传入 page / page_size 任一参数才启用分页并返回 { items, pagination }；
+  // 未传分页参数时维持旧行为——返回过滤后的全量数组，避免旧脚本/第三方调用静默截断
+  const paginated = c.req.query('page') != null || c.req.query('page_size') != null
   // parseInt + `|| 默认值` 兜底：Number('abc') 得 NaN，Math.max(1, NaN) 会传播 NaN 进 SQL
   const page = Math.max(1, Number.parseInt(c.req.query('page') || '1', 10) || 1)
   const pageSize = Math.min(100, Math.max(1, Number.parseInt(c.req.query('page_size') || '20', 10) || 20))
@@ -30,6 +33,14 @@ app.get('/', async (c) => {
   )!)!)
   if (type) conds.push(eq(schema.assets.type, type))
   const where = and(...conds)
+
+  if (!paginated) {
+    // 旧契约：过滤/排序仍 SQL 下推，但不分页（无 limit/offset），返回全量数组
+    const rows = await db.select().from(schema.assets)
+      .where(where)
+      .orderBy(desc(schema.assets.createdAt))
+    return success(c, rows.map(toSnakeCase))
+  }
 
   const total = (await db.select({ value: count() }).from(schema.assets).where(where))[0]?.value ?? 0
   const rows = await db.select().from(schema.assets)

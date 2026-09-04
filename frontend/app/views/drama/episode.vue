@@ -1630,7 +1630,13 @@
               <strong>{{ asset.name }}</strong>
               <small>{{ asset.source }}</small>
             </button>
-            <div v-if="refAssetLibraryHasMore" class="ref-asset-picker-more">
+            <!-- 追加（加载更多）失败：保留已加载素材，仅尾部内联「点击重试」；重试仍走 loadMore 只重拉失败那页 -->
+            <div v-if="refAssetLibraryLoadMoreError" class="ref-asset-picker-more">
+              <button class="btn btn-sm" :disabled="refAssetLibraryLoadingMore" @click="loadMoreRefAssets">
+                <RefreshCw :size="12" /> 加载失败，点击重试
+              </button>
+            </div>
+            <div v-else-if="refAssetLibraryHasMore" class="ref-asset-picker-more">
               <button class="btn btn-sm" :disabled="refAssetLibraryLoadingMore" @click="loadMoreRefAssets">
                 <Loader2 v-if="refAssetLibraryLoadingMore" :size="12" class="animate-spin" />
                 <template v-else><RefreshCw :size="12" /></template>
@@ -2150,13 +2156,16 @@ const {
   items: mediaLibraryAssets,
   loading: refAssetPickerLoading,
   loadError: refAssetLibraryError,
+  loadMoreError: refAssetLibraryLoadMoreError,
   hasMore: refAssetLibraryHasMore,
   loadingMore: refAssetLibraryLoadingMore,
   loadMore: loadMoreRefAssets,
   reload: reloadRefAssetLibrary,
   reset: resetRefAssetLibrary,
 } = usePagedList(
-  (q) => assetLibraryAPI.list({ drama_id: dramaId, episode_id: epId.value, ...q }),
+  // 携带当前选择器类型：服务端先按 type 过滤再分页，避免「第 1 页 60 条全为其他类型、
+  // 目标类型排在后续页」时前端过滤后为空、加载更多入口也随之消失
+  (q) => assetLibraryAPI.list({ drama_id: dramaId, episode_id: epId.value, type: refAssetPicker.value.kind, ...q }),
   { pageSize: 60 },
 )
 const REF_SELECTION_STORE_KEY = `huobao:video-refs:${dramaId}:${episodeNumber}`
