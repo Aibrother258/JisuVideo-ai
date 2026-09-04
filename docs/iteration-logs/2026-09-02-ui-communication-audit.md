@@ -24,8 +24,8 @@
 
 | 表述 | 指代 | 代码状态（2026-09-02） |
 | --- | --- | --- |
-| 策划包导入 UI / 导入前端 | 线 A：上传→识别→问题→影响摘要→确认导入界面（见 `JisuVideo-ai与shuohao-skills分步实施方案.md` §5.4/§10.2） | **未开始**（依赖迭代 1 后端与方案冻结） |
-| 多视频类型扩展前端 | 线 A：创建向导/类型目录/Schema 表单（见 `docs/multi-video-type-extension-plan.md` §10.1） | **未开始**（v2.2 待评审冻结） |
+| 策划包导入 UI / 导入前端 | 线 A：上传→识别→问题→影响摘要→确认导入界面（见 `JisuVideo-ai与shuohao-skills分步实施方案.md` §5.4/§10.2） | **未开始**——方向保留，转「短剧上游导入」独立立项待排期（2026-09-04 扩展线取消后脱钩） |
+| 多视频类型扩展前端 | 线 A：创建向导/类型目录/Schema 表单（原见 `docs/multi-video-type-extension-plan.md` §10.1） | **已取消**（2026-09-04 用户决策，见 `docs/ui-optimization-plan.md` 修订记录 v3.3）；冻结稿头部已标注「已取消」保留存档 |
 | UI 治理 / 前端 UI 优化 | 线 B：`docs/ui-optimization-plan.md` | P0-F（PR #13）、C1/C2（PR #14）已合入 master；P1 在 `feat/ui-p1-token-spec` 进行中 |
 | 设置页两级导航 | 线 B P0-F：基础/高级 树形导航 | 已合入 master（PR #13） |
 | 三态治理 | 线 B C1/C2：加载/空/错误统一规范 | 已合入 master（PR #14，`5cd1690`） |
@@ -40,5 +40,5 @@
 ## 5. 后续提问/检索建议
 
 - 问"UI 到哪一步"时：先查本文件 §3 → 再查 `git branch`（尤其 `feat/ui-*`、`docs/ui-*`）→ `docs/ui-optimization-plan.md` 修订记录。
-- 问"策划包/多视频类型"时：查仓库根方案文档与 `docs/multi-video-type-extension-plan.md`，并以其自述状态（待评审/冻结）为准。
+- 问"多视频类型扩展"时：**已取消**（2026-09-04 用户决策），以 `docs/ui-optimization-plan.md` 修订记录 v3.3 与冻结稿头部「已取消」标注为准；问"策划包导入"时：方向保留为「短剧上游导入」独立立项（未排期），参考根目录 shuohao-skills 结合族文档与 `JisuVideo-ai与shuohao-skills分步实施方案.md` v1.2。
 - 项目级状态以 `docs/iteration-logs/README.md` 登记表为准；本文为跨线术语索引，两者互相补充。
