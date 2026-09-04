@@ -4,7 +4,7 @@
 
 <div align="center">
 
-**基于 TypeScript 全栈的 AI 短剧自动化生产平台**
+**面向个人创作者和小型团队的 AI 短剧生产工作台（TypeScript 全栈）**
 
 [![Node Version](https://img.shields.io/badge/Node.js-20+-339933?style=flat&logo=node.js)](https://nodejs.org)
 [![Vue Version](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
@@ -20,14 +20,14 @@
 
 ## 📖 项目简介
 
-Huobao Drama 是一个基于 AI 的短剧自动化生产平台，实现从剧本生成、角色设计、分镜制作到视频合成的全流程自动化。
+JisuVideo（Huobao Drama 的社区 fork）是一个**面向个人创作者和小型团队的 AI 短剧生产工作台**：把小说、故事和剧本转成可审阅的分集方案、统一的人物场景资产、可执行分镜以及图片/视频生成任务，并保留每一步的修改、版本和回退。定位与路线详见 `docs/product-positioning-roadmap.md`。
 
 ### 🎯 核心价值
 
 - **🤖 AI 驱动**：使用大语言模型解析剧本，提取角色、场景和分镜信息
 - **🎨 智能创作**：AI 绘图生成角色形象和场景背景
 - **📹 视频生成**：基于文生视频和图生视频模型自动生成分镜视频
-- **🔄 工作流**：完整的短剧制作工作流，从创意到成片一站式完成
+- **🔄 工作流**：完整的短剧纵向生产链路——导入原文 → AI 分集 → 剧本 → 资产 → 分镜 → 生成 → 拼接，每一步可控、可审阅、可恢复
 
 ### 🛠️ 技术架构
 
