@@ -1,9 +1,10 @@
 # 原文整理与智能分集 v0.4 需求与契约
 
-> 版本：v0.4-rev2（契约稿，待 Hermes 复审 → Bugbot 复审 → owner 最终裁决）
-> 日期：2026-09-04（初稿）/ 2026-09-05（rev1，响应 PR #63 Hermes 技术评审）/ 2026-09-05（rev2，响应 Hermes 复审 P0-5/P0-6）
+> 版本：v0.4-rev3（契约稿，待 Bugbot 复审 → owner 最终裁决）
+> 日期：2026-09-04（初稿）/ 2026-09-05（rev1，响应 PR #63 Hermes 技术评审）/ 2026-09-05（rev2，响应 Hermes 复审 P0-5/P0-6）/ 2026-09-05（rev3，响应 Codex 接管复审 P0-①~P0-⑤ / P1-①~P1-②）
 > 修订记录：rev1 修复 P0-1/P0-2（§6.1 表结构选型与存储约束重写）、P0-3（§5.3 新增 `PUT /dramas/:id/source/current` + T10）、P0-4（§5.3 confirm 三态返回与原子性 UPDATE + T11）；同步吸收与本次表/端点修改同源的 P1-1（`source_hash` → `content_hash`/`base_hash`）、P1-4（整理任务进度复用 `GET /tasks/:id`）、P1-5（`user-edited` 测试缺口随 T10 补齐）；其余 P1-2/P1-3/P1-6 与 P2 各项登记为 v0.4.1 修正式 / owner 裁决意见（见 §10）。
 > 修订记录（rev2）：修复 P0-5（§6.1 版本序号并入自增主键 `id`，废除 `MAX(version_seq)+1` 并发撞号）、P0-6（§5.3 新增 `POST /dramas/:id/source/switch` 版本切换端点 + T12）；P1-新1（`PUT current` 与 skip 状态机死锁）随 P0-6 方案 A 自动闭环；P1-新2（`sys_task` 生命周期复用）与既有 P1 打包登记 v0.4.1（见 §10）。
+> 修订记录（rev3）：修复 Codex 复审 5 条 P0——①confirm 等指针写统一「锁 `dramas` 行 + 锁内判定」原子原语（§5.3）、②switch 请求体拆 `target_version_id` + `expected_current_version_id`（§5.3）、③`from-plan` 读取与哈希校验对象改为当前有效正文并列为 v0.4 唯一必改点（§5.2/§5.4）、④冻结规范化输入基准并登记 trim 实施改动（§3.3/§5.2）、⑤skip 语义收紧为「从未整理才允许」（§5.3）；顺手吸收 P1 两条文案（§0.1/§3.3 能力表述降级、§2.1 `chapter_marker` 不入删除区间）；§7.2 T2/T7/T8/T11/T12 断言同步（见 §10）。
 > 关联：`docs/product-positioning-roadmap.md` §4「命名收敛」与 §4.1「v0.4 修正方向」、§5 定位裁决 #4；GitHub Issue #61
 > 基线：主仓库 `master` = `21b1dd3`（PR #58 定位文档 + PR #60 协作基线合入后）
 > 本文性质：**公共契约与需求稿**。只定义状态、数据、接口、失败降级与验收标准；不包含任何运行时代码、数据库迁移或对既有文件的业务修改。
@@ -20,7 +21,7 @@
 - **检查原文**：导入后识别章节号、广告、水印、重复段等噪声，只提示、不自动改。
 - **AI 整理原文**（可选、可跳过）：去噪声但**不改写正文**，结果可预览、可复现、可回退。
 - **查看整理结果**：原文 / AI 整理稿 / 用户确认稿 / 差异记录四者关系可见。
-- **智能分集**：基于「用户确认稿」做 AI 边界建议 + 后端确定性切片，顺序不变、不漏字、不重复。
+- **智能分集**：基于「用户确认稿」做 AI 推荐集数与摘要 + 后端确定性切片，顺序不变、不漏字、不重复。
 
 不使用「净化」作为产品主定位或强制步骤（见 roadmap §4）。
 
@@ -110,7 +111,8 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 4. **不改写**：除删除区间外，原文任何字符不得被改动、替换、插写或重排。
 5. **章节标题不丢弃**：识别为章节标题的区间先提取为结构锚点（入锚点表），不作为普通噪声删除；用户可在确认页决定是否同时保留在正文。
 
-> 删除区间的分类采用有限集合，v0.4 冻结如下：`chapter_marker`（章节号/卷标题行）、`ad`（广告）、`watermark`（水印/作者话）、`duplicate`（重复段）、`garbage`（乱码/无意义字符）。分类仅用于展示与统计，不改变删除语义。分类集合属于「实施拆分时可扩充」项。
+> 删除区间的分类采用有限集合，v0.4 冻结如下：`ad`（广告）、`watermark`（水印/作者话）、`duplicate`（重复段）、`garbage`（乱码/无意义字符）。分类仅用于展示与统计，不改变删除语义。分类集合属于「实施拆分时可扩充」项。
+> **`chapter_marker` 不入删除区间（rev3，响应 Codex P1-②）**：章节号/卷标题行由 §2.1-5 提取为结构锚点并保留在正文，AI 整理**不得输出** `chapter_marker` 删除区间（与「章节标题不丢弃」一致）；`chapter_marker` 仅用于健康检查检出提示与锚点建立。用户确需删除章节标题时，经 `PUT /dramas/:id/source/current` 的 `user-edited` 人工编辑版本完成（§2.2），健康检查 issues 类型不含 `chapter_marker`（§5.3）。
 
 ### 2.2 用户人工编辑后的规则切换
 
@@ -142,14 +144,15 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 - 后端按「段首短锚候选 → 内容哈希精确校验 → 区间在整体中单调重排」的顺序组合定位；候选数大于 1 时返回候选列表并提示冲突，不做静默猜测。
 - 定位失败的段（短锚漂移且哈希不命中）标记为 `unresolved`，由用户在该段上下文手动选择或降级为相邻段落（见 3.4）。
 
-### 3.3 AI 建议边界与后端确定性切片
+### 3.3 AI 推荐集数与摘要 + 后端确定性切片
 
 延续现有职责划分（`backend/src/routes/dramas.ts` `POST /dramas/:id/analyze-episodes` + `splitSourceIntoEpisodes`），v0.4 冻结为：
 
-- **AI 只做内容理解**：`episode_planner` Agent 只输出 `recommended_count / reason / episodes[{title, summary}]`；正文永远来自输入文本，由后端切片（现状已如此）。
-- **分集输入**：读取当前有效正文版本（`confirmed` / `user-edited` / 跳过整理时的 `source`），将文本原样作为 `content` 传入现有分集链路。
+- **AI 只做内容理解（rev3 措辞降级，响应 Codex P1-①）**：`episode_planner` Agent 只输出 `recommended_count / reason / episodes[{title, summary}]`，**不输出任何字符级边界建议**；正文永远来自输入文本，由后端切片（现状已如此）。语义分集 = AI 推荐集数与摘要 + 后端确定性切片；若未来要 Agent 输出可校验边界建议，另立决策，不属于 v0.4 能力承诺。
+- **规范化输入（rev3 定稿，响应 Codex P0-④）**：v0.4 冻结输入基准 = `normalized = String(content).trim()`（与 `content_hash` 的 trim 口径一致，§5.4/§6.1）。版本行 `content`、分集输入、`content_hash`、切片与一致性断言一律以规范化输入为准；进入分集链路前不引入任何其他改写。
+- **分集输入**：读取当前有效正文版本（`confirmed` / `user-edited` / 跳过整理时的 `source`），将规范化文本作为 `content` 传入现有分集链路。
 - **后端确定性切片**：沿用 `splitSourceIntoEpisodes` 的边界候选 + 顺序切分算法；对确认稿新增「段落锚边界」候选源（候选边界必须落在段落边界集合内），使分集边界与段落锚对齐。
-- **一致性断言（每轮切片必过，可测）**：各集正文按 `episode_number` 顺序拼接后逐字符等于输入文本；`character_count` 之和等于输入长度；段落在各集内不重复出现。
+- **一致性断言（每轮切片必过，可测）**：各集正文按 `episode_number` 顺序拼接后逐字符等于**规范化输入**；`character_count` 之和等于规范化输入长度；段落在各集内不重复出现。断言与现状 trim 行为（`splitSourceIntoEpisodes` 输入整体 trim / `normalizeReviewablePlan` 单集二次 trim）的衔接，见 §5.2「v0.4 行为必改点」。
 
 ### 3.4 越界 / 定位失败的降级
 
@@ -198,14 +201,13 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 - `409` 语义沿用 `VERSION_CONFLICT`；正文源变化类冲突返回 `409` 并带可读 message（现状 `analyze-episodes` 保存草稿、`from-plan` 均已实现，见 `dramas.ts`）。
 - 所有新增端点只读写项目级正文版本，不改动 `episodes` 表语义。
 
-### 5.2 现有端点与行为（零变化，兼容旧项目与跳过整理）
+### 5.2 现有端点与行为（兼容旧项目与跳过整理；v0.4 存在唯二必改点，rev3）
 
-以下端点在 v0.4 中**不改变行为**；未整理/跳过整理项目走它们 = 现状：
+以下端点在 v0.4 中**不改变行为**；未整理/跳过整理项目走它们 = 现状。`from-plan` 的正文读取对象与分集正文 trim 口径是**唯二的行为必改点**（rev3，响应 Codex P0-③/P0-④，见下方小节），其余端点维持零变化：
 
 - `POST /dramas`（创建项目，含原文导入到 `dramas.description`）
 - `POST /dramas/:id/analyze-episodes`（AI 集数/标题/摘要建议 + 确定性切片 + 草稿保存；`content` 由调用方传当前有效正文）
 - `GET|PUT /dramas/:id/episode-plan`（草稿读取/保存，乐观锁 `expected_version`）
-- `POST /dramas/:id/episodes/from-plan`（全量确认后生成/同步剧集；`source_hash` 列名沿用现状，其「分集输入正文哈希」语义见 §5.4）
 - `PUT /episodes/:id`、`GET /episodes/:id/pipeline-status` 等既有剧集端点
 
 兼容规则（已冻结）：
@@ -213,9 +215,22 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 - 旧项目（`source_versions` 无任何记录）：健康检查与整理全部可跳过，链路与现状逐字节一致。
 - 前端在「导入原文 → 分集」之间新增的可选步骤不改变任何现有保存动作的请求/响应结构。
 
+**v0.4 行为必改点（rev3 定稿；除以下两点外，§5.2 其余端点零变化）**：
+
+1. **`from-plan` 正文读取与哈希校验对象 = 当前有效正文**（响应 Codex P0-③）：现状实现写死 `sourceHash(drama.description)`（`backend/src/services/episode-plan-draft.ts`），一旦确认稿/编辑稿切换当前指针，整理后的项目将永远 `409`、无法从整理稿出剧集。v0.4 冻结改法：
+   - `POST /dramas/:id/episodes/from-plan` 的正文读取与「全文未变化」校验对象 = 当前有效正文（`current_source_version_id` 指向行的 `content`；NULL 时 = `dramas.description`，旧项目/跳过整理回退分支与现状逐字节一致）；
+   - 校验哈希 = 当前有效正文的 `content_hash`（§5.4），与 `analyze-episodes` 保存草稿写入的 `source_hash` 对齐，「全文已变化 → 409」语义不变；
+   - 该改动把「从确认稿/编辑稿生成剧集」补成闭环；未整理项目行为不变。
+2. **分集正文 trim 口径 = 规范化输入 + 保留段间换行**（响应 Codex P0-④）：现状 `splitSourceIntoEpisodes()` 先对输入整体 `content.trim()`、`normalizeReviewablePlan()` 再对每集正文整篇 `trim()`，会造成输入两端空白与集间换行在保存链路丢失，与 §3.3「按集拼接 = 输入」断言冲突。v0.4 冻结改法：
+   - 版本存储、哈希与一致性断言以 §3.3「规范化输入」`String(content).trim()` 为基准；
+   - 切片与草稿保存以段落为最小保留单元、**保留段间换行**；`normalizeReviewablePlan` 不再对单集正文做整篇二次 trim（消除边界空白丢失根因）；
+   - 实施 PR 触碰 `episode-planning.ts` / `episode-plan-draft.ts` 时按此冻结实现并 diff 说明。
+
 ### 5.3 新增端点草案（契约冻结，实施任务拆分时落地）
 
 > 以下为 v0.4 冻结的请求/响应形状；实际路由文件、幂等迁移与前端接线由后续实施 PR 承担。未获授权的清理/回收类（D 系列）端点不在此列。
+
+**写端点的统一原子原语（rev3 定稿，响应 Codex P0-①/P0-②）**：凡修改 `dramas.current_source_version_id` 的端点——clean 懒生成 `source` 行、confirm、PUT current、switch——在同一事务内先执行 `SELECT id, current_source_version_id FROM dramas WHERE id=? FOR UPDATE` 锁定项目行（同一项目的此类写按锁序串行执行），再做判定与写入，提交前指针变更对外不可见。`200 / 409 / 400` 一律来自**锁内判定**（与请求到达时序无关，测试可稳定复现）：调用方携带的 `expected_*` 与锁内读到的当前指针不符、或目标已非最新/已迁移 → `409`；目标不存在/参数非法 → `400`。rev2 及更早条文里「条件 UPDATE 后补 SELECT 区分 400/409」「单条 UPDATE 即天然防并发覆盖」的描述按此废除。
 
 #### `POST /dramas/:id/source/health-check`
 
@@ -226,7 +241,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 ```json
 { "code": 200, "data": {
   "status": "clean" | "issues",
-  "issues": [ { "type": "chapter_marker|ad|watermark|duplicate|garbage",
+  "issues": [ { "type": "ad|watermark|duplicate|garbage",
                 "count": 0, "sample_ranges": [[0, 10]] } ],
   "char_count": 0
 }, "message": "success" }
@@ -274,8 +289,12 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | 行存在，但已是 `confirmed`（被并发重复确认）或不是最新的 `cleaned`（存在更新清理稿） | 冲突 | `409 VERSION_CONFLICT` |
 | 行不存在 | 参数错误 | `400` |
 
-- 原子性（已冻结）：单事务内执行条件 UPDATE——
-  `UPDATE source_versions SET base_kind='confirmed', updated_at=? WHERE id=? AND drama_id=? AND base_kind='cleaned'`，**影响行数 = 1 才算成功**；影响行数 = 0 时补一次 SELECT 区分「不存在 → 400」与「kind 已变 / 非最新 → 409」。成功后 `UPDATE dramas SET current_source_version_id=? WHERE id=?`。并发重复 confirm 同一行时，第二个请求的 UPDATE 影响行数为 0 → `409`。
+- 原子性（rev3 定稿，响应 Codex P0-①）：按 §5.3 统一原子原语，事务内——
+  1. `SELECT current_source_version_id FROM dramas WHERE id=? FOR UPDATE`（锁项目行，串行化同项目所有指针写）；
+  2. 锁内判定目标行：`SELECT id, base_kind FROM source_versions WHERE id=? AND drama_id=?`——不存在 → `400`；`kind=cleaned` 且 `id` = 该项目当前 `id` 最大的 `cleaned`（`SELECT MAX(id) FROM source_versions WHERE drama_id=? AND base_kind='cleaned'`，锁内无并发干扰）→ 继续；已迁移（`confirmed`）或非最新 `cleaned` → `409`；
+  3. `UPDATE source_versions SET base_kind='confirmed', updated_at=? WHERE id=? AND drama_id=? AND base_kind='cleaned'`（影响行数 = 1 才算成功，防御性校验）；
+  4. `UPDATE dramas SET current_source_version_id=? WHERE id=?`，提交。
+  两个**不同** cleaned 并发确认时，按锁序先到者成功，后到者在第 2 步读到目标已迁移或已非最新 → `409`（rev2 的「未锁行条件 UPDATE + 影响行数 0 判定」无法排除更新的 cleaned，已废除）。
 - 响应 `200`：迁移后的版本对象。
 
 #### `PUT /dramas/:id/source/current`
@@ -290,13 +309,15 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
   - 存在但**已不是当前有效正文**（并发下被其他请求切走）→ `409 VERSION_CONFLICT`；
   - 存在且为当前，但 `kind` 不是 `confirmed`/`user-edited` → `400`（不允许直接编辑 `cleaned`/`source`）。
 - 行为（已冻结）：新建一行 `base_kind=user-edited` 版本，`content` = 请求正文，`parent_version_id` = 旧当前行 id，当前指针切换为新行；旧当前行完整保留（即「编辑前自动版本快照」）。
-- 原子性：事务内先 `INSERT` 新行，再
-  `UPDATE dramas SET current_source_version_id=?new_id WHERE id=? AND current_source_version_id=?expected_version`，**影响行数 = 1 才提交**；影响行数 = 0 → `409` 并回滚。
+- 原子性（rev3）：按 §5.3 统一原子原语，事务内先 `SELECT ... FROM dramas WHERE id=? FOR UPDATE` 锁行，锁内校验 `expected_version` = 当前指针（不符 → `409`，不 INSERT）；再 `INSERT` 新 `user-edited` 行并
+  `UPDATE dramas SET current_source_version_id=?new_id WHERE id=? AND current_source_version_id=?expected_version`，**影响行数 = 1 才提交**（双保险）；影响行数 = 0 → `409` 并回滚。锁序保证并发编辑下败者 `409` 且不产生孤儿版本行（T11）。
 - 响应 `200`：新版本对象。
 
 #### `POST /dramas/:id/source/skip`
 
-- 前置条件（已冻结）：仅当当前有效正文 = `source`（`current_source_version_id` 为 NULL 或指向 `kind=source` 行）时允许；已存在整理稿时返回 `400` 并提示「如需回到原文，请使用版本切换端点 `POST /dramas/:id/source/switch`（§5.3）」。
+- 前置条件（rev3 定稿，响应 Codex P0-⑤）：**仅当该项目从未产生任何整理稿**时允许——不存在 `base_kind ∈ {cleaned, confirmed, user-edited}` 的版本行，且当前有效正文 = `source`（指针为 NULL 或指向 `kind=source` 行）。
+  - 语义说明：rev2 的「指针 = source 时允许」与「已有整理稿 → 400」在 clean 成功后同时成立（clean 只新增 `cleaned`、不切指针），前置自相矛盾。定稿取**最严语义**：只要存在任一整理稿（含未确认的 `cleaned`）即拒绝 skip；「放弃未确认整理稿」= 重跑 clean 覆盖或直接不确认，不设 skip 标记、不删历史（与 §6.1 无 `deleted_at` 一致）。
+  - 已存在整理稿 → `400` 并提示：如需回到原文，请使用版本切换端点 `POST /dramas/:id/source/switch`（§5.3）。
 - 请求体：`{ note?: string }`（≤200 字）。
 - 行为：在项目记录中写入跳过整理标记（方向：`dramas` 新增列 `source_skip_at`，见 §6.1）；当前有效正文保持 = `source`。
 - 取消标记：用户显式发起 `POST /source/clean` 时清除。
@@ -306,18 +327,22 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 
 显式版本切换：把「当前有效正文」指针切到历史某个已生效版本（回到 `source` 原文、或切回更早的 `confirmed`/`user-edited` 基线）。rev2 新增（响应 Hermes 复审 P0-6），承接 rev1「回退 = 新建版本 + 切指针」的指针侧显式入口，并闭环「`confirmed` 后想回到原文」的状态机路径（P1-新1）。
 
-- 请求体：`{ expected_version: number }`；`expected_version` = 目标版本行 `id`（主键兼版本序号，rev2 §6.1）。
-- 目标限定（已冻结）：目标行 `base_kind ∈ { source, confirmed, user-edited }`——只有已生效基线可被切为当前；**`cleaned` 行不可切换**（未确认不生效，与 §6.1「cleaned 永不成为 current」一致）。
-- 三态返回表（已冻结）：
+- 请求体（rev3 定稿，响应 Codex P0-②）：`{ target_version_id: number, expected_current_version_id: number | null }`。
+  - `target_version_id` = 目标版本行 `id`（要切到的行，主键兼版本序号，rev2 §6.1）；
+  - `expected_current_version_id` = 调用方当前持有的指针值（取自已响应 `GET /versions` 的 `current.id`；`null` 表示调用方认为未整理）。rev2 单一 `expected_version` 无法区分「目标」与「当前」，两个 switch 并发会都 `200`、后写覆盖前写，已废除。
+- 目标限定（已冻结）：`target_version_id` 行 `base_kind ∈ { source, confirmed, user-edited }`——只有已生效基线可被切为当前；**`cleaned` 行不可切换**（未确认不生效，与 §6.1「cleaned 永不成为 current」一致）。
+- 三态返回表（rev3 定稿，已冻结）：
 
-| `expected_version` 指向 | 判定 | 返回 |
-| --- | --- | --- |
-| 行存在，`base_kind ∈ { source, confirmed, user-edited }` | 成功 | `200`：当前有效正文指针切至该行；行内容不变、**不新建版本、不迁移 kind**（已指向该行时为幂等 `200`，无变化） |
-| 行存在，但 `base_kind = cleaned` | 参数错误 | `400`：cleaned 未确认不得成为当前有效正文 |
-| 行不存在 | 参数错误 | `400` |
+| 判定（锁内） | 返回 |
+| --- | --- |
+| 行存在、`base_kind ∈ { source, confirmed, user-edited }`、`expected_current_version_id` = 当前指针、且 `target_version_id` ≠ 当前指针 | `200`：指针切至目标行；行内容不变、**不新建版本、不迁移 kind** |
+| `target_version_id` = 当前指针（已指向目标，且 expected 匹配） | `200` 幂等，无变化 |
+| 行存在但 `base_kind = cleaned` | `400`：cleaned 未确认不得成为当前有效正文 |
+| `target_version_id` 不存在 | `400` |
+| 行存在且 kind 合法，但 `expected_current_version_id` ≠ 锁内读到的当前指针 | `409 VERSION_CONFLICT`：并发下指针已被其他请求切走（两个 switch 并发时后到者 `409`，T12） |
 
-- 原子性（已冻结）：单条 `UPDATE dramas SET current_source_version_id=? WHERE id=?` 天然原子（`dramas` 行锁串行化并发写）；影响行数 = 1 即成功（= 0 表示项目不存在，返回 `404`/`400` 按现有错误码约定）。切换后，其他持有旧当前行的乐观写（`confirm`/`PUT current`）在各自 `AND current_source_version_id=?old` 条件 UPDATE 下影响行数为 0 → `409`，与 T11 一致。
-- 行为语义：switch 只移动指针，**不产生新版本行**，历史完整保留；被切走的旧当前行自动降为只读历史。切换后用户可继续 `clean`（基于新当前正文重新整理）或 `skip`（仅当新当前 = `source` 且无整理稿时）。
+- 原子性（rev3 定稿）：按 §5.3 统一原子原语，单事务内锁 `dramas` 行 → 校验 target 行存在与 kind → 校验 `expected_current_version_id` = 当前指针 → `UPDATE dramas SET current_source_version_id=?target WHERE id=?` → 提交。行锁 + 旧指针校验双保险，杜绝并发覆盖；与 confirm / PUT current 的并发按锁序判定，T12 的 `409` 断言稳定可复现。
+- 行为语义：switch 只移动指针，**不产生新版本行**，历史完整保留；被切走的旧当前行自动降为只读历史。切换后用户可继续 `clean`（基于新当前正文重新整理）；`skip` 仅当新当前 = `source` 且从未有整理稿时可用（rev3，P0-⑤）。
 - 响应 `200`：`{ current: { kind: "source|confirmed|user-edited", id: 1 } }`。
 
 ### 5.4 与分集端点的衔接（已冻结）
@@ -326,6 +351,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 - 哈希语义（rev1，响应 P1-1）：`episode_plan_drafts.source_hash` 的列名沿用现状，本文统一解释为「**分集输入正文哈希**」= 当前有效正文的 `content_hash`（算法不变：`sha256(String(content || '').trim())`，与现有 `sourceHash()`（`backend/src/services/episode-plan-draft.ts`）算法一致）。检测对象由「固定 `dramas.description`」改为「当前有效正文」：
   - 未整理旧项目：当前有效正文 = `description`，哈希与现状逐字节一致，零回归（§5.2/T9）；
   - 整理/编辑/回退后：`confirm`、`PUT current`、`POST switch`（rev2）切换当前指针即改变哈希 → 既有「全文已变化，请重新生成分集建议」的 409 语义自然延续到确认稿/编辑稿/切回稿，不产生误报与漏报。
+- `from-plan` 的正文读取与哈希校验同步以当前有效正文为对象（rev3，§5.2 必改点 1），把「从确认稿/编辑稿生成剧集」补成闭环；未整理项目仍 = `dramas.description`，与现状逐字节一致、零回归。
 - 存储列不另设 `source_hash`；版本行哈希字段为 `content_hash`/`base_hash`（定义见 §6.1）。
 
 ---
@@ -334,7 +360,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 
 ### 6.1 新增存储（不实施）
 
-#### `source_versions` 正文版本表（rev2 定稿）
+#### `source_versions` 正文版本表（rev3 定稿）
 
 选型（响应 Hermes P0-1 / P0-2，rev1 冻结；rev2 修订序号分配机制）：**版本行不可变 + `base_kind` 允许 `cleaned → confirmed` 原地状态迁移 + 版本序号 = 自增主键 `id`**；「当前有效正文」用 `dramas.current_source_version_id` 指针列表达，不做同表唯一键技巧。
 
@@ -343,7 +369,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | `id` | `INT` NOT NULL AUTO_INCREMENT | 版本行主键，同时兼作**版本序号**（rev2，P0-5：由数据库自增分配，天然无并发撞号；同一项目内严格递增、可排序、不复用；`MAX(version_seq)+1` 事务内取值方案已废止，见否决备选） |
 | `drama_id` | `INT` NOT NULL | 关联 `dramas.id` |
 | `base_kind` | `VARCHAR(16)` NOT NULL | `source / cleaned / confirmed / user-edited`；仅 `cleaned → confirmed` 允许原地迁移（§5.3 confirm），其余行创建后不再变更 |
-| `content` | **`LONGTEXT`** NOT NULL | 版本全文（`clean_text` 一律用 `LONGTEXT`，不落 `TEXT`，对齐 roadmap §4.1 工程修正） |
+| `content` | **`LONGTEXT`** NOT NULL | 版本全文 = 规范化输入（`String(content).trim()`，rev3 §3.3，与 `content_hash` 同基准；`clean_text` 一律用 `LONGTEXT`，不落 `TEXT`，对齐 roadmap §4.1 工程修正） |
 | `content_hash` | `VARCHAR(64)` NOT NULL | `sha256(String(content || '').trim())`（算法与现有 `sourceHash` 一致）；「全文变化检测」与定位的哈希依据 |
 | `base_hash` | `VARCHAR(64)` NOT NULL | `base_kind=source` 行 = 自身 `content_hash`；其余行 = `parent_version_id` 指向行的 `content_hash`；用于跨版本完整性与 §2.1 可复现校验 |
 | `parent_version_id` | `INT` NULL | 前驱版本行 id（`source` 首行为 NULL） |
@@ -371,7 +397,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 ### 6.3 迁移与回填（已冻结）
 
 - 旧项目零回填：无 `source_versions` 记录的项目全部按 `source` 处理，链路与现状一致（§5.2）。
-- `source` 行懒生成（rev1）：不为存量项目批量建行；当项目首次发起健康检查 / 整理 / 或 `analyze-episodes` 首次携带正文时，由后端把当前有效正文（此时 = `dramas.description`）落为 `base_kind=source` 首行并回填 `current_source_version_id`。`POST /dramas` 行为不变（正文仍写 `description`），避免改变现状创建链路。
+- `source` 行懒生成（rev1；rev3 补并发防重）：不为存量项目批量建行；当项目首次发起健康检查 / 整理 / 或 `analyze-episodes` 首次携带正文时，由后端把当前有效正文（此时 = `dramas.description`）落为 `base_kind=source` 首行并回填 `current_source_version_id`。并发防重（rev3）：懒生成遵循 §5.3 统一原子原语——事务内锁 `dramas` 行后判定「该项目是否已有任意版本行」，无则 INSERT + 回填，有则跳过，避免并发首次访问产生重复 `source` 行。`POST /dramas` 行为不变（正文仍写 `description`），避免改变现状创建链路。
 - 迁移文件遵循仓库现状：不引入独立迁移工具，DDL 在 `mysql-schema.ts` 的幂等 `initMySqlSchema` 流程追加（`db/index.ts` 启动调用），保证对已存在旧库可重复执行；`source_versions`/新增列用 `CREATE TABLE IF NOT EXISTS` / `information_schema.COLUMNS` 判存的幂等 ALTER（沿用 `sys_task` 恢复租约列的既有模式）。
 
 ---
@@ -389,17 +415,17 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | # | 层 | 用例 | 断言 |
 | --- | --- | --- | --- |
 | T1 | 纯函数（定位） | 锚点四件套计算 | 稳定段落 ID 对同段重复计算一致；不同段冲突概率受哈希前缀控制 |
-| T2 | 纯函数（切片一致性） | 确认稿进入 `splitSourceIntoEpisodes` | 拼接=输入；`character_count` 和=输入长度；段落不重复 |
+| T2 | 纯函数（切片一致性） | 确认稿进入 `splitSourceIntoEpisodes` | 按集拼接 = 规范化输入（`String(content).trim()` 基准，rev3）；`character_count` 和=规范化输入长度；段落不重复；输入含首尾空白/段间空行时不丢内容 |
 | T3 | 纯函数（可复现性） | 同一原文+同一删除区间集合跑两次整理校验 | 两次 `cleaned` 逐字节相等 |
 | T4 | 纯函数（质量门） | 删除区间含重叠/越界/找不到 snippet 的非法集 | 校验拒绝并给出具体错误 |
 | T5 | 路由（健康检查） | clean/issues 两态响应 | 无模型调用；issues 分类计数正确 |
 | T6 | 路由（clean） | 发起/重跑/并发 | running/already_running；旧版本不被覆盖 |
-| T7 | 路由（confirm） | 三态返回 + 原子迁移 | 最新 cleaned → 200 且该行 `kind` 原地迁移为 confirmed、指针切换；重复确认同一行 → 409；确认非最新 cleaned → 409；`expected_version` 不存在 → 400 |
-| T8 | 路由（skip） | 跳过整理 | 仅当当前正文=source 时 200 并记录标记；已有整理稿 → 400；再发起 clean 可取消标记 |
+| T7 | 路由（confirm） | 三态返回 + 原子迁移 | 最新 cleaned → 200 且该行 `kind` 原地迁移为 confirmed、指针切换；重复确认同一行 → 409；确认非最新 cleaned → 409（两个不同 cleaned 并发确认，后到者按锁序 409，rev3）；`expected_version` 不存在 → 400 |
+| T8 | 路由（skip） | 跳过整理 | 从未整理（无任何 cleaned/confirmed/user-edited 行且当前=source）→ 200 并记录标记；已存在未确认 cleaned（即使指针仍=source）→ 400（rev3 最严语义）；已确认/编辑 → 400；再发起 clean 可取消标记 |
 | T9 | 集成（旧项目） | 无版本记录项目完整走分集 | 行为与现状基线一致（逐接口 diff 为空） |
 | T10 | 路由（user-edited） | `PUT /source/current` 编辑切换 | confirmed 编辑后新建 `user-edited` 行、指针切换、旧行保留为快照；重复编辑产生第二条 user-edited；过期 `expected_version` → 409；对 `cleaned`/`source` 行编辑 → 400 |
-| T11 | 路由（并发） | confirm / PUT current 并发 | 同一 cleaned 并发 confirm 两次，第二个 409（UPDATE 影响行数 0 判定）；PUT current 并发切换，败者 409 且无孤儿版本行 |
-| T12 | 路由（switch） | `POST /source/switch` 版本切换 | 从 confirmed 切回 `source` 行 → 200 且 current=source、不新建版本行；切 `cleaned` 行 → 400；`expected_version` 不存在 → 400；重复切同一行幂等 200；switch 后旧当前行降为只读历史、再 `clean`+`confirm` 状态机可重新走通（P0-6 / P1-新1 闭环）；switch 与 PUT current 并发时持旧当前行的写者 409 |
+| T11 | 路由（并发） | confirm / PUT current 并发 | 同一 cleaned 并发 confirm 两次，第二个按锁序 409（rev3 锁内判定）；PUT current 并发切换，败者 409 且不产生孤儿版本行 |
+| T12 | 路由（switch） | `POST /source/switch` 版本切换 | 从 confirmed 切回 `source` 行 → 200 且 current=source、不新建版本行；切 `cleaned` 行 → 400；`target_version_id` 不存在 → 400；target = 当前指针（expected 匹配）→ 幂等 200；`expected_current_version_id` 过期（两个 switch 并发 / 与 PUT current 并发）→ 后到者 409（rev3）；switch 后旧当前行降为只读历史、再 `clean`+`confirm` 状态机可重新走通（P0-6 / P1-新1 闭环） |
 
 ### 7.3 三个代表样本（roadmap §6「真实基线」先行对象）
 
@@ -421,6 +447,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 - [ ] 分集顺序不变、不漏字、不重复：T2 + S2/S3 全覆盖。
 - [ ] 定位失败可降级：§3.4 有实现路径与用例（T2 unresolved 分支）。
 - [ ] 旧项目与跳过整理保持现有行为：§5.2 兼容规则 + T9。
+- [ ] 从整理稿出剧集闭环：`from-plan` 正文读取与哈希校验以当前有效正文为对象（§5.2 必改点 1），确认稿/编辑稿项目可正常生成剧集；旧项目/跳过整理走 `dramas.description` 回退，行为零回归。
 - [ ] 每项验收可落成后续自动测试或代表样本测试：§7.2 矩阵全部标注可执行。
 - [ ] PR 只包含契约文档及必要索引，不包含运行时代码。
 
@@ -438,7 +465,7 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 
 ---
 
-## 10. 评审修订登记（Hermes PR #63 评审，2026-09-05）
+## 10. 评审修订登记（Hermes PR #63 + Codex 接管复审，2026-09-05）
 
 ### 10.1 已修复 / 已吸收
 
@@ -461,6 +488,18 @@ AI 自动整理只被允许输出「删除区间建议」，不允许输出改�
 | P0-5 | `version_seq` 用 `MAX(version_seq)+1` 并发撞号 | §6.1 定稿：版本序号并入自增主键 `id`（AUTO_INCREMENT 由库分配），废除独立 `version_seq` 列与 `uk_source_versions_seq`；否决备选记录理由 |
 | P0-6 | skip 承诺「版本切换」但契约无该端点 | §5.3 新增 `POST /dramas/:id/source/switch` 完整定义（三态返回表 + 原子性 UPDATE 指针）；skip 提示改指端点；§1.1 状态约束 / §6.1 指针时机联动；§7.2 新增 T12 |
 | P1-新1 | `PUT current` 与 skip 状态机死锁（confirmed 后无法回 source） | 随 P0-6 方案 A 自动闭环：`switch` 可切回 `source` 行，T12 断言；无需单独立项 |
+
+**rev3（本节修订，响应 Codex 接管复审 head `8bfd68c`，2026-09-05）**：
+
+| 编号 | 评审项 | 落点 |
+| --- | --- | --- |
+| P0-① | confirm 条件 UPDATE 未锁项目行，「非最新必须 409」在并发不同 cleaned 下不可稳定复现 | §5.3 统一原子原语：所有指针写端点（clean 懒生成/confirm/PUT current/switch）事务内先 `SELECT ... FOR UPDATE` 锁 `dramas` 行再判定；confirm 三态改为锁内判定（rev2「UPDATE 后补 SELECT 区分 400/409」废除） |
+| P0-② | switch 请求体无「调用方当前版本」，UPDATE 无法检测并发覆盖、T12 的 409 承诺不成立 | §5.3 switch 重写：请求体拆 `target_version_id` + `expected_current_version_id`；锁行 + 旧指针校验，409/幂等 200 语义写死 |
+| P0-③ | §5.2 冻结 from-plan「行为零变化」与 §5.4「读取当前有效正文」冲突 | §5.2 from-plan 移出零变化清单，列为 v0.4 唯二必改点之一（读取+哈希校验对象 = 当前有效正文，旧项目 `description` 回退分支保留）；§5.4 回链；§8 验收补闭环条目 |
+| P0-④ | T2「拼接=输入」与现状 trim 行为（输入整体 trim + 单集二次 trim）冲突 | §3.3 冻结规范化输入 `String(content).trim()`（版本/哈希/切片/断言同基准）；§5.2 必改点 2：保留段间换行、`normalizeReviewablePlan` 不再整篇二次 trim |
+| P0-⑤ | skip 前置条件自相矛盾（clean 后指针=source 但「已有整理稿 400」同时成立） | §5.3 skip 定稿最严语义：仅「从未产生任何整理稿」时允许（存在未确认 cleaned 也 400） |
+| P1-① | §3.3「AI 建议边界」超出 Agent 现状输出（集数/标题/摘要） | §0.1/§3.3 措辞降级为「AI 推荐集数与摘要 + 后端确定性切片」，不承诺 Agent 输出字符级边界 |
+| P1-② | §2.1-5「章节标题不丢弃」与删除区间分类含 `chapter_marker` 冲突 | §2.1/§5.3：删除区间分类冻结 `{ad, watermark, duplicate, garbage}`，`chapter_marker` 仅检出/锚点，不入删除区间；health-check issues type 同步移除 |
 
 ### 10.2 登记 v0.4.1 修正式（后续独立 PR，本文不再扩大范围）
 
