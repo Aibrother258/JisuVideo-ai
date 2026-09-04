@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| v1.1 | 2026-09-04 | PR #58 复审收口：中期路线「shuohao 策划包导入 Beta」标注候选方向（承接短剧上游导入，未单独立项前不作路线承诺）；新增 §12「双 Fork 协作与审核门禁」（职责划分 / 热点文件单一所有权 / 最终审核门禁） |
 | v1.0 | 2026-09-04 | 初稿：产品定位收敛为「AI 短剧生产工作台」；确定下一专项「原文整理与智能分集」；登记阶段路线图（短期 6–8 周 / 中期 3–6 个月 / 长期 6–12 个月）、暂停清单与核心指标 |
 
 ---
@@ -156,7 +157,7 @@ UI 治理（`docs/ui-optimization-plan.md`）主体收口情况（2026-09-04 核
 - 章节、人物、事件、时间线结构图。
 - 分集边界对比与历史版本。
 - 分集结果质量统计。
-- shuohao 策划包导入 Beta。
+- shuohao 策划包导入 Beta（**候选方向**——承接「短剧上游导入」，待单独立项后纳入排期；未立项前不作为正式路线承诺）。
 
 **主线二：跨镜头一致性**
 - 人物、场景、道具统一资产身份。
@@ -219,3 +220,25 @@ UI 治理（`docs/ui-optimization-plan.md`）主体收口情况（2026-09-04 核
 - **变更登记**：定位/范围裁决变更先在本文件 §0 修订记录登记，并同步在 `docs/iteration-logs/README.md` 台账登记（HB 编号），再修订正文。
 - **专项状态口径**：UI 治理进度与历史以 `docs/ui-optimization-plan.md` 修订记录为准；跨线术语口径以本文件与 `docs/iteration-logs/2026-09-02-ui-communication-audit.md` 术语索引为准。
 - **未拍板事项**：方向性候选一律标注「候选方向，待单独立项」，不得写成已立项/已决策。
+
+---
+
+## 12. 双 Fork 协作与审核门禁
+
+**协作拓扑**（git 操作细节见 `CONTRIBUTING.md` 与 `CLAUDE.md`）：
+
+```text
+chatfire-AI/huobao-drama   ← 上游原项目（只读，不用管）
+        │  fork
+        ▼
+Aibrother258/JisuVideo-ai  ← 主协作仓库：master 与 docs 正式基线的唯一持有方
+        │  fork
+        ▼
+csx12588/JisuVideo-ai      ← 实施 fork：改动一律经 PR 汇入主仓库
+```
+
+- **双 Fork 职责划分**（2026-09-04 PR #58 定位收口评审确认）：
+  - 主仓库（Aibrother258）持有 master 与全部 docs 正式基线，负责产品/范围最终裁决、评审与合并；Hermes（主仓库侧评审 agent）出具技术评审，Bugbot 出具复审。
+  - 实施 fork（csx12588）负责功能与文档实施，所有改动经 PR 汇入主仓库，不直接推送 master 与 docs 基线。`gh` 命令一律显式加 `--repo Aibrother258/JisuVideo-ai`——fork 中 `gh` 默认操作父仓库 `chatfire-AI/huobao-drama`，已实际踩坑，见 `CLAUDE.md`。
+- **热点文件单一所有权**：产品定位/路线文档、修订记录号位（v1.x / v3.x）、台账 HB 编号、术语索引等热点文件与号位由主仓库基线唯一持有；fork 与本地任何同名/同号位草稿一律不提交、不并入（本次以 `product-positioning-roadmap.md` 为唯一正式路径，本地 `product-positioning-and-roadmap.md` 不提交即依此约定）。同号位冲突时以主仓库基线为准吸收内容，不让两套文案互相覆盖。
+- **最终审核门禁**：定位/范围裁决与热点文档变更须依次通过 Hermes 技术评审 → Bugbot 复审 → 主仓库 owner 最终裁决，方合入 master；未过门禁前相关内容一律标「候选方向，待单独立项」，不得写成已拍板/已立项。
