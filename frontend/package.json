@@ -7,7 +7,8 @@
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "test": "node --import tsx/esm --test",
+    "test": "node --import tsx/esm --test tests/*.test.mjs",
+    "test:build": "node --import tsx/esm --test tests/build/*.test.mjs",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {

@@ -116,13 +116,13 @@
 3. 原生控件（select/滚动条/switch）随 `color-scheme: dark` 变暗，无白底原生控件钉在暗页。
 4. 系统偏好暗色时开页即暗（无先亮后闪）；改系统偏好实时切换；`localStorage['ui-theme']='light'` 可强制亮。
 5. **light 回归**：`:root` light token 值零改动，亮色观感与合入前逐像素一致。
-6. 测试守卫：结构测试锚定 studio.css dark 覆盖块与 `color-scheme`、nuxt.config 首帧 bootstrap（app.vue 不再运行时注入）、B1/P2 字面量清理、light token 值零改动；行为测试直接运行 `theme-core.mjs`（零 DOM 依赖）：三态解析与非法值回退、存储读写异常容错、bootstrap 全场景矩阵（vm 沙箱执行）、controller 运行时跟随/手动覆盖/监听生命周期、`--sel` 双主题 AA 对比度（WCAG 实算）；构建产物校验 bootstrap 已嵌入 SPA 渲染模板且先于入口资源。
+6. 测试守卫：结构测试锚定 studio.css dark 覆盖块与 `color-scheme`、nuxt.config 首帧 bootstrap（app.vue 不再运行时注入）、B1/P2 字面量清理、light token 值零改动；行为测试直接运行 `theme-core.mjs`（零 DOM 依赖）：三态解析与非法值回退、存储读写异常容错、bootstrap 全场景矩阵（vm 沙箱执行）、controller 运行时跟随/手动覆盖/监听生命周期、`--sel` 双主题 AA 对比度（WCAG 实算）；**构建产物集成测试**（`npm run test:build`，独立于快速 `npm test`）每次强制全新 production build 并启动 nitro server 请求实际 SPA HTML，断言 bootstrap 先于 stylesheet 与 module entry——产物缺失、构建失败或顺序破坏均判失败，绝不静默 skip（已做负面验证：移除 bootstrap 后测试红）。
 
 ## 6. 分批路线
 
 | 批次 | 交付 | 验证 |
 |---|---|---|
-| **首批（本 PR）** | dark token 覆盖块 + `color-scheme` + 首帧 bootstrap（nuxt.config 静态 head，产物嵌入校验）+ system 运行时跟随（plugin/composable）+ B1 纸面字面量 token 化 + 局部暗色修复（`--sel` 提升全局、skill 错误卡语义 token）+ 行为级测试（主题核心/AA 对比度） | frontend 全量测试 + build；亮色零变化；暗色人工验收 |
+| **首批（本 PR）** | dark token 覆盖块 + `color-scheme` + 首帧 bootstrap（nuxt.config 静态 head）+ system 运行时跟随（plugin/composable）+ B1 纸面字面量 token 化 + 局部暗色修复（`--sel` 提升全局、skill 错误卡语义 token）+ 行为级测试（主题核心/AA 对比度）+ 构建产物集成测试（test:build） | `npm test` 全量 + `npm run test:build`（真构建产物 HTML 顺序断言）；亮色零变化；暗色人工验收 |
 | 第二批 | B2 局部语义色 token 化 + 页面级暗色细节走查修正（对比度/遮罩/玻璃） | 同上 |
 | 第三批 | 设置页「外观」切换控件（浅色/深色/跟随系统三态）+ 持久化 | 手工 + 结构守卫 |
 

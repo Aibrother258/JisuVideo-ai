@@ -1,10 +1,9 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 const root = new URL('..', import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), 'utf8')
-const exists = (path) => existsSync(new URL(path, root))
 
 test('C4 batch: studio.css defines dark token overlay block + color-scheme without touching light values', () => {
   const css = read('app/assets/studio.css')
@@ -40,15 +39,6 @@ test('C4 P1-1 batch: first-frame bootstrap lives in nuxt.config static head (not
   // 运行时跟随由 client plugin 承担，暴露 useTheme
   assert.match(read('app/plugins/theme.client.ts'), /createThemeController/)
   assert.match(read('app/composables/useTheme.ts'), /setTheme/)
-})
-
-test('C4 P1-1 batch: built SPA html embeds the theme bootstrap before entry resources (dist check)', { skip: !exists('.output/server/chunks/routes/renderer.mjs') }, () => {
-  const dist = read('.output/server/chunks/routes/renderer.mjs')
-  const boot = dist.indexOf("setAttribute('data-theme'")
-  assert.ok(boot >= 0, 'built renderer should embed the bootstrap script')
-  // bootstrap 在 html <head> 中作为内联同步脚本先执行；入口资源引用必须在其后
-  const entry = dist.indexOf('/_nuxt/')
-  if (entry >= 0) assert.ok(boot < entry, `bootstrap (${boot}) must precede entry script (${entry})`)
 })
 
 test('C4-B1 batch: detail.vue paper/glass literals tokenized (no raw hex/white-glass/black-hover leftovers)', () => {
