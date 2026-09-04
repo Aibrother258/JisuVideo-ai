@@ -1,9 +1,9 @@
 # JisuVideo-ai 产品定位与路线（AI 短剧生产工作台）
 
-> 版本：v1.1
+> 版本：v1.2
 > 日期：2026-09-04
-> 状态：**定位裁决基线（2026-09-04 用户决策，随 PR #58 收口）**——产品定位、范围裁决与阶段路线图（短期 6–8 周 / 中期 3–6 个月 / 长期 6–12 个月）
-> 关联：`docs/ui-optimization-plan.md`（UI 治理专项，v3.4 进入维护状态）、`docs/multi-video-type-extension-plan.md`（多视频类型扩展，已取消归档）、`docs/shuohao-practices-borrowing-report.md`（参考资料，不等于立项）
+> 状态：**定位裁决与协作基线（2026-09-04 用户决策）**——产品定位、范围裁决、阶段路线图与双实施 Fork 任务认领制
+> 关联：`docs/ui-optimization-plan.md`（UI 治理专项，v3.4 进入维护状态）、`docs/collaboration-task-claim-plan.md`（任务认领制实施细则）、`docs/multi-video-type-extension-plan.md`（多视频类型扩展，已取消归档）、`docs/shuohao-practices-borrowing-report.md`（参考资料，不等于立项）
 > 本文性质：定位与范围裁决文档。已决定事项与候选事项分开记录，不再混在一份文档里一次拍板。
 
 ---
@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | 内容 |
 | --- | --- | --- |
+| v1.2 | 2026-09-04 | 双实施 Fork 协作从固定分线升级为「主账号通过 Codex 发布任务 + 两个实施 Fork 从 GitHub Issues 认领」；明确账号映射、任务状态、热点文件锁、两台电脑同步规则与审核门禁；实施细则见 `docs/collaboration-task-claim-plan.md` |
 | v1.1 | 2026-09-04 | PR #58 复审收口（Hermes + Bugbot 多轮评审修订）：① 「shuohao 策划包导入 Beta」移出中期正式路线，并入新建 §8 候选能力池，去掉 Beta 前缀与时间窗口——承接「短剧上游导入」，未单独立项前不作路线承诺；② 协作章节（原 §12）修订并顺延为 §13「双实施 Fork 协作与审核门禁」——协作拓扑为主仓库（Aibrother258）+ 两个实施 fork，账号 ↔ 实施线对应后续明确，补充「契约 PR 先合入 → 两账号同步 master → 分头实施 → 依次合并」顺序；③ 文档头部版本号与修订记录统一为 v1.1，ui-plan v3.4 与 PR 正文引用同步 |
 | v1.0 | 2026-09-04 | 初稿：产品定位收敛为「AI 短剧生产工作台」；确定下一专项「原文整理与智能分集」；登记阶段路线图（短期 6–8 周 / 中期 3–6 个月 / 长期 6–12 个月）、暂停清单与核心指标 |
 
@@ -232,7 +233,7 @@ UI 治理（`docs/ui-optimization-plan.md`）主体收口情况（2026-09-04 核
 
 ---
 
-## 13. 双实施 Fork 协作与审核门禁
+## 13. 主仓库调度 + 双实施 Fork 任务认领制
 
 **协作拓扑**（git 操作细节见 `CONTRIBUTING.md` 与 `CLAUDE.md`）：
 
@@ -243,13 +244,16 @@ chatfire-AI/huobao-drama   ← 上游原项目（只读，不用管）
 Aibrother258/JisuVideo-ai  ← 主仓库：master 与 docs 正式基线的唯一持有方（最终裁决与合并）
         │  fork（两个实施账号）
         ▼
-实施 Fork A / 实施 Fork B  ← 实施 fork：功能与文档实施，一律经 PR 汇入主仓库
+csx12588 / balltoo          ← 两个实施 fork：从主仓库 Issue 任务池认领，经 PR 汇入
 ```
 
-- **角色与职责划分**（2026-09-04 用户确认：共三个 git 账号——Aibrother258 为主仓库，另两个账号均为 fork 实施账号）：
-  - 主仓库（Aibrother258）持有 master 与全部 docs 正式基线，负责产品/范围最终裁决、评审与合并；Hermes（主仓库侧评审 agent）出具技术评审，Bugbot 出具复审。
-  - 两个实施 fork（账号 A / 账号 B）负责功能与文档实施，所有改动一律经 PR 汇入主仓库，不直接推送 master 与 docs 基线。`gh` 命令一律显式加 `--repo Aibrother258/JisuVideo-ai`——fork 中 `gh` 默认操作父仓库 `chatfire-AI/huobao-drama`，已实际踩坑，见 `CLAUDE.md`。
-  - **实施线分工方向（账号 ↔ 实施线对应尚未明确，明确后在本节登记）**：拟分两条实施线并行——「原文理解 / 智能分集」与「生产可靠性 / 代表样板」；由哪个账号承担哪条线后续再定，未定前两账号共用本协作规则。
-- **协作顺序（防热点文件互相覆盖）**：契约 / 范围裁决类 PR 先合入主仓库 → 两个实施账号各自同步主仓库 master → 在各自线内分头实施 → **依次**提交并合入 PR（而非同时改同一批热点文件），保证任一时刻热点文件只有一路在改；同号位冲突时以主仓库基线为准吸收内容，不让两套文案互相覆盖。
-- **热点文件单一所有权**：产品定位/路线文档、修订记录号位（v1.x / v3.x）、台账 HB 编号、术语索引等热点文件与号位由主仓库基线唯一持有；fork 与本地任何同名/同号位草稿一律不提交、不并入（本次以 `product-positioning-roadmap.md` 为唯一正式路径，本地 `product-positioning-and-roadmap.md` 不提交即依此约定）。
-- **最终审核门禁**：定位/范围裁决与热点文档变更须依次通过 Hermes 技术评审 → Bugbot 复审 → 主仓库 owner 最终裁决，方合入 master；未过门禁前相关内容一律标「候选方向，待单独立项」，不得写成已拍板/已立项。
+- **主账号调度**：`Aibrother258` 持有 `master`、产品路线和公共契约，通过 Codex 把路线拆成 GitHub Issues，维护优先级、依赖、热点文件锁并最终审核合并。
+- **实施 Fork A**：`csx12588/JisuVideo-ai` 默认优先认领「原文理解 / 智能分集」，但可认领其他无冲突任务。
+- **实施 Fork B**：`balltoo/JisuVideo-ai-ball` 默认优先认领「生产可靠性 / 代表样板」，但可认领其他无冲突任务。
+- **认领是事实源**：实施线只表示默认专长，Issue Assignee 与状态标签才表示当前任务归属；每个实施账号同时最多认领一个主要任务。
+- **协作顺序**：主账号发布 Issue → 实施账号留言认领并同步最新 `master` → 主账号确认 Assignee/热点锁 → 独立分支实施 → PR 关联 Issue → Hermes → Bugbot → owner 合并 → 两个实施账号重新同步 `master`。
+- **热点文件单一所有权**：数据库/schema、共享 API/共享 utils、产品路线、UI 规划、HB 台账号位、巨型页面和公共组件等热点区域，任一时刻只允许一个在途任务修改。共同依赖先拆最小契约 PR 合入，再并行实现。
+- **禁止分支串联**：不得从另一个实施账号尚未合入的分支继续开发；两台电脑只通过主仓库已合并代码和 GitHub Issue/PR 同步。
+- **最终审核门禁**：所有实施 PR 依次通过 Hermes 技术评审 → Bugbot 复审 → 主仓库 owner 最终裁决后方可合入 `master`。
+
+完整任务状态、认领话术、两台电脑同步命令、Issue/PR 要求和首批试运行见 `docs/collaboration-task-claim-plan.md`。

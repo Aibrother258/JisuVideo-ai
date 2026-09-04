@@ -2,6 +2,8 @@
 
 本项目采用 **Fork + Pull Request** 协作模式：每位协作者在自己账号下维护一个 fork，所有改动通过 PR 汇入主仓库。
 
+任务由主账号通过 Codex 拆成 GitHub Issues；实施账号先认领 Issue，再创建分支。完整规则见 [`docs/collaboration-task-claim-plan.md`](docs/collaboration-task-claim-plan.md)。
+
 ---
 
 ## 一、仓库关系与术语
@@ -60,6 +62,16 @@ cd ../frontend && npm install
 ---
 
 ## 三、日常开发流程
+
+### 先认领任务，再开始开发
+
+1. 在 `Aibrother258/JisuVideo-ai` Issues 中选择带 `status:ready` 的任务。
+2. 按任务认领格式留言，写明账号、实施线、分支、预计文件、热点文件和当前主仓库提交号。
+3. 等待主账号设置 Assignee，并把状态改为 `status:claimed`。
+4. 每个实施账号同时最多认领一个主要任务；没有 Issue 的实施 PR 原则上不进入最终审核。
+5. 默认分工：`csx12588` 优先内容理解/智能分集，`balltoo` 优先生产可靠性/代表样板；可以跨线认领，但不得与其他任务冲突。
+
+如果任务涉及数据库/schema、共享 API、共享 utils、路线/台账、巨型页面或公共组件，必须在 Issue 标明 `hotspot`，主账号确认锁后再开发。
 
 ### 开工前：先同步主仓库最新代码
 
@@ -153,7 +165,7 @@ git push -u origin feat/我要做的东西
    而不是 `chatfire-AI/huobao-drama`。发到上游会打扰原作者，也不会被合并。
 
 3. **勾选 `Allow edits by maintainers`** —— 方便 owner 直接帮你修小问题，不用反复来回
-4. 标题与描述按 PR 模板填写，说清楚「改了什么 / 为什么 / 怎么自测的」
+4. 标题与描述按 PR 模板填写，说清楚「关联 Issue / 实施线 / 主仓库基线 / 热点文件 / 改了什么 / 为什么 / 怎么自测的」
 5. 指定至少一位 reviewer
 
 ### 使用 gh CLI 时（又一个「默认指到上游」的坑）

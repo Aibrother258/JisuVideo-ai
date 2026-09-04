@@ -61,7 +61,8 @@
 | HB-20260904-04 | UI C4 暗色主题首批（B1）——dark token 覆盖块 + `data-theme` 切换 + 首帧 FOUC + B1 字面量 token 化 | 完成（PR #53，merge `7c99e15`）；经三轮评审收口（静态 head bootstrap / 真构建产物集成测试 + CI 强制 / 子进程兜底清理）；frontend 142/142、test:build 通过 | [查看归档](../pr-records/2026-09-04-ui-c4-dark-theme-b1.md) |
 | HB-20260904-05 | UI C4 暗色主题第二批（B2）——局部语义色/投影残留收口 + `solid-ink` 反色实心块 | 完成（PR #54，merge `f959214`）；经三轮 Request Changes 守卫逐级收紧（逐选择器断言 / bg shorthand 只许 solid-ink / 全部同名规则 + 空白规范化），145/145、test:build 通过 | [查看归档](../pr-records/2026-09-04-ui-c4-b2-solid-ink-token.md) |
 | HB-20260904-06 | UI C4 暗色主题第三批——设置页「外观」三态切换面板 + 持久化（C4 完结批） | 完成（PR #56，merge `c58323e`）；评审 P2 跟进：说明文字改 `--text-2`（dark AA）+ 双主题守卫锚定；面板抽 `ThemeAppearanceCard` + vitest 挂载级交互套件（真实 useTheme/controller，`npm run test:ui` 4/4，CI/verify 强制）；frontend 148/148、test:build 通过 | [查看归档](../pr-records/2026-09-04-ui-c4-batch3-appearance-switcher.md) |
-| HB-20260904-07 | 产品定位收敛与 PR #58 改造为「战略定位与范围裁决 PR」（2026-09-04 定位裁决）——产品定位收敛为「AI 短剧生产工作台」、登记阶段路线图/暂停清单/北极星指标、UI 治理转维护、「原文整理与智能分集」定为下一专项（v0.4 另开 PR）、净化稿 v0.3 移出 PR、shuohao 报告降级参考资料 | 随 PR #58 待合入（纯文档：定位文档新增 + 相关文档口径同步）；README 定位口径已同步 | [定位文档](../product-positioning-roadmap.md) |
+| HB-20260904-07 | 产品定位收敛与 PR #58 改造为「战略定位与范围裁决 PR」（2026-09-04 定位裁决）——产品定位收敛为「AI 短剧生产工作台」、登记阶段路线图/暂停清单/北极星指标、UI 治理转维护、「原文整理与智能分集」定为下一专项（v0.4 另开 PR）、净化稿 v0.3 移出 PR、shuohao 报告降级参考资料 | 完成（PR #58，merge `0bf7ed5`）；README 与唯一定位主文档已同步 | [定位文档](../product-positioning-roadmap.md) |
+| HB-20260904-08 | 双实施 Fork 协作升级为任务认领制——主账号通过 Codex 发布 GitHub Issues，`csx12588` 与 `balltoo` 从任务池认领；增加热点文件锁、两台电脑同步规则、Issue/PR 模板和审核门禁 | 随协调 PR 待合入；首批试运行：Fork A 负责原文整理与智能分集 v0.4 契约，Fork B 完成 PR #59 测试与 backend CI | [实施计划](../collaboration-task-claim-plan.md) |
 
 ## 记录规范
 

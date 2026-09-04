@@ -9,6 +9,15 @@
 - [ ] `docs` 文档
 - [ ] `test` 测试
 
+## 任务认领信息
+
+- Closes #
+- 实施账号：
+- 实施线：`content-intelligence` / `production-reliability` / `shared-contract`
+- 开始开发时的主仓库基线提交：
+- 热点文件：无 / 列出文件
+- 是否已确认热点锁：不涉及 / 已确认
+
 ## 改了什么
 
 <!-- 一句话说清改动内容 -->
@@ -42,3 +51,5 @@
 - [ ] 没有提交 API Key、密码等敏感信息（AI 配置请在界面「设置 → AI 服务」中填写）
 - [ ] 涉及用法变化时，已同步更新 `README.md` 或 `docs/` 下相关文档
 - [ ] 已勾选 `Allow edits by maintainers`
+- [ ] 本 PR 已关联认领的 Issue，且范围没有超出任务单
+- [ ] 已写明所有 skipped、环境依赖或未执行的验证

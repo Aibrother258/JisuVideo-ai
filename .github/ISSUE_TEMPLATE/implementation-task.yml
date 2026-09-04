@@ -1,0 +1,92 @@
+name: Implementation Task
+description: 双实施 Fork 认领制的标准开发任务
+title: "[TASK] "
+labels:
+  - task
+  - status:ready
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本 Issue 是主仓库任务池的唯一事实源。认领前请确认未分配、无热点冲突，并先同步主仓库最新 master。
+  - type: dropdown
+    id: track
+    attributes:
+      label: 推荐实施线
+      options:
+        - content-intelligence
+        - production-reliability
+        - shared-contract
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级
+      options:
+        - P0
+        - P1
+        - P2
+        - P3
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: 用户价值与问题背景
+      description: 为什么现在做，解决什么真实问题。
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: 本次交付
+      description: 列出本任务必须完成的内容。
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: 明确不做
+      description: 防止实施范围扩张。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 每一项都应可验证。
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: 预计修改与热点文件
+      description: 列出文件/目录；没有热点文件时写“无”。
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与合并顺序
+      description: 写明依赖的已合并 Issue/PR；没有时写“无”。
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: 必须执行的验证
+      description: 测试、构建、类型检查和人工验收。
+    validations:
+      required: true
+  - type: checkboxes
+    id: ready
+    attributes:
+      label: 发布检查
+      options:
+        - label: 任务可在半天至两天内独立完成
+          required: true
+        - label: 已明确热点文件和依赖关系
+          required: true
+        - label: 已给出可验证的完成标准
+          required: true
