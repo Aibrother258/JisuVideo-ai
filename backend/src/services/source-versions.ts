@@ -53,14 +53,13 @@ const now = () => new Date().toISOString()
  * 无正文（description 为空）返回 null，不建立空 source 行 —— 避免污染当前指针。
  *
  * @param connectionPool 连接池，默认取本进程全局 pool；测试可注入隔离库的池。
- * @param contentOverride 本次请求携带的正文（如 analyze-episodes 的 body.content）。
- *   给定时以它落为 source 行 content，否则回退 dramas.description。
- *   理由：ensure 后版本行不可变（I7），若以 description 落行而请求带的是新内容，
- *   该源将永久锁死，后续所有分析都基于过期正文。
+ * @param expectedContent 请求正文，仅用于锁内比对，绝不作为 source 的内容来源。
  */
+export class SourceContentConflict extends Error {}
+
 export async function ensureSourceVersion(
   dramaId: number,
-  contentOverride?: unknown,
+  expectedContent?: string,
   connectionPool: Pool = pool,
 ): Promise<number | null> {
   const connection = await connectionPool.getConnection()
@@ -69,13 +68,18 @@ export async function ensureSourceVersion(
     try {
       // 锁 dramas 行（契约 §6.3 懒生成原子原语）
       const [rows] = await connection.query<any[]>(
-        'SELECT id, description FROM dramas WHERE id = ? FOR UPDATE',
+        'SELECT id, description, deleted_at FROM dramas WHERE id = ? FOR UPDATE',
         [dramaId],
       )
       const drama = rows[0]
-      if (!drama) {
+      if (!drama || drama.deleted_at) {
         await connection.commit()
         return null
+      }
+
+      const content = String(drama.description ?? '').trim()
+      if (expectedContent !== undefined && expectedContent.trim() !== content) {
+        throw new SourceContentConflict('全文内容已变化，请先保存并刷新后重新分析')
       }
 
       // 锁内判定：已有任意版本行即返回既有 id，与本次 content 是否有效无关
@@ -89,9 +93,7 @@ export async function ensureSourceVersion(
         return Number(versions[0].id)
       }
 
-      // 无版本行 → 校验正文。content 取请求携带正文优先，否则 dramas.description
-      // （POST /dramas 创建链路不变）。空正文不建行：避免空 source 行污染当前指针。
-      const content = String(contentOverride ?? drama.description ?? '').trim()
+      // 首版只使用锁内持久化正文；空正文不创建版本。
       if (!content) {
         await connection.commit()
         return null

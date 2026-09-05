@@ -14,14 +14,14 @@
  *   - 契约字段类型对齐（LONGTEXT / VARCHAR(64) / INT / 非 JSON 列）
  *   - analyze-episodes 懒生成接线
  *
- * 真实 MySQL 段（本文件末）：本机 MySQL 可用时真实执行 initMySqlSchema 连续 2 次、
- *   并发 5 次懒生成、指针回填与不变量断言。无 MySQL 时以 skip 标记跳过并说明原因
+ * 真实 MySQL 段（本文件末）：显式配置 MySQL 后真实执行 initMySqlSchema 连续 2 次、
+ *   并发 5 次懒生成、指针回填与不变量断言。仅本地显式 SOURCE_DB_TEST=0 时 skip，CI 连接失败直接失败
  *   （与仓库「无 MySQL 两态」约定一致；skip 只限真实 DB 段，纯函数与结构断言永不 skip）。
  *
  * 运行：cd backend && npm test
  */
 import { readFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -148,6 +148,8 @@ test('schema.ts 类型映射与 DDL 一致（index 非 uniqueIndex，对齐 DDL 
   assert.match(schema, /content: longtext\('content'\)\.notNull\(\)/)
   assert.match(schema, /baseHash: varchar\('base_hash', \{ length: 64 \}\)\.notNull\(\)/)
   assert.match(schema, /diff: longtext\('diff'\)/)
+  const versionMapping = schema.slice(schema.indexOf('export const sourceVersions'), schema.indexOf('export const sourceAnchors'))
+  assert.match(versionMapping, /updatedAt: varchar\('updated_at', \{ length: 64 \}\)\.notNull\(\)/)
   assert.match(schema, /export const sourceAnchors = mysqlTable\('source_anchors'/)
   assert.match(schema, /currentSourceVersionId: int\('current_source_version_id'\)/)
   assert.match(schema, /sourceSkipAt: varchar\('source_skip_at', \{ length: 64 \}\)/)
@@ -171,7 +173,7 @@ test('I7：懒生成代码无任何版本行 UPDATE / DELETE 路径', () => {
 test('懒生成：事务内锁 dramas 行 + 锁内判定已有版本行则跳过', () => {
   const src = read('src/services/source-versions.ts')
   assert.match(src, /await connection\.beginTransaction\(\)/)
-  assert.match(src, /SELECT id, description FROM dramas WHERE id = \? FOR UPDATE/)
+  assert.match(src, /SELECT id, description, deleted_at FROM dramas WHERE id = \? FOR UPDATE/)
   assert.match(src, /SELECT id FROM source_versions WHERE drama_id = \? ORDER BY id ASC LIMIT 1/)
   assert.match(src, /await connection\.commit\(\)/)
   assert.match(src, /await connection\.rollback\(\)/)
@@ -194,7 +196,7 @@ test('懒生成：事务内锁 dramas 行 + 锁内判定已有版本行则跳过
 
 test('懒生成：不新建业务端点，仅在 analyze-episodes 携带正文处接线（契约 §6.3 触发点）', () => {
   const routes = read('src/routes/dramas.ts')
-  assert.match(routes, /import \{ ensureSourceVersion \} from '\.\.\/services\/source-versions\.js'/)
+  assert.match(routes, /import \{ ensureSourceVersion, SourceContentConflict \} from '\.\.\/services\/source-versions\.js'/)
   assert.match(routes, /await ensureSourceVersion\(id, content\)/)
   // Issue #71 明确不做：不得新增 source 业务端点
   assert.doesNotMatch(routes, /source\/versions/, '不得新增 GET /source/versions（归 #72）')
@@ -230,64 +232,30 @@ test('POST /dramas 创建链路不变：懒生成不参与创建（契约 §6.3�
   assert.doesNotMatch(src, /INSERT INTO dramas/, '懒生成不得创建项目')
 })
 
-// ─── 6. 真实 MySQL 集成（可用时执行，否则显式 skip 并说明原因）───────────
-// 隔离策略：用 root 建独立库 s1_test_source_versions，跑完 DROP DATABASE，
-// 完全不碰开发库 huobao_drama。huobao 用户无 CREATE DATABASE 权限（SHOW GRANTS
-// 仅 ALL ON `huobao_drama`.*），故 root 连接仅用于建/删库，业务断言全部走 huobao
-// 连接池（与实际运行身份一致）。库名固定且带 s1_test_ 前缀，DROP 前再校验名称，
-// 避免误删非测试库。
+// 真实数据库模式：CI 强制执行；本地仅显式 SOURCE_DB_TEST=0 可跳过。
+// 每次创建唯一隔离库，不删除/授权任何既有库或用户。
 test('真实 MySQL：initMySqlSchema 连续 2 次幂等 + 并发 5 次懒生成只产生 1 行', async (t) => {
-  let mysql
-  try {
-    mysql = await import('mysql2/promise')
-  } catch (err) {
-    t.skip(`mysql2 不可用，跳过真实 DB 段：${err.message}`)
+  if (process.env.SOURCE_DB_TEST === '0' && !process.env.CI) {
+    t.skip('显式无 MySQL 模式 SOURCE_DB_TEST=0')
     return
   }
-
-  const host = process.env.MYSQL_HOST || '127.0.0.1'
-  const port = process.env.MYSQL_PORT || '3307'
-  const user = process.env.MYSQL_USER || 'huobao'
-  const password = process.env.MYSQL_PASSWORD || 'huobao'
-  const dbName = process.env.MYSQL_DATABASE || 'huobao_drama'
-  if (dbName !== 'huobao_drama') {
-    t.skip(`MYSQL_DATABASE=${dbName} 非开发库，跳过真实 DB 段（本段需与开发库同实例）`)
-    return
+  const mysql = (await import('mysql2/promise')).default
+  const options = {
+    host: process.env.MYSQL_HOST || '127.0.0.1',
+    port: Number(process.env.MYSQL_PORT || 3306),
+    user: process.env.MYSQL_TEST_ADMIN_USER || process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_TEST_ADMIN_PASSWORD ?? process.env.MYSQL_PASSWORD ?? 'huobao',
+    connectTimeout: 5000,
   }
-
-  let admin
-  try {
-    admin = await mysql.default.createConnection({ host, port, user: 'root', password: 'huobao_root', connectTimeout: 5000 })
-  } catch (err) {
-    t.skip(`无 root 连接（${err.message}），跳过真实 DB 段（需要 root 建隔离库，huobao 无 CREATE DATABASE 权限）`)
-    return
-  }
-  const testDb = 's1_test_source_versions'
-  await admin.query(`DROP DATABASE IF EXISTS \`${testDb}\``)
-  await admin.query(`CREATE DATABASE \`${testDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
-  // huobao 仅被授权 huobao_drama.*，需为其授予隔离库权限，业务断言才能走实际运行身份
-  await admin.query(`GRANT ALL PRIVILEGES ON \`${testDb}\`.* TO 'huobao'@'%'`)
-  await admin.query('FLUSH PRIVILEGES')
-
-  // 业务断言走 huobao 身份（与实际运行一致），库指向隔离库
-  const pool = mysql.default.createPool({ host, port, user, password, database: testDb, charset: 'utf8mb4', connectionLimit: 20 })
+  const admin = await mysql.createConnection(options)
+  const testDb = 's1_test_' + randomUUID().replaceAll('-', '')
+  let pool
+  let created = false
   const MARKER = 'S1TEST-'
-  // cleanup 先关池再删库：隔离库被 DROP 后池中连接会失效
-  const cleanup = async () => {
-    try {
-      await pool.end()
-    } catch {
-      /* 池可能已关闭或连接已失效，忽略 */
-    }
-    if (testDb.startsWith('s1_test_')) {
-      await admin.query(`DROP DATABASE IF EXISTS \`${testDb}\``)
-      // 回收临时授权，避免在 huobao 的 GRANTS 中留下已删库的条目
-      await admin.query(`REVOKE ALL PRIVILEGES ON \`${testDb}\`.* FROM 'huobao'@'%'`)
-      await admin.query('FLUSH PRIVILEGES')
-    }
-  }
-
   try {
+    await admin.query(`CREATE DATABASE \`${testDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+    created = true
+    pool = mysql.createPool({ ...options, database: testDb, charset: 'utf8mb4', connectionLimit: 20 })
     // 6.1 幂等升级：先在隔离库用「上一版本」的 source_versions 定义建表
     //（故意不含契约 §6.1 要求的 updated_at），再跑生产 initMySqlSchema，
     // 验证既有表能被 information_schema 判存 ALTER 补齐新列——与 sys_task 恢复租约列同模式。
@@ -330,7 +298,7 @@ test('真实 MySQL：initMySqlSchema 连续 2 次幂等 + 并发 5 次懒生成�
       [testDb],
     )
     const colNames = new Map(columns.map((row) => [row.COLUMN_NAME, row]))
-    for (const name of ['id', 'drama_id', 'base_kind', 'content', 'content_hash', 'base_hash', 'parent_version_id', 'diff', 'stats', 'created_at']) {
+    for (const name of ['id', 'drama_id', 'base_kind', 'content', 'content_hash', 'base_hash', 'parent_version_id', 'diff', 'stats', 'created_at', 'updated_at']) {
       assert.ok(colNames.has(name), `source_versions 缺少列 ${name}`)
     }
     assert.equal(colNames.get('content').DATA_TYPE, 'longtext')
@@ -412,14 +380,14 @@ test('真实 MySQL：initMySqlSchema 连续 2 次幂等 + 并发 5 次懒生成�
 
     // 6.6 已存在版本行时不新建（幂等），且不因正文为空而错报
     assert.equal(await mod.ensureSourceVersion(dramaId, sourceText, pool), Number(row.id), '已有版本行时返回既有 id')
-    assert.equal(await mod.ensureSourceVersion(dramaId, '   ', pool), Number(row.id), '已有版本行 + 空正文仍返回既有 id')
+    assert.equal(await mod.ensureSourceVersion(dramaId, undefined, pool), Number(row.id), '不携带 expected 正文时幂等返回')
     const [versionsAfter] = await pool.query('SELECT COUNT(*) AS count FROM source_versions WHERE drama_id = ?', [dramaId])
     assert.equal(Number(versionsAfter[0].count), 1, '重复调用不得新增版本行')
 
     // 6.7 已有版本行的项目不会因 contentOverride 变化而新建（I7 不可变语义）
     const overrideText = '重写后的正文，用于验证 contentOverride 不会改写既有版本行。'
     assert.equal(mod.sourceVersionContentHash(overrideText), createHash('sha256').update(overrideText).digest('hex'))
-    assert.equal(await mod.ensureSourceVersion(dramaId, overrideText, pool), Number(row.id))
+    await assert.rejects(mod.ensureSourceVersion(dramaId, overrideText, pool), mod.SourceContentConflict)
 
     // 6.8 旧项目零回填：另建项目，验证指针 NULL、无版本行；显式调用才建行
     const legacyTitle = `${MARKER}legacy-${suffix}`
@@ -431,6 +399,11 @@ test('真实 MySQL：initMySqlSchema 连续 2 次幂等 + 并发 5 次懒生成�
     assert.equal(legacy[0].current_source_version_id, null, '旧项目指针应保持 NULL')
     const [legacyVersions] = await pool.query('SELECT COUNT(*) AS count FROM source_versions WHERE drama_id = ?', [legacy[0].id])
     assert.equal(Number(legacyVersions[0].count), 0, '旧项目不得被批量回填版本行')
+    await assert.rejects(mod.ensureSourceVersion(legacy[0].id, '未保存的正文，不得固化为原版', pool), mod.SourceContentConflict)
+    const [rejected] = await pool.query('SELECT current_source_version_id FROM dramas WHERE id = ?', [legacy[0].id])
+    assert.equal(rejected[0].current_source_version_id, null)
+    const [rejectedVersions] = await pool.query('SELECT COUNT(*) AS count FROM source_versions WHERE drama_id = ?', [legacy[0].id])
+    assert.equal(Number(rejectedVersions[0].count), 0)
     const legacyVersionId = await mod.ensureSourceVersion(legacy[0].id, undefined, pool)
     assert.ok(legacyVersionId > 0, '显式调用应为旧项目建立首条 source 行')
     const [legacyAfter] = await pool.query('SELECT current_source_version_id FROM dramas WHERE id = ?', [legacy[0].id])
@@ -453,7 +426,16 @@ test('真实 MySQL：initMySqlSchema 连续 2 次幂等 + 并发 5 次懒生成�
     assert.equal(finalRow[0].base_hash, expectedHash)
     assert.equal(finalRow[0].content, sourceText.trim())
   } finally {
-    await cleanup()
-    await admin.end()
+    try {
+      if (pool) await pool.end()
+    } finally {
+      try {
+        if (created && /^s1_test_[a-f0-9]{32}$/.test(testDb)) {
+          await admin.query(`DROP DATABASE \`${testDb}\``)
+        }
+      } finally {
+        await admin.end()
+      }
+    }
   }
 })

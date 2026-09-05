@@ -80,6 +80,7 @@ export const sourceVersions = mysqlTable('source_versions', {
   diff: longtext('diff'),
   stats: text('stats'),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
+  updatedAt: varchar('updated_at', { length: 64 }).notNull(),
 }, table => ({
   dramaIndex: index('idx_source_versions_drama').on(table.dramaId),
   parentIndex: index('idx_source_versions_parent').on(table.parentVersionId),
