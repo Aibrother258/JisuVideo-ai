@@ -69,7 +69,7 @@
 
 | 编号 | 迭代 | 状态 | 详细日志 |
 |---|---|---|---|
-| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | 文档起草；Projects #1 基础配置完成、6 个 enabled workflow 已核验安全方向；标签自动同步与 Fork 访问验证待完成，未闭环 | [查看日志](./2026-09-05-coordination-hardening.md) |
+| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | PR #70 已撤 Draft；Projects #1 4 字段 + 2 视图 + 6 个 enabled workflow 全部核验安全方向；owner 裁决标签自动同步=人工同步；Fork 访问验证通过（csx12588 / balltoo 均能访问 Project #1）；#67 看板 Blocked=Yes→No、status 标签 blocked→in-progress；HB 台账 plan-log / run-flow 按"仅记 completed"原则暂不登记，待门禁链合入后一并补登 | [查看日志](./2026-09-05-coordination-hardening.md) |
 
 ## 记录规范
 
