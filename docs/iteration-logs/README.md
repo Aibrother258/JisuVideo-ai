@@ -65,6 +65,12 @@
 | HB-20260904-08 | 双实施 Fork 协作升级为任务认领制——主账号通过 Codex 发布 GitHub Issues，`csx12588` 与 `balltoo` 从任务池认领；增加热点文件锁、两台电脑同步规则、Issue/PR 模板和审核门禁 | 已合入（PR #60，merge 21b1dd3）；首批试运行：Fork A 负责原文整理与智能分集 v0.4 契约，Fork B 完成 PR #59 测试与 backend CI | [实施计划](../collaboration-task-claim-plan.md) |
 | HB-20260904-09 | 台账补齐——`plan-log.jsonl` 与 `run-flow.log.jsonl` 9 月 2-3 日缺口回填（26 + 29 条）与 HB-20260904-09 登记（自身闭环） | 已合入（PR #68，merge `b8adf0f`，2026-09-04T17:35:13Z）；plan-log 由 6→32 条（+26），run-flow 由 3→32 条（+29），全部时间戳按 GitHub `merged_at` 转为北京时间 +08:00；合入后由主账号追加自身闭环记录（plan-log +1、run-flow +1，共 plan-log 33 条 / run-flow 38 条），字段来源对齐 `docs/iteration-logs/README.md` 描述、`docs/pr-records/` 归档与 `gh pr list` 真实数据 | [查看归档](../pr-records/2026-09-04-hb-20260904-09-ledger-backfill.md) |
 
+## 2026-09-05
+
+| 编号 | 迭代 | 状态 | 详细日志 |
+|---|---|---|---|
+| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | PR #70 已撤 Draft；Projects #1 4 字段 + 2 视图 + 6 个 enabled workflow 全部核验安全方向；owner 裁决标签自动同步=人工同步；Fork 访问验证通过（csx12588 / balltoo 均能访问 Project #1）；#67 看板 Blocked=Yes→No、status 标签 blocked→in-progress；HB 台账 plan-log / run-flow 按"仅记 completed"原则暂不登记，待门禁链合入后一并补登 | [查看日志](./2026-09-05-coordination-hardening.md) |
+
 ## 记录规范
 
 每篇日志至少包含：
