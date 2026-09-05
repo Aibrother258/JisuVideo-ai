@@ -342,6 +342,60 @@ export async function initMySqlSchema(pool: Pool) {
   for (const statement of mysqlSchemaStatements) {
     await pool.query(statement)
   }
+  // ── v0.4 原文版本表（S1-1 / Issue #71，契约 §6.1 / §6.3）────────────────────
+  // 字段类型一律以契约 §6.1 字段表为准：LONGTEXT 而非 TEXT、VARCHAR(64) 而非 CHAR(64)/TIMESTAMP、
+  // INT 而非 BIGINT、diff/stats 用 LONGTEXT/TEXT 而非 MySQL JSON 列（对齐 plan_json 的既有写法）。
+  // 版本序号 = 自增主键 id（rev2，废除 MAX(version_seq)+1）；无 (drama_id, base_kind) 类唯一键
+  // ——同一 kind 多行历史是常态（重跑整理 / 重复编辑），且版本行完全不可变（I7），无软删。
+  await pool.query(`CREATE TABLE IF NOT EXISTS source_versions (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    drama_id INT NOT NULL,
+    base_kind VARCHAR(16) NOT NULL,
+    content LONGTEXT NOT NULL,
+    content_hash VARCHAR(64) NOT NULL,
+    base_hash VARCHAR(64) NOT NULL,
+    parent_version_id INT,
+    diff LONGTEXT,
+    stats TEXT,
+    created_at VARCHAR(64) NOT NULL,
+    updated_at VARCHAR(64) NOT NULL,
+    INDEX idx_source_versions_drama (drama_id),
+    INDEX idx_source_versions_parent (parent_version_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  // source_versions.updated_at 幂等补齐（沿用 sys_task 恢复租约列模式）。
+  // 契约 §6.1 要求 created_at / updated_at 均为 VARCHAR(64) NOT NULL；
+  // 版本行内容不可变（I7），updated_at 仅作行创建时间戳冗余，不随后续操作变化。
+  const [sourceVersionUpdatedAt] = await pool.query<any[]>(
+    "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'source_versions' AND COLUMN_NAME = 'updated_at'",
+  )
+  if (!sourceVersionUpdatedAt.length) {
+    await pool.query('ALTER TABLE source_versions ADD COLUMN updated_at VARCHAR(64) NOT NULL AFTER created_at')
+  }
+  // 段落/章节锚点索引（契约 §6.2）。锚点表不承载正文，正文权威为「当前有效正文」。
+  await pool.query(`CREATE TABLE IF NOT EXISTS source_anchors (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    drama_id INT NOT NULL,
+    version_id INT NOT NULL,
+    para_id VARCHAR(64) NOT NULL,
+    anchor_text TEXT NOT NULL,
+    hash VARCHAR(64) NOT NULL,
+    start INT NOT NULL,
+    end INT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    INDEX idx_source_anchors_drama (drama_id, version_id),
+    INDEX idx_source_anchors_para (version_id, para_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+  // CREATE TABLE IF NOT EXISTS 不会给已有表补列；启动时幂等补齐（沿用 sys_task 恢复租约列模式）。
+  const [sourceVersionColumns] = await pool.query<any[]>(
+    "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dramas' AND COLUMN_NAME IN ('current_source_version_id','source_skip_at')",
+  )
+  const sourceVersionCols = new Set(sourceVersionColumns.map((row: any) => row.COLUMN_NAME))
+  if (!sourceVersionCols.has('current_source_version_id')) {
+    await pool.query('ALTER TABLE dramas ADD COLUMN current_source_version_id INT AFTER metadata')
+  }
+  if (!sourceVersionCols.has('source_skip_at')) {
+    await pool.query('ALTER TABLE dramas ADD COLUMN source_skip_at VARCHAR(64) AFTER current_source_version_id')
+  }
   // 用户正文和剧本允许 20 万字符，必须使用 LONGTEXT；ALTER MODIFY 为幂等的数据保留迁移。
   await pool.query('ALTER TABLE dramas MODIFY COLUMN description LONGTEXT, MODIFY COLUMN metadata LONGTEXT')
   await pool.query('ALTER TABLE episodes MODIFY COLUMN content LONGTEXT, MODIFY COLUMN script_content LONGTEXT, MODIFY COLUMN description LONGTEXT')

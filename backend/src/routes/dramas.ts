@@ -8,6 +8,7 @@ import { getActiveConfigId } from '../services/ai.js'
 import { importNovelSource } from '../services/source-import.js'
 import { defaultEpisodeCount, splitSourceIntoEpisodes } from '../services/episode-planning.js'
 import { contentFingerprint, normalizeReviewablePlan, parseJsonArray, serializePlanDraft, sourceHash } from '../services/episode-plan-draft.js'
+import { ensureSourceVersion, SourceContentConflict } from '../services/source-versions.js'
 import { acquireAiRequest } from '../services/request-guard.js'
 import { parseJsonObject } from '../utils/json.js'
 import { sampleSourceContent } from '../utils/source-sample.js'
@@ -444,6 +445,9 @@ app.post('/:id/analyze-episodes', async (c) => {
 
   const requirement = String(body.requirement ?? '').trim()
   if (requirement.length > 500) return badRequest(c, '创作要求最多 500 字，请精简后重试')
+  if (content !== String(drama.description || '').trim()) {
+    return conflict(c, '全文内容已变化，请先保存并刷新后重新分析')
+  }
   const requirementContext = requirement
     ? `\n\n用户提出了明确的创作要求，请在保证不脱离原文主线的前提下优先满足，并在 reason 中简要说明如何落实。\n<requirement>\n${requirement}\n</requirement>`
     : ''
@@ -473,6 +477,8 @@ ${sampleSourceContent(content)}
   try {
     const agent = mastra.getAgent('episode_planner')
     if (!agent) return badRequest(c, '全文拆集服务未就绪')
+    // 参数校验及运行保护已通过；锁内核对已保存正文后才建立 source 首版。
+    await ensureSourceVersion(id, content)
     const result = await agent.generate([{ role: 'user', content: message }], { maxSteps: 1 })
     const raw = parseJsonObject(result.text || '')
     const plan = normalizeEpisodePlan(raw, content, requestedCount)
@@ -487,7 +493,7 @@ ${sampleSourceContent(content)}
     })
     return success(c, saved)
   } catch (err: any) {
-    if (err instanceof PlanVersionConflict) return conflict(c, err.message)
+    if (err instanceof PlanVersionConflict || err instanceof SourceContentConflict) return conflict(c, err.message)
     console.error('[episode-planner]', err?.stack || err)
     return badRequest(c, err?.message || 'AI 集数分析失败，请稍后重试')
   } finally {
