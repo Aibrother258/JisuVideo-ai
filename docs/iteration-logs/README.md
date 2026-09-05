@@ -69,7 +69,7 @@
 
 | 编号 | 迭代 | 状态 | 详细日志 |
 |---|---|---|---|
-| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | 已合入（PR #70，merge `59bf68a`，2026-09-05T14:49:52Z）；协作计划新增 §10.1/§10.2/§10.3/附录 A；Projects #1（PVT_kwHODc-qWM4BgT-r）建立 4 字段 + 2 视图 + 3 Issue；6 个 enabled 内置 workflow 全部核验安全方向；owner 裁决标签同步=人工同步（#67 issuecomment-5551869432）；Fork 访问验证通过；#67 已关闭，看板 Status 自动流转 Done | [查看日志](./2026-09-05-coordination-hardening.md) |
+| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | 已合入（PR #70，merge `59bf68a`，2026-09-05T14:46:33Z）；协作计划新增 §10.1/§10.2/§10.3/附录 A；Projects #1（PVT_kwHODc-qWM4BgT-r）建立 4 字段 + 2 视图 + 3 Issue；Auto-close issue 反向关闭已停用并回读 enabled=false；其余 5 个工作流保持启用；owner 裁决标签同步=人工同步（#67 issuecomment-5551869432）；Fork 访问验证通过；#67 已关闭，看板 Status 最终为 Done（不推断触发工作流） | [查看日志](./2026-09-05-coordination-hardening.md) |
 
 ## 记录规范
 
@@ -85,3 +85,5 @@
 8. 后续迭代建议。
 
 除非日志明确写明“真实生成已验证”，否则模型调用和付费生成能力只视为结构接通。
+
+复核纠正时间：2026-09-05 15:34:31 UTC。Auto-close issue 已停用；可在 Project 设置重新启用，但重新启用前需 owner 明确确认其反向关闭影响。
