@@ -35,8 +35,7 @@
 ## 接下来的执行与回滚
 
 - 本期接受"人工同步"方案（owner 裁决 issuecomment-5551869432）；若真实协调缺陷出现，另立最小自动化任务，明确权限、事件、幂等与回写方向。
-- PR #70 已撤 Draft，HEAD `b691485`；进入 Hermes → Bugbot → owner 评审链。
-- 使用 Refs #67，不自动关闭 Issue；owner 合入后再手动关闭 #67。
-- HB 台账 plan-log / run-flow 未追加 HB-20260905-01：按"仅记 completed"原则，待 PR #70 合入后一并补登。
+- PR #70 已合入（merge `59bf68a`）；#67 于 2026-09-05T14:49:52Z 关闭，看板 Status 由 Auto-close issue workflow 自动流转 In Progress→Done。
+- HB 台账 plan-log / run-flow 在 PR #70 合入后由 HB-20260905-01 补登提交（本 PR）完成"仅记 completed"闭环：plan-log 44 条 / run-flow 39 条。
 
 如文档需要回退，通过普通 PR 撤销本次新增段落；已创建的外部看板不得静默删除。无运行时或数据迁移需要回滚。

@@ -69,7 +69,7 @@
 
 | 编号 | 迭代 | 状态 | 详细日志 |
 |---|---|---|---|
-| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | PR #70 已撤 Draft；Projects #1 4 字段 + 2 视图 + 6 个 enabled workflow 全部核验安全方向；owner 裁决标签自动同步=人工同步；Fork 访问验证通过（csx12588 / balltoo 均能访问 Project #1）；#67 看板 Blocked=Yes→No、status 标签 blocked→in-progress；HB 台账 plan-log / run-flow 按"仅记 completed"原则暂不登记，待门禁链合入后一并补登 | [查看日志](./2026-09-05-coordination-hardening.md) |
+| HB-20260905-01 | Issue #67：事实源、看板映射与协调边界 | 已合入（PR #70，merge `59bf68a`，2026-09-05T14:49:52Z）；协作计划新增 §10.1/§10.2/§10.3/附录 A；Projects #1（PVT_kwHODc-qWM4BgT-r）建立 4 字段 + 2 视图 + 3 Issue；6 个 enabled 内置 workflow 全部核验安全方向；owner 裁决标签同步=人工同步（#67 issuecomment-5551869432）；Fork 访问验证通过；#67 已关闭，看板 Status 自动流转 Done | [查看日志](./2026-09-05-coordination-hardening.md) |
 
 ## 记录规范
 
