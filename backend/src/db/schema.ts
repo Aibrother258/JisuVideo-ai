@@ -1,7 +1,7 @@
 /**
  * Drizzle schema - MySQL column mappings.
  */
-import { mysqlTable, text, longtext, int, double, boolean, primaryKey, uniqueIndex, varchar } from 'drizzle-orm/mysql-core'
+import { mysqlTable, text, longtext, int, double, boolean, primaryKey, uniqueIndex, index, varchar } from 'drizzle-orm/mysql-core'
 
 export const dramas = mysqlTable('dramas', {
   id: int('id').primaryKey().autoincrement(),
@@ -16,6 +16,8 @@ export const dramas = mysqlTable('dramas', {
   thumbnail: text('thumbnail'),
   tags: text('tags'),
   metadata: longtext('metadata'),
+  currentSourceVersionId: int('current_source_version_id'),
+  sourceSkipAt: varchar('source_skip_at', { length: 64 }),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
   updatedAt: varchar('updated_at', { length: 64 }).notNull(),
   deletedAt: varchar('deleted_at', { length: 64 }),
@@ -59,6 +61,44 @@ export const episodePlanDrafts = mysqlTable('episode_plan_drafts', {
   updatedAt: varchar('updated_at', { length: 64 }).notNull(),
 }, table => ({
   dramaUnique: uniqueIndex('uq_episode_plan_drafts_drama').on(table.dramaId),
+}))
+
+// v0.4 原文正文版本表（契约 §6.1）。版本行完全不可变（I7）：
+// INSERT 后 content / base_kind / content_hash / base_hash / diff / stats 均无 UPDATE 路径。
+// 版本序号 = 自增主键 id；不设 (drama_id, base_kind, …) 类唯一键 —— 同一 kind 多行历史是常态。
+export const sourceVersions = mysqlTable('source_versions', {
+  id: int('id').primaryKey().autoincrement(),
+  dramaId: int('drama_id').notNull(),
+  baseKind: varchar('base_kind', { length: 16 }).notNull(),
+  content: longtext('content').notNull(),
+  contentHash: varchar('content_hash', { length: 64 }).notNull(),
+  // source 首行（parent 为 NULL）base_hash = 自身 content_hash（I2），故 NOT NULL
+  baseHash: varchar('base_hash', { length: 64 }).notNull(),
+  parentVersionId: int('parent_version_id'),
+  // diff 为 JSON 文本（对齐 plan_json 的 LONGTEXT 写法，非 MySQL JSON 列）；
+  // confirmed 派生行 = identity { removals: [], removed_chars: 0 }
+  diff: longtext('diff'),
+  stats: text('stats'),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, table => ({
+  dramaIndex: index('idx_source_versions_drama').on(table.dramaId),
+  parentIndex: index('idx_source_versions_parent').on(table.parentVersionId),
+}))
+
+// v0.4 段落/章节锚点索引（契约 §6.2）。锚点表不承载正文，正文权威为「当前有效正文」。
+export const sourceAnchors = mysqlTable('source_anchors', {
+  id: int('id').primaryKey().autoincrement(),
+  dramaId: int('drama_id').notNull(),
+  versionId: int('version_id').notNull(),
+  paraId: varchar('para_id', { length: 64 }).notNull(),
+  anchorText: text('anchor_text').notNull(),
+  hash: varchar('hash', { length: 64 }).notNull(),
+  start: int('start').notNull(),
+  end: int('end').notNull(),
+  sortOrder: int('sort_order').notNull().default(0),
+}, table => ({
+  dramaVersionIndex: index('idx_source_anchors_drama').on(table.dramaId, table.versionId),
+  paraIndex: index('idx_source_anchors_para').on(table.versionId, table.paraId),
 }))
 
 export const characters = mysqlTable('characters', {

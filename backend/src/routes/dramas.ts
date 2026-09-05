@@ -8,6 +8,7 @@ import { getActiveConfigId } from '../services/ai.js'
 import { importNovelSource } from '../services/source-import.js'
 import { defaultEpisodeCount, splitSourceIntoEpisodes } from '../services/episode-planning.js'
 import { contentFingerprint, normalizeReviewablePlan, parseJsonArray, serializePlanDraft, sourceHash } from '../services/episode-plan-draft.js'
+import { ensureSourceVersion } from '../services/source-versions.js'
 import { acquireAiRequest } from '../services/request-guard.js'
 import { parseJsonObject } from '../utils/json.js'
 import { sampleSourceContent } from '../utils/source-sample.js'
@@ -417,6 +418,11 @@ app.post('/:id/analyze-episodes', async (c) => {
   const content = String(body.content ?? drama.description ?? '').trim()
   if (content.length < 20) return badRequest(c, '全文内容太短，请至少输入 20 个字')
   if (content.length > 200_000) return badRequest(c, '全文内容超过 20 万字，请先精简后再分析')
+  // v0.4 契约 §6.3：analyze-episodes 首次携带正文是 source 行懒生成触发点之一。
+  // 幂等且并发防重（事务内锁 dramas 行 → 锁内判定已有版本行则跳过），此处不新建任何业务端点。
+  // 传入本次 content：I7 下版本行不可变，若此处落 description 而 body.content 是正文（前端可能
+  // 刚改完未保存），版本行会永久锁死在过期正文上。saveEpisodePlanDraft 随后仍校验 source_content，语义不变。
+  await ensureSourceVersion(id, content)
   const requestedRaw = body.episode_count
   const requestedCount = requestedRaw === undefined || requestedRaw === null || requestedRaw === ''
     ? undefined
